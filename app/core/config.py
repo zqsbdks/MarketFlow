@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # secret_key 用于 JWT HMAC 签名，生产环境应使用至少 32 字节的随机值。
     secret_key: str = Field(default="dev-only-change-me-before-production", min_length=32)
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
-    access_token_expire_minutes: int = Field(default=30, gt=0)
+    access_token_expire_minutes: int = Field(default=7 * 24 * 60, gt=0)
 
     # Redis 是可选服务；URL 为空时不会创建客户端或初始化缓存后端。
     redis_url: str | None = None

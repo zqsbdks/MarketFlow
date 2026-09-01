@@ -139,6 +139,19 @@ def test_enum_values_match_confirmed_business_values() -> None:
     assert Product.__table__.c.status.type.enums == [item.value for item in ProductStatus]
     assert Sale.__table__.c.source.type.enums == [item.value for item in SaleSource]
 
+    expected_constraint_names = {
+        "employee": "employee_role",
+        "product": "product_status",
+        "sale": "sale_source",
+    }
+    for table_name, constraint_name in expected_constraint_names.items():
+        check_names = {
+            constraint.name
+            for constraint in Base.metadata.tables[table_name].constraints
+            if isinstance(constraint, CheckConstraint)
+        }
+        assert constraint_name in check_names
+
 
 def test_all_tables_explicitly_use_utf8mb4() -> None:
     """所有表都显式声明 MySQL utf8mb4 字符集。"""

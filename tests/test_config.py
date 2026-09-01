@@ -16,6 +16,15 @@ def test_default_database_is_marketflow_utf8mb4() -> None:
     assert url.query["charset"] == "utf8mb4"
 
 
+def test_default_project_and_token_lifetime_match_marketflow() -> None:
+    """默认项目名为 MarketFlow，访问令牌有效期为七天。"""
+
+    settings = Settings(_env_file=None)
+
+    assert settings.project_name == "MarketFlow"
+    assert settings.access_token_expire_minutes == 7 * 24 * 60
+
+
 def test_settings_accept_mysql_async_url() -> None:
     """显式传入的 aiomysql URL 应被保留，并继续带有默认 API 前缀。"""
 

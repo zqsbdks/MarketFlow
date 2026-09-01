@@ -34,6 +34,10 @@ class Employee(TimestampMixin, Base):
             "role = 'store_manager' OR department_id IS NOT NULL",
             name="ck_employee_department_required",
         ),
+        CheckConstraint(
+            "role IN ('store_manager', 'regular_employee', 'contract_worker')",
+            name="employee_role",
+        ),
         UniqueConstraint("employee_no", name="uq_employee_employee_no"),
         {"mysql_charset": "utf8mb4"},
     )
@@ -48,7 +52,7 @@ class Employee(TimestampMixin, Base):
             values_callable=lambda enum_type: [item.value for item in enum_type],
             name="employee_role",
             native_enum=False,
-            create_constraint=True,
+            create_constraint=False,
             validate_strings=True,
             length=30,
         ),

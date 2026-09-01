@@ -35,6 +35,7 @@ class Sale(CreatedAtMixin, Base):
             "gross_profit = total_amount - total_cost",
             name="ck_sale_gross_profit_matches_totals",
         ),
+        CheckConstraint("source IN ('demo_seed')", name="sale_source"),
         UniqueConstraint("sale_no", name="uq_sale_sale_no"),
         {"mysql_charset": "utf8mb4"},
     )
@@ -51,7 +52,7 @@ class Sale(CreatedAtMixin, Base):
             values_callable=lambda enum_type: [item.value for item in enum_type],
             name="sale_source",
             native_enum=False,
-            create_constraint=True,
+            create_constraint=False,
             validate_strings=True,
             length=30,
         ),

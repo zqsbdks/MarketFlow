@@ -36,6 +36,7 @@ class Product(TimestampMixin, Base):
         CheckConstraint("purchase_price >= 0", name="ck_product_purchase_price_non_negative"),
         CheckConstraint("sale_price >= 0", name="ck_product_sale_price_non_negative"),
         CheckConstraint("stock_quantity >= 0", name="ck_product_stock_quantity_non_negative"),
+        CheckConstraint("status IN ('on_sale', 'stopped')", name="product_status"),
         UniqueConstraint("product_no", name="uq_product_product_no"),
         ForeignKeyConstraint(
             ["category_id", "department_id"],
@@ -74,7 +75,7 @@ class Product(TimestampMixin, Base):
             values_callable=lambda enum_type: [item.value for item in enum_type],
             name="product_status",
             native_enum=False,
-            create_constraint=True,
+            create_constraint=False,
             validate_strings=True,
             length=20,
         ),
