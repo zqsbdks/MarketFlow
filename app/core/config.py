@@ -28,12 +28,14 @@ class Settings(BaseSettings):
     )
 
     environment: Literal["development", "test", "production"] = "development"
-    project_name: str = "FastAPI Starter"  # OpenAPI 文档和日志中显示的项目名。
+    project_name: str = "MarketFlow"  # OpenAPI 文档和日志中显示的项目名。
     debug: bool = False  # 生产环境必须关闭，避免响应中泄露调试信息。
     api_v1_prefix: str = "/api/v1"  # 业务 API 的统一版本前缀。
 
     # URL 必须使用 aiomysql 异步驱动；echo=True 时 SQL 会写入日志。
-    database_url: str = "mysql+aiomysql://username:password@localhost:3306/app?charset=utf8mb4"
+    database_url: str = (
+        "mysql+aiomysql://username:password@localhost:3306/MarketFlowDB?charset=utf8mb4"
+    )
     database_echo: bool = False
 
     # log_file 留空时只输出到控制台，设置路径后同时写入轮转文件。

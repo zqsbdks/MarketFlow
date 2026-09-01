@@ -2,8 +2,18 @@
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.engine import make_url
 
 from app.core.config import Settings
+
+
+def test_default_database_is_marketflow_utf8mb4() -> None:
+    """第一版默认连接 MarketFlowDB，并明确启用 utf8mb4。"""
+
+    url = make_url(Settings(_env_file=None).database_url)
+
+    assert url.database == "MarketFlowDB"
+    assert url.query["charset"] == "utf8mb4"
 
 
 def test_settings_accept_mysql_async_url() -> None:

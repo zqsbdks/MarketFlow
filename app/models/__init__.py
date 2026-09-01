@@ -6,6 +6,24 @@ Alembic 只会看到导入进 ``Base.metadata`` 的模型。新增模型后，�
 """
 
 from app.models.base import Base
+from app.models.category import Category
+from app.models.department import Department
+from app.models.employee import Employee
+from app.models.enums import EmployeeRole, ProductStatus, SaleSource
+from app.models.product import Product
+from app.models.sale import Sale
+from app.models.sale_item import SaleItem
 
-# 新增模型后同步加入 __all__，让包的公共接口保持清晰。
-__all__ = ["Base"]
+# 业务模型必须在此导入，确保 Alembic 能从 Base.metadata 发现全部表。
+__all__ = [
+    "Base",
+    "Category",
+    "Department",
+    "Employee",
+    "EmployeeRole",
+    "Product",
+    "ProductStatus",
+    "Sale",
+    "SaleItem",
+    "SaleSource",
+]

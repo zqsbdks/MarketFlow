@@ -1,4 +1,10 @@
 {
+    ".github": {
+        "description": "GitHub仓库自动化配置目录"
+    },
+    ".github/workflows/ci.yml": {
+        "description": "GitHub Actions代码检查与自动测试工作流"
+    },
     ".vscode": {
         "description": "VS Code项目级编辑器配置"
     },
@@ -34,6 +40,9 @@
     },
     "app/core/exceptions.py": {
         "description": "统一响应结构与全局异常处理器"
+    },
+    "app/core/health.py": {
+        "description": "MySQL与可选Redis服务就绪状态检查"
     },
     "app/core/lifespan.py": {
         "description": "应用启动和关闭时的资源生命周期管理"
@@ -78,7 +87,28 @@
         "description": "ORM模型注册与Alembic发现入口"
     },
     "app/models/base.py": {
-        "description": "所有ORM模型共享的声明式Base"
+        "description": "ORM声明式Base与公共时间字段Mixin"
+    },
+    "app/models/enums.py": {
+        "description": "员工角色、商品状态与销售来源业务枚举"
+    },
+    "app/models/department.py": {
+        "description": "固定部门SQLAlchemy ORM模型"
+    },
+    "app/models/employee.py": {
+        "description": "员工登录账号、角色与部门归属ORM模型"
+    },
+    "app/models/category.py": {
+        "description": "部门商品分类及同部门名称唯一约束ORM模型"
+    },
+    "app/models/product.py": {
+        "description": "商品价格、销售状态与当前库存ORM模型"
+    },
+    "app/models/sale.py": {
+        "description": "销售单金额、成本与毛利润汇总ORM模型"
+    },
+    "app/models/sale_item.py": {
+        "description": "销售商品、价格和成本快照明细ORM模型"
     },
     "app/routers": {
         "description": "API业务路由目录"
@@ -113,8 +143,8 @@
     "alembic/versions/.gitkeep": {
         "description": "确保空迁移目录可被Git保留"
     },
-    "alembic/versions/02af0f92c4cd_template_baseline.py": {
-        "description": "模板数据库的初始迁移基线"
+    "alembic/versions/20260901_0001_create_marketflow_tables.py": {
+        "description": "创建MarketFlow第一版六张业务表的初始迁移"
     },
     "tests": {
         "description": "pytest单元测试与集成测试"
@@ -137,11 +167,20 @@
     "tests/test_security.py": {
         "description": "密码哈希与JWT往返测试"
     },
+    "tests/test_models.py": {
+        "description": "第一版ORM字段、约束、关系与迁移结构测试"
+    },
     "scripts": {
         "description": "可复用项目自动化脚本"
     },
     "scripts/freeze_requirements.py": {
         "description": "使用当前虚拟环境生成依赖快照"
+    },
+    "scripts/check_database.py": {
+        "description": "检查MySQL连接和数据库基本可用性"
+    },
+    "scripts/setup.py": {
+        "description": "跨平台初始化环境、依赖与项目配置"
     },
     "scripts/setup.ps1": {
         "description": "克隆后创建环境配置、虚拟环境并安装全部依赖"
@@ -151,6 +190,9 @@
     },
     ".env.example": {
         "description": "可安全提交的环境变量示例"
+    },
+    ".gitattributes": {
+        "description": "Git文本编码与跨平台换行规则"
     },
     ".gitignore": {
         "description": "Git忽略规则"
