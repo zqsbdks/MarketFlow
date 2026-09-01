@@ -22,22 +22,29 @@ class Category(TimestampMixin, Base):
         UniqueConstraint("department_id", "name", name="uq_category_department_name"),
         # 为商品的复合外键提供候选键，确保分类和商品属于同一部门。
         UniqueConstraint("id", "department_id", name="uq_category_id_department_id"),
-        {"mysql_charset": "utf8mb4"},
+        {"mysql_charset": "utf8mb4", "comment": "商品分类表"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        comment="分类主键",
+    )
     department_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("department.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+        comment="所属部门",
     )
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="分类名称")
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
         server_default=text("1"),
+        comment="是否启用",
     )
 
     department: Mapped[Department] = relationship(back_populates="categories")

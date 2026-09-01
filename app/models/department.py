@@ -23,17 +23,23 @@ class Department(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("code", name="uq_department_code"),
         UniqueConstraint("name", name="uq_department_name"),
-        {"mysql_charset": "utf8mb4"},
+        {"mysql_charset": "utf8mb4", "comment": "部门表"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    code: Mapped[str] = mapped_column(String(20), nullable=False)
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        comment="部门主键",
+    )
+    code: Mapped[str] = mapped_column(String(20), nullable=False, comment="部门代码")
+    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="部门名称")
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
         server_default=text("1"),
+        comment="是否启用",
     )
 
     employees: Mapped[list[Employee]] = relationship(back_populates="department")

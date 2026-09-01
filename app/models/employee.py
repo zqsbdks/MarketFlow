@@ -39,13 +39,18 @@ class Employee(TimestampMixin, Base):
             name="employee_role",
         ),
         UniqueConstraint("employee_no", name="uq_employee_employee_no"),
-        {"mysql_charset": "utf8mb4"},
+        {"mysql_charset": "utf8mb4", "comment": "员工表"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    employee_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        comment="员工主键",
+    )
+    employee_no: Mapped[str] = mapped_column(String(20), nullable=False, comment="员工编号")
+    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="员工姓名")
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False, comment="密码哈希")
     role: Mapped[EmployeeRole] = mapped_column(
         Enum(
             EmployeeRole,
@@ -57,26 +62,34 @@ class Employee(TimestampMixin, Base):
             length=30,
         ),
         nullable=False,
+        comment="员工类型",
     )
     department_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("department.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
+        comment="所属部门",
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
         server_default=text("1"),
+        comment="账号是否启用",
     )
     must_change_password: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
         server_default=text("1"),
+        comment="是否必须修改密码",
     )
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="最后登录时间",
+    )
 
     department: Mapped[Department | None] = relationship(back_populates="employees")
 

@@ -71,6 +71,15 @@ EXPECTED_COLUMNS = {
     },
 }
 
+EXPECTED_TABLE_COMMENTS = {
+    "department": "部门表",
+    "employee": "员工表",
+    "category": "商品分类表",
+    "product": "商品表",
+    "sale": "销售单表",
+    "sale_item": "销售明细表",
+}
+
 
 def test_first_version_has_only_six_physical_tables() -> None:
     """最终设计删除 inventory，因此元数据只注册六张物理表。"""
@@ -84,6 +93,21 @@ def test_model_columns_match_first_version_design() -> None:
 
     for table_name, expected_columns in EXPECTED_COLUMNS.items():
         assert set(Base.metadata.tables[table_name].columns.keys()) == expected_columns
+
+
+def test_every_business_column_has_chinese_comment() -> None:
+    """数据库工具可以在全部业务字段下显示中文说明。"""
+
+    for table in Base.metadata.sorted_tables:
+        for column in table.columns:
+            assert column.comment
+
+
+def test_every_business_table_has_chinese_comment() -> None:
+    """全部业务表都带有用于数据库工具展示的中文说明。"""
+
+    for table_name, expected_comment in EXPECTED_TABLE_COMMENTS.items():
+        assert Base.metadata.tables[table_name].comment == expected_comment
 
 
 def test_inventory_is_stored_on_product_with_non_negative_constraint() -> None:
@@ -180,4 +204,4 @@ def test_initial_alembic_revision_is_the_only_head() -> None:
     """首个迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260901_0001"]
+    assert script.get_heads() == ["20260901_0003"]

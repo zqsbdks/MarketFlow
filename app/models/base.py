@@ -27,6 +27,7 @@ class CreatedAtMixin:
         DateTime,
         nullable=False,
         server_default=func.current_timestamp(),
+        comment="创建时间",
     )
 
 
@@ -39,6 +40,7 @@ class TimestampMixin(CreatedAtMixin):
         server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
         server_onupdate=FetchedValue(),
         onupdate=func.current_timestamp(),
+        comment="更新时间",
     )
 
 

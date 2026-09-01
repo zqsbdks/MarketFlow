@@ -44,30 +44,46 @@ class Product(TimestampMixin, Base):
             name="fk_product_category_department",
             ondelete="RESTRICT",
         ),
-        {"mysql_charset": "utf8mb4"},
+        {"mysql_charset": "utf8mb4", "comment": "商品表"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    product_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        comment="商品主键",
+    )
+    product_no: Mapped[str] = mapped_column(String(20), nullable=False, comment="商品编号")
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="商品名称")
     department_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("department.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+        comment="所属部门",
     )
     category_id: Mapped[int] = mapped_column(
         BigInteger,
         nullable=False,
         index=True,
+        comment="所属分类",
     )
-    purchase_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    sale_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    purchase_price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        comment="进货价",
+    )
+    sale_price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        comment="销售价",
+    )
     stock_quantity: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
         server_default=text("0"),
+        comment="当前库存数量",
     )
     status: Mapped[ProductStatus] = mapped_column(
         Enum(
@@ -82,6 +98,7 @@ class Product(TimestampMixin, Base):
         nullable=False,
         default=ProductStatus.ON_SALE,
         server_default=ProductStatus.ON_SALE.value,
+        comment="商品销售状态",
     )
 
     department: Mapped[Department] = relationship(

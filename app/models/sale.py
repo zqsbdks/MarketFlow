@@ -37,15 +37,37 @@ class Sale(CreatedAtMixin, Base):
         ),
         CheckConstraint("source IN ('demo_seed')", name="sale_source"),
         UniqueConstraint("sale_no", name="uq_sale_sale_no"),
-        {"mysql_charset": "utf8mb4"},
+        {"mysql_charset": "utf8mb4", "comment": "销售单表"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    sale_no: Mapped[str] = mapped_column(String(30), nullable=False)
-    sold_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
-    total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    gross_profit: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        comment="销售单主键",
+    )
+    sale_no: Mapped[str] = mapped_column(String(30), nullable=False, comment="销售单号")
+    sold_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        index=True,
+        comment="销售发生时间",
+    )
+    total_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        comment="销售总金额",
+    )
+    total_cost: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        comment="商品总成本",
+    )
+    gross_profit: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        comment="毛利润",
+    )
     source: Mapped[SaleSource] = mapped_column(
         Enum(
             SaleSource,
@@ -59,6 +81,7 @@ class Sale(CreatedAtMixin, Base):
         nullable=False,
         default=SaleSource.DEMO_SEED,
         server_default=SaleSource.DEMO_SEED.value,
+        comment="数据来源",
     )
 
     items: Mapped[list[SaleItem]] = relationship(

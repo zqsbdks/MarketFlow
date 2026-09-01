@@ -32,35 +32,67 @@ class SaleItem(Base):
             "cost_subtotal = unit_cost * quantity",
             name="ck_sale_item_cost_subtotal_matches",
         ),
-        {"mysql_charset": "utf8mb4"},
+        {"mysql_charset": "utf8mb4", "comment": "销售明细表"},
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True,
+        comment="销售明细主键",
+    )
     sale_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("sale.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+        comment="所属销售单",
     )
     product_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("product.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+        comment="商品主键",
     )
-    product_no_snapshot: Mapped[str] = mapped_column(String(20), nullable=False)
-    product_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
+    product_no_snapshot: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        comment="成交时商品编号",
+    )
+    product_name_snapshot: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        comment="成交时商品名称",
+    )
     department_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("department.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+        comment="成交时所属部门",
     )
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    unit_cost: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    cost_subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, comment="销售数量")
+    unit_price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        comment="成交单价",
+    )
+    unit_cost: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        comment="成交时成本价",
+    )
+    subtotal: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        comment="商品销售小计",
+    )
+    cost_subtotal: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        comment="商品成本小计",
+    )
 
     sale: Mapped[Sale] = relationship(back_populates="items")
     product: Mapped[Product] = relationship(back_populates="sale_items")

@@ -116,6 +116,27 @@
     "app/routers/__init__.py": {
         "description": "顶层API路由聚合入口"
     },
+    "app/routers/auth.py": {
+        "description": "员工登录认证API路由"
+    },
+    "app/services": {
+        "description": "登录、查询与统计业务服务层"
+    },
+    "app/services/__init__.py": {
+        "description": "业务服务层Python包入口"
+    },
+    "app/services/auth.py": {
+        "description": "员工登录认证与最后登录时间业务逻辑"
+    },
+    "app/crud/auth.py": {
+        "description": "按员工编号查询登录账号的数据访问函数"
+    },
+    "app/schemas/auth_requests.py": {
+        "description": "员工登录请求Pydantic模型"
+    },
+    "app/schemas/auth_responses.py": {
+        "description": "员工登录令牌与公开信息响应模型"
+    },
     "app/schemas": {
         "description": "Pydantic请求与响应模型目录"
     },
@@ -146,6 +167,12 @@
     "alembic/versions/20260901_0001_create_marketflow_tables.py": {
         "description": "创建MarketFlow第一版六张业务表的初始迁移"
     },
+    "alembic/versions/20260901_0002_add_chinese_column_comments.py": {
+        "description": "为六张业务表字段添加中文说明的迁移"
+    },
+    "alembic/versions/20260901_0003_add_chinese_table_comments.py": {
+        "description": "为六张业务表添加中文表说明的迁移"
+    },
     "tests": {
         "description": "pytest单元测试与集成测试"
     },
@@ -154,6 +181,9 @@
     },
     "tests/test_app.py": {
         "description": "根接口、健康检查和404响应测试"
+    },
+    "tests/test_auth.py": {
+        "description": "员工登录成功、失败、停用与密码验证测试"
     },
     "tests/test_config.py": {
         "description": "应用配置加载与隔离性测试"

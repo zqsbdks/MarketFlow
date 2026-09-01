@@ -27,5 +27,4 @@ class ResponseModel(BaseModel, Generic[T]):
     # from_attributes=True 支持直接从 SQLAlchemy 等属性对象构造响应模型。
     model_config = ConfigDict(from_attributes=True)
 
-
 __all__ = ["ResponseModel"]
