@@ -1,0 +1,185 @@
+{
+    ".vscode": {
+        "description": "VS Code项目级编辑器配置"
+    },
+    ".vscode/settings.json": {
+        "description": "VS Code插件与工作区选项"
+    },
+    ".vscode/tasks.json": {
+        "description": "VS Code一键初始化、开发、测试和迁移任务"
+    },
+    ".vscode/extensions.json": {
+        "description": "VS Code推荐扩展列表"
+    },
+    "app": {
+        "description": "FastAPI后端应用源码"
+    },
+    "app/__init__.py": {
+        "description": "应用Python包入口（保持无副作用）"
+    },
+    "app/main.py": {
+        "description": "FastAPI应用工厂与ASGI启动入口"
+    },
+    "app/core": {
+        "description": "配置、数据库、缓存、安全等核心基础设施"
+    },
+    "app/core/__init__.py": {
+        "description": "核心模块公共导出入口"
+    },
+    "app/core/config.py": {
+        "description": "环境变量与.env配置模型"
+    },
+    "app/core/database.py": {
+        "description": "异步MySQL引擎、会话工厂与数据库依赖"
+    },
+    "app/core/exceptions.py": {
+        "description": "统一响应结构与全局异常处理器"
+    },
+    "app/core/lifespan.py": {
+        "description": "应用启动和关闭时的资源生命周期管理"
+    },
+    "app/core/logging.py": {
+        "description": "控制台与轮转文件日志配置"
+    },
+    "app/core/middlewares.py": {
+        "description": "CORS等全局中间件的统一注册入口"
+    },
+    "app/core/redis.py": {
+        "description": "可选Redis异步客户端与连接关闭逻辑"
+    },
+    "app/core/security.py": {
+        "description": "Argon2密码哈希与校验工具"
+    },
+    "app/core/token.py": {
+        "description": "JWT访问令牌签发工具"
+    },
+    "app/crud": {
+        "description": "数据库访问层扩展目录"
+    },
+    "app/crud/__init__.py": {
+        "description": "CRUD数据访问包入口"
+    },
+    "app/dependencies": {
+        "description": "FastAPI可复用Depends依赖"
+    },
+    "app/dependencies/__init__.py": {
+        "description": "公共依赖统一导出入口"
+    },
+    "app/dependencies/db.py": {
+        "description": "数据库会话依赖的简短别名"
+    },
+    "app/dependencies/auth.py": {
+        "description": "Bearer JWT解析与认证依赖"
+    },
+    "app/models": {
+        "description": "SQLAlchemy ORM模型目录"
+    },
+    "app/models/__init__.py": {
+        "description": "ORM模型注册与Alembic发现入口"
+    },
+    "app/models/base.py": {
+        "description": "所有ORM模型共享的声明式Base"
+    },
+    "app/routers": {
+        "description": "API业务路由目录"
+    },
+    "app/routers/__init__.py": {
+        "description": "顶层API路由聚合入口"
+    },
+    "app/schemas": {
+        "description": "Pydantic请求与响应模型目录"
+    },
+    "app/schemas/__init__.py": {
+        "description": "Pydantic模型包入口与公共类型导出"
+    },
+    "app/schemas/base.py": {
+        "description": "通用泛型API响应模型"
+    },
+    "alembic": {
+        "description": "数据库版本迁移工作目录"
+    },
+    "alembic/env.py": {
+        "description": "Alembic异步迁移运行环境与元数据绑定"
+    },
+    "alembic/script.py.mako": {
+        "description": "新迁移脚本的代码生成模板"
+    },
+    "alembic/README": {
+        "description": "Alembic目录说明文件"
+    },
+    "alembic/versions": {
+        "description": "数据库迁移版本脚本目录"
+    },
+    "alembic/versions/.gitkeep": {
+        "description": "确保空迁移目录可被Git保留"
+    },
+    "alembic/versions/02af0f92c4cd_template_baseline.py": {
+        "description": "模板数据库的初始迁移基线"
+    },
+    "tests": {
+        "description": "pytest单元测试与集成测试"
+    },
+    "tests/conftest.py": {
+        "description": "测试环境变量与共享测试配置"
+    },
+    "tests/test_app.py": {
+        "description": "根接口、健康检查和404响应测试"
+    },
+    "tests/test_config.py": {
+        "description": "应用配置加载与隔离性测试"
+    },
+    "tests/test_database.py": {
+        "description": "异步MySQL驱动与连接集成测试"
+    },
+    "tests/test_dependencies.py": {
+        "description": "JWT认证依赖测试"
+    },
+    "tests/test_security.py": {
+        "description": "密码哈希与JWT往返测试"
+    },
+    "scripts": {
+        "description": "可复用项目自动化脚本"
+    },
+    "scripts/freeze_requirements.py": {
+        "description": "使用当前虚拟环境生成依赖快照"
+    },
+    "scripts/setup.ps1": {
+        "description": "克隆后创建环境配置、虚拟环境并安装全部依赖"
+    },
+    ".env": {
+        "description": "本地私密运行配置（禁止提交）"
+    },
+    ".env.example": {
+        "description": "可安全提交的环境变量示例"
+    },
+    ".gitignore": {
+        "description": "Git忽略规则"
+    },
+    "alembic.ini": {
+        "description": "Alembic迁移与日志主配置"
+    },
+    "folder-alias.json": {
+        "description": "项目目录和文件的中文用途别名"
+    },
+    "pyproject.toml": {
+        "description": "pytest、Ruff和MyPy工具配置"
+    },
+    "README.md": {
+        "description": "项目结构、启动、迁移与测试说明"
+    },
+    "COMMANDS.md": {
+        "description": "开发、测试、迁移和依赖管理命令手册"
+    },
+    "NAMING.md": {
+        "description": "Python命名规范与常用英文词表"
+    },
+    "requirements.txt": {
+        "description": "生产运行依赖列表"
+    },
+    "requirements-dev.txt": {
+        "description": "测试和代码质量开发依赖列表"
+    },
+    "requirements-freeze.txt": {
+        "description": "自动生成且不提交的完整依赖快照"
+    }
+}

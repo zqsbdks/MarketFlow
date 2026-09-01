@@ -1,0 +1,152 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Setup: 克隆后初始化项目",
+            "detail": "创建 .env 和 .venv、生成密钥，并安装运行与开发依赖",
+            "type": "process",
+            "command": "python3",
+            "windows": { "command": "python" },
+            "args": ["${workspaceFolder}/scripts/setup.py"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true,
+                "clear": true
+            }
+        },
+        {
+            "label": "FastAPI: 启动开发服务",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "uvicorn", "app.main:app", "--reload"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated", "focus": true }
+        },
+        {
+            "label": "Database: 检查连接",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "scripts.check_database"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test: 运行普通测试",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "pytest"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Test: 运行 MySQL 集成测试",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "pytest", "-m", "integration"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": { "RUN_MYSQL_TESTS": "1" }
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Quality: Ruff 检查",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "ruff", "check", "."],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Quality: Ruff 自动格式化",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "ruff", "format", "."],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Quality: Ruff 格式检查",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "ruff", "format", "--check", "."],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Quality: MyPy 类型检查",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "mypy", "app"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Quality: 完整检查",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Quality: Ruff 检查",
+                "Quality: Ruff 格式检查",
+                "Quality: MyPy 类型检查",
+                "Test: 运行普通测试"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Alembic: 生成迁移",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": [
+                "-m",
+                "alembic",
+                "revision",
+                "--autogenerate",
+                "-m",
+                "${input:migrationMessage}"
+            ],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Alembic: 升级到 head",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "alembic", "upgrade", "head"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Dependencies: 生成 freeze 快照",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["scripts/freeze_requirements.py"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "migrationMessage",
+            "type": "promptString",
+            "description": "请输入 Alembic 迁移说明（中文或英文均可）",
+            "default": "描述本次数据库结构变更"
+        }
+    ]
+}
