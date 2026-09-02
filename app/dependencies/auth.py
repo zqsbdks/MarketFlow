@@ -65,6 +65,8 @@ async def get_current_token_payload(
         )
 
     return payload
+
+
 # endregion
 
 
@@ -82,6 +84,8 @@ async def get_current_employee_id(
             detail="访问令牌中的员工标识无效",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+
 # endregion
 
 __all__ = ["get_current_employee_id", "get_current_token_payload"]

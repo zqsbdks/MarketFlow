@@ -97,6 +97,8 @@ async def create_employee_service(
         temporary_password=DEFAULT_EMPLOYEE_PASSWORD,
         must_change_password=new_employee.must_change_password,
     )
+
+
 # endregion
 
 
@@ -176,6 +178,8 @@ async def get_list_employees_service(
         total=total,
         total_pages=total_pages,
     )
+
+
 # endregion
 
 
@@ -241,6 +245,8 @@ async def update_employee_status_service(
         id=employee.id,
         is_active=employee.is_active,
     )
+
+
 # endregion
 
 __all__ = [

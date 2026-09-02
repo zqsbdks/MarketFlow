@@ -51,7 +51,10 @@ async def create_employee(
         message="员工创建成功",
         data=new_employee,
     )
+
+
 # endregion
+
 
 # region 获取员工列表接口
 @employees_router.get(
@@ -81,6 +84,8 @@ async def get_list_employees(
         message="获取员工列表成功",
         data=employees,
     )
+
+
 # endregion
 
 
@@ -110,6 +115,8 @@ async def update_employee_status(
         message="员工状态更新成功",
         data=updated_employee,
     )
+
+
 # endregion
 
 

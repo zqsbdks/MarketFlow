@@ -40,6 +40,8 @@ async def auth_login(
         message="登录成功",
         data=login_result,
     )
+
+
 # endregion
 
 
@@ -64,6 +66,8 @@ async def get_current_employee_info(
         message="获取当前登录员工信息成功",
         data=employee_info,
     )
+
+
 # endregion
 
 
@@ -89,6 +93,8 @@ async def change_password(
     )
 
     return ResponseModel[None](message="密码修改成功")
+
+
 # endregion
 
 

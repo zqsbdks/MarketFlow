@@ -15,6 +15,8 @@ class AuthDepartmentResponse(BaseModel):
     name: str = Field(..., description="部门名称", min_length=1, max_length=50)
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 
@@ -30,6 +32,8 @@ class AuthLoginEmployee(BaseModel):
     must_change_password: bool = Field(..., description="是否需要修改密码")
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 
@@ -40,6 +44,8 @@ class AuthLoginResponse(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
     employee: AuthLoginEmployee
+
+
 # endregion
 
 
@@ -55,6 +61,8 @@ class AuthMeResponse(BaseModel):
     is_active: bool = Field(..., description="账号是否激活")
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 __all__ = [

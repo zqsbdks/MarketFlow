@@ -414,9 +414,7 @@ async def test_get_list_employees_service_rejects_non_manager(monkeypatch) -> No
 def test_update_employee_status_uses_json_body(monkeypatch) -> None:
     """状态接口从 JSON 请求体读取 is_active 并返回最新状态。"""
 
-    update_service = AsyncMock(
-        return_value=EmployeesStatusUpdateResponse(id=2, is_active=False)
-    )
+    update_service = AsyncMock(return_value=EmployeesStatusUpdateResponse(id=2, is_active=False))
     monkeypatch.setattr("app.routers.employees.update_employee_status_service", update_service)
     application = create_app()
     application.dependency_overrides[get_db] = override_db

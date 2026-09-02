@@ -74,6 +74,8 @@ async def auth_login_service(
         token_type="bearer",
         employee=employee_response,
     )
+
+
 # endregion
 
 
@@ -103,6 +105,8 @@ async def get_current_employee_info_service(employee_id: int, db: AsyncSession) 
         department=department_response,
         is_active=employee.is_active,
     )
+
+
 # endregion
 
 
@@ -153,6 +157,8 @@ async def change_password_service(
     employee.must_change_password = False
 
     await db.commit()
+
+
 # endregion
 
 

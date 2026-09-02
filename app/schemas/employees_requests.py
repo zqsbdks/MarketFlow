@@ -15,6 +15,8 @@ class EmployeesCreateRequest(BaseModel):
 
     # 自动清除字符串两端空格；只包含空格的姓名会因 min_length=1 被拒绝。
     model_config = ConfigDict(str_strip_whitespace=True)
+
+
 # endregion
 
 
@@ -27,6 +29,8 @@ class EmployeesListRequest(BaseModel):
     department_id: int | None = Field(None, description="所属部门ID", ge=1)
     role: EmployeeRole | None = Field(None, description="员工角色")
     is_active: bool | None = Field(None, description="是否启用")
+
+
 # endregion
 
 
@@ -35,6 +39,8 @@ class EmployeesStatusUpdateRequest(BaseModel):
     """店长启用或停用员工时提交的状态。"""
 
     is_active: bool = Field(..., description="是否启用")
+
+
 # endregion
 
 

@@ -19,6 +19,8 @@ async def get_department_by_id(
     """按主键查询部门。"""
 
     return await db.get(Department, department_id)
+
+
 # endregion
 
 
@@ -58,6 +60,8 @@ async def get_list_employees(
     employees = list(list_result.scalars().all())
 
     return employees, total
+
+
 # endregion
 
 
@@ -73,6 +77,8 @@ async def update_employee_status(
     # CRUD 只执行 flush，最终提交或回滚仍由 Service 控制。
     await db.flush()
     return employee
+
+
 # endregion
 
 
@@ -104,6 +110,8 @@ async def create_employee(
     await db.flush()
 
     return new_employee
+
+
 # endregion
 
 

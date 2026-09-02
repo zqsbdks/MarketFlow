@@ -23,8 +23,9 @@ async def get_employee_by_employee_no(
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
-# endregion
 
+
+# endregion
 
 
 # region 更新最后登录时间
@@ -38,6 +39,8 @@ async def update_employee_last_login(
     employee.last_login_at = login_time
     # flush 只把 SQL 发送到数据库，事务最终由 Service 统一提交或回滚。
     await db.flush()
+
+
 # endregion
 
 
@@ -57,6 +60,8 @@ async def get_employee_by_id(
     employee = result.scalar_one_or_none()
 
     return employee
+
+
 # endregion
 
 __all__ = [

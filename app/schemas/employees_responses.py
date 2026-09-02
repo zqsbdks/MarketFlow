@@ -28,6 +28,8 @@ class EmployeesCreateResponse(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 
@@ -48,6 +50,8 @@ class EmployeesItemResponse(BaseModel):
     is_active: bool = Field(..., description="是否启用")
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 
@@ -62,6 +66,8 @@ class EmployeesListResponse(BaseModel):
     total_pages: int = Field(..., description="总页数", ge=0)
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 
@@ -73,6 +79,8 @@ class EmployeesStatusUpdateResponse(BaseModel):
     is_active: bool = Field(..., description="是否启用")
 
     model_config = ConfigDict(from_attributes=True)
+
+
 # endregion
 
 
