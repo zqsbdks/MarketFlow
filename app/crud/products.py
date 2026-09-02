@@ -59,4 +59,26 @@ async def get_products_list(
 # endregion
 
 
-__all__ = ["get_products_list"]
+# region 根据ID获取商品
+async def get_product_by_id(
+    product_id: int,
+    db: AsyncSession,
+) -> Product | None:
+    """根据商品 ID 查询商品，并提前加载所属部门和分类。"""
+
+    select_statement = (
+        select(Product)
+        .options(
+            selectinload(Product.department),
+            selectinload(Product.category),
+        )
+        .where(Product.id == product_id)
+    )
+    result = await db.scalar(select_statement)
+    return result
+
+
+# endregion
+
+
+__all__ = ["get_product_by_id", "get_products_list"]

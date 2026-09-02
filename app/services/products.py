@@ -5,9 +5,15 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
-from app.crud.products import get_products_list
+from app.crud.products import get_product_by_id, get_products_list
 from app.models.enums import EmployeeRole, ProductStatus
-from app.schemas.products_responses import ProductsItemResponse, ProductsListResponse
+from app.schemas.products_responses import (
+    CategoryResponse,
+    DepartmentResponse,
+    ItemResponse,
+    ProductsItemResponse,
+    ProductsListResponse,
+)
 
 
 # region 获取商品列表
@@ -93,4 +99,71 @@ async def get_products_list_service(
 # endregion
 
 
-__all__ = ["get_products_list_service"]
+# region 获取商品详情
+async def get_product_detail_service(
+    product_id: int,
+    db: AsyncSession,
+    current_employee_id: int,
+) -> ItemResponse:
+    """验证当前店长账号，并返回指定商品的详情。"""
+
+    employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+    if employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if employee.role != EmployeeRole.STORE_MANAGER:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长可以查看商品详情",
+        )
+
+    product = await get_product_by_id(
+        product_id=product_id,
+        db=db,
+    )
+    if product is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="商品不存在",
+        )
+
+    # 商品详情只有一个对象，不需要列表推导式或 for 循环。
+    return ItemResponse(
+        id=product.id,
+        product_no=product.product_no,
+        name=product.name,
+        department=DepartmentResponse(
+            id=product.department.id,
+            name=product.department.name,
+        ),
+        category=CategoryResponse(
+            id=product.category.id,
+            name=product.category.name,
+        ),
+        purchase_price=product.purchase_price,
+        sale_price=product.sale_price,
+        stock_quantity=product.stock_quantity,
+        status=product.status,
+    )
+
+
+# endregion
+
+
+__all__ = ["get_products_list_service", "get_product_detail_service"]

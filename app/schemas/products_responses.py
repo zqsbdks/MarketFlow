@@ -44,4 +44,48 @@ class ProductsListResponse(BaseModel):
 # endregion
 
 
-__all__ = ["ProductsItemResponse", "ProductsListResponse"]
+# region 商品详情响应
+class DepartmentResponse(BaseModel):
+    """商品所属部门的简要信息。"""
+
+    id: int = Field(..., description="部门ID", ge=1)
+    name: str = Field(..., description="部门名称", min_length=1, max_length=50)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryResponse(BaseModel):
+    """商品所属分类的简要信息。"""
+
+    id: int = Field(..., description="分类ID", ge=1)
+    name: str = Field(..., description="分类名称", min_length=1, max_length=50)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ItemResponse(BaseModel):
+    """单个商品的完整详情。"""
+
+    id: int = Field(..., description="商品ID", ge=1)
+    product_no: str = Field(..., description="商品编号", min_length=1, max_length=20)
+    name: str = Field(..., description="商品名称", min_length=1, max_length=100)
+    department: DepartmentResponse = Field(..., description="所属部门信息")
+    category: CategoryResponse = Field(..., description="所属分类信息")
+    purchase_price: Decimal = Field(..., description="进货价", ge=0)
+    sale_price: Decimal = Field(..., description="销售价", ge=0)
+    stock_quantity: int = Field(..., description="库存数量", ge=0)
+    status: ProductStatus = Field(..., description="商品销售状态")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# endregion
+
+
+__all__ = [
+    "CategoryResponse",
+    "DepartmentResponse",
+    "ItemResponse",
+    "ProductsItemResponse",
+    "ProductsListResponse",
+]
