@@ -60,6 +60,19 @@ class EmployeesListResponse(BaseModel):
     page_size: int = Field(..., description="每页数量", ge=1)
     total: int = Field(..., description="员工总数", ge=0)
     total_pages: int = Field(..., description="总页数", ge=0)
+
+    model_config = ConfigDict(from_attributes=True)
+# endregion
+
+
+# region 修改员工状态响应
+class EmployeesStatusUpdateResponse(BaseModel):
+    """状态修改成功后的员工 ID 和最新状态。"""
+
+    id: int = Field(..., description="员工ID", ge=1)
+    is_active: bool = Field(..., description="是否启用")
+
+    model_config = ConfigDict(from_attributes=True)
 # endregion
 
 
@@ -67,4 +80,5 @@ __all__ = [
     "EmployeesCreateResponse",
     "EmployeesItemResponse",
     "EmployeesListResponse",
+    "EmployeesStatusUpdateResponse",
 ]

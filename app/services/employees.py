@@ -5,12 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.crud.auth import get_employee_by_id
-from app.crud.employees import create_employee, get_department_by_id, get_list_employees
+from app.crud.employees import (
+    create_employee,
+    get_department_by_id,
+    get_list_employees,
+    update_employee_status,
+)
 from app.models.enums import EmployeeRole
 from app.schemas.employees_responses import (
     EmployeesCreateResponse,
     EmployeesItemResponse,
     EmployeesListResponse,
+    EmployeesStatusUpdateResponse,
 )
 
 DEFAULT_EMPLOYEE_PASSWORD = "123456"
@@ -173,8 +179,73 @@ async def get_list_employees_service(
 # endregion
 
 
+# region 修改员工状态
+async def update_employee_status_service(
+    employee_id: int,
+    is_active: bool,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> EmployeesStatusUpdateResponse:
+    """验证店长权限，并更新指定员工的状态。"""
+
+    current_employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if current_employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    if current_employee.role != EmployeeRole.STORE_MANAGER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有店长可以修改员工状态",
+        )
+
+    if employee_id == current_employee_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不能修改自己的账号状态",
+        )
+
+    employee = await get_employee_by_id(employee_id=employee_id, db=db)
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="员工不存在",
+        )
+
+    await update_employee_status(
+        employee=employee,
+        is_active=is_active,
+        db=db,
+    )
+    await db.commit()
+
+    return EmployeesStatusUpdateResponse(
+        id=employee.id,
+        is_active=employee.is_active,
+    )
+# endregion
+
 __all__ = [
     "DEFAULT_EMPLOYEE_PASSWORD",
     "create_employee_service",
     "get_list_employees_service",
+    "update_employee_status_service",
 ]

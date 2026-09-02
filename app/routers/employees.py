@@ -1,14 +1,26 @@
 """员工管理 API 路由。"""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.employees_requests import EmployeesCreateRequest, EmployeesListRequest
-from app.schemas.employees_responses import EmployeesCreateResponse, EmployeesListResponse
-from app.services.employees import create_employee_service, get_list_employees_service
+from app.schemas.employees_requests import (
+    EmployeesCreateRequest,
+    EmployeesListRequest,
+    EmployeesStatusUpdateRequest,
+)
+from app.schemas.employees_responses import (
+    EmployeesCreateResponse,
+    EmployeesListResponse,
+    EmployeesStatusUpdateResponse,
+)
+from app.services.employees import (
+    create_employee_service,
+    get_list_employees_service,
+    update_employee_status_service,
+)
 
 employees_router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -70,5 +82,35 @@ async def get_list_employees(
         data=employees,
     )
 # endregion
+
+
+# region 修改员工状态接口
+@employees_router.put(
+    "/status/{employee_id}",
+    response_model=ResponseModel[EmployeesStatusUpdateResponse],
+    summary="修改员工状态",
+    description="店长启用或停用指定员工账号。",
+)
+async def update_employee_status(
+    request: EmployeesStatusUpdateRequest,
+    employee_id: int = Path(..., description="员工ID", ge=1),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[EmployeesStatusUpdateResponse]:
+    """修改指定员工的状态。"""
+
+    updated_employee = await update_employee_status_service(
+        employee_id=employee_id,
+        is_active=request.is_active,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[EmployeesStatusUpdateResponse](
+        message="员工状态更新成功",
+        data=updated_employee,
+    )
+# endregion
+
 
 __all__ = ["employees_router"]

@@ -30,4 +30,16 @@ class EmployeesListRequest(BaseModel):
 # endregion
 
 
-__all__ = ["EmployeesCreateRequest", "EmployeesListRequest"]
+# region 修改员工状态请求
+class EmployeesStatusUpdateRequest(BaseModel):
+    """店长启用或停用员工时提交的状态。"""
+
+    is_active: bool = Field(..., description="是否启用")
+# endregion
+
+
+__all__ = [
+    "EmployeesCreateRequest",
+    "EmployeesListRequest",
+    "EmployeesStatusUpdateRequest",
+]

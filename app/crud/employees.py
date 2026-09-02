@@ -61,6 +61,21 @@ async def get_list_employees(
 # endregion
 
 
+# region 修改员工状态
+async def update_employee_status(
+    employee: Employee,
+    is_active: bool,
+    db: AsyncSession,
+) -> Employee:
+    """修改员工启用状态，并把变更发送到当前事务。"""
+
+    employee.is_active = is_active
+    # CRUD 只执行 flush，最终提交或回滚仍由 Service 控制。
+    await db.flush()
+    return employee
+# endregion
+
+
 # region 创建员工
 async def create_employee(
     name: str,
@@ -92,4 +107,9 @@ async def create_employee(
 # endregion
 
 
-__all__ = ["create_employee", "get_department_by_id", "get_list_employees"]
+__all__ = [
+    "create_employee",
+    "get_department_by_id",
+    "get_list_employees",
+    "update_employee_status",
+]

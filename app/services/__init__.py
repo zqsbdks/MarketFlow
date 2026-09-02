@@ -5,7 +5,11 @@ from app.services.auth import (
     change_password_service,
     get_current_employee_info_service,
 )
-from app.services.employees import create_employee_service, get_list_employees_service
+from app.services.employees import (
+    create_employee_service,
+    get_list_employees_service,
+    update_employee_status_service,
+)
 
 __all__ = [
     "auth_login_service",
@@ -13,4 +17,5 @@ __all__ = [
     "create_employee_service",
     "get_current_employee_info_service",
     "get_list_employees_service",
+    "update_employee_status_service",
 ]

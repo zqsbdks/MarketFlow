@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password, verify_password
-from app.crud.employees import create_employee
+from app.crud.employees import create_employee, update_employee_status
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
@@ -17,11 +17,16 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole
 from app.schemas.employees_requests import EmployeesCreateRequest
-from app.schemas.employees_responses import EmployeesCreateResponse, EmployeesListResponse
+from app.schemas.employees_responses import (
+    EmployeesCreateResponse,
+    EmployeesListResponse,
+    EmployeesStatusUpdateResponse,
+)
 from app.services.employees import (
     DEFAULT_EMPLOYEE_PASSWORD,
     create_employee_service,
     get_list_employees_service,
+    update_employee_status_service,
 )
 
 
@@ -404,3 +409,156 @@ async def test_get_list_employees_service_rejects_non_manager(monkeypatch) -> No
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "只有店长可以查看员工列表"
+
+
+def test_update_employee_status_uses_json_body(monkeypatch) -> None:
+    """状态接口从 JSON 请求体读取 is_active 并返回最新状态。"""
+
+    update_service = AsyncMock(
+        return_value=EmployeesStatusUpdateResponse(id=2, is_active=False)
+    )
+    monkeypatch.setattr("app.routers.employees.update_employee_status_service", update_service)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_manager_id
+
+    with TestClient(application) as client:
+        response = client.put(
+            "/api/v1/employees/status/2",
+            json={"is_active": False},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "code": 200,
+        "message": "员工状态更新成功",
+        "data": {"id": 2, "is_active": False},
+    }
+    update_service.assert_awaited_once_with(
+        employee_id=2,
+        is_active=False,
+        current_employee_id=1,
+        db=None,
+    )
+
+
+async def test_update_employee_status_service_updates_target(monkeypatch) -> None:
+    """店长可以修改其他员工状态并提交事务。"""
+
+    manager = build_employee(
+        employee_id=1,
+        employee_no="E00001",
+        role=EmployeeRole.STORE_MANAGER,
+        must_change_password=False,
+    )
+    target = build_employee(
+        employee_id=2,
+        employee_no="E00002",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
+    )
+    employees = iter([manager, target])
+
+    async def get_employee(**_kwargs):
+        return next(employees)
+
+    async def update_status(*, employee, is_active, **_kwargs):
+        employee.is_active = is_active
+        return employee
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
+    monkeypatch.setattr("app.services.employees.update_employee_status", update_status)
+    session = AsyncMock(spec=AsyncSession)
+
+    result = await update_employee_status_service(
+        employee_id=target.id,
+        is_active=False,
+        current_employee_id=manager.id,
+        db=session,
+    )
+
+    assert result.id == target.id
+    assert result.is_active is False
+    session.commit.assert_awaited_once()
+
+
+async def test_update_employee_status_service_rejects_self_update(monkeypatch) -> None:
+    """店长不能停用或启用自己的账号。"""
+
+    manager = build_employee(
+        employee_id=1,
+        employee_no="E00001",
+        role=EmployeeRole.STORE_MANAGER,
+        must_change_password=False,
+    )
+
+    async def get_employee(**_kwargs):
+        return manager
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
+    session = AsyncMock(spec=AsyncSession)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await update_employee_status_service(
+            employee_id=manager.id,
+            is_active=False,
+            current_employee_id=manager.id,
+            db=session,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "不能修改自己的账号状态"
+    session.commit.assert_not_awaited()
+
+
+async def test_update_employee_status_service_rejects_missing_target(monkeypatch) -> None:
+    """目标员工不存在时返回 404，且不提交事务。"""
+
+    manager = build_employee(
+        employee_id=1,
+        employee_no="E00001",
+        role=EmployeeRole.STORE_MANAGER,
+        must_change_password=False,
+    )
+    employees = iter([manager, None])
+
+    async def get_employee(**_kwargs):
+        return next(employees)
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
+    session = AsyncMock(spec=AsyncSession)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await update_employee_status_service(
+            employee_id=999,
+            is_active=False,
+            current_employee_id=manager.id,
+            db=session,
+        )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "员工不存在"
+    session.commit.assert_not_awaited()
+
+
+async def test_update_employee_status_crud_flushes_change() -> None:
+    """CRUD 修改内存状态并 flush，但不自行提交事务。"""
+
+    employee = build_employee(
+        employee_id=2,
+        employee_no="E00002",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
+    )
+    session = AsyncMock(spec=AsyncSession)
+
+    result = await update_employee_status(
+        employee=employee,
+        is_active=False,
+        db=session,
+    )
+
+    assert result is employee
+    assert result.is_active is False
+    session.flush.assert_awaited_once()
+    session.commit.assert_not_awaited()
