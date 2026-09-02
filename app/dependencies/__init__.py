@@ -5,7 +5,12 @@
 """
 
 from app.core.database import get_db_session
-from app.dependencies.auth import get_current_token_payload
+from app.dependencies.auth import get_current_employee_id, get_current_token_payload
 from app.dependencies.db import get_db
 
-__all__ = ["get_current_token_payload", "get_db", "get_db_session"]
+__all__ = [
+    "get_current_employee_id",
+    "get_current_token_payload",
+    "get_db",
+    "get_db_session",
+]

@@ -66,4 +66,21 @@ async def get_current_token_payload(
     return payload
 
 
-__all__ = ["get_current_token_payload"]
+# region 获取当前员工ID
+async def get_current_employee_id(
+    token_payload: dict[str, Any] = Depends(get_current_token_payload),
+) -> int:
+    """从已验证的 JWT 载荷中取得数字类型的员工 ID。"""
+
+    try:
+        return int(token_payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="访问令牌中的员工标识无效",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+# endregion
+
+
+__all__ = ["get_current_employee_id", "get_current_token_payload"]

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import verify_password
+from app.core.security import hash_password, verify_password
 from app.core.token import create_access_token
 from app.crud.auth import (
     get_employee_by_employee_no,
@@ -106,4 +106,58 @@ async def get_current_employee_info_service(employee_id: int, db: AsyncSession) 
 # endregion
 
 
-__all__ = ["auth_login_service", "get_current_employee_info_service"]
+# region 修改当前员工密码
+async def change_password_service(
+    employee_id: int,
+    old_password: str,
+    new_password: str,
+    confirm_password: str,
+    db: AsyncSession,
+) -> None:
+    """修改当前登录员工密码。"""
+
+    employee = await get_employee_by_id(employee_id=employee_id, db=db)
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="员工不存在",
+        )
+
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+
+    if not verify_password(old_password, employee.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="旧密码错误",
+        )
+
+    if new_password != confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="两次输入的新密码不一致",
+        )
+
+    if verify_password(new_password, employee.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="新密码不能与旧密码相同",
+        )
+
+    # 更新密码哈希
+    employee.password_hash = hash_password(new_password)
+    # 标记不再需要修改密码
+    employee.must_change_password = False
+
+    await db.commit()
+# endregion
+
+
+__all__ = [
+    "auth_login_service",
+    "change_password_service",
+    "get_current_employee_info_service",
+]

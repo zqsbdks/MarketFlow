@@ -1,4 +1,4 @@
-"""员工登录接口的请求模型。"""
+"""员工认证接口的请求模型。"""
 
 from pydantic import BaseModel, Field
 
@@ -12,4 +12,14 @@ class AuthLoginRequest(BaseModel):
 # endregion
 
 
-__all__ = ["AuthLoginRequest"]
+# region 修改密码请求模型
+class AuthPasswordChangeRequest(BaseModel):
+    """员工修改密码请求。"""
+
+    old_password: str = Field(..., description="旧密码", min_length=3, max_length=128)
+    new_password: str = Field(..., description="新密码", min_length=3, max_length=128)
+    confirm_password: str = Field(..., description="确认新密码", min_length=3, max_length=128)
+# endregion
+
+
+__all__ = ["AuthLoginRequest", "AuthPasswordChangeRequest"]

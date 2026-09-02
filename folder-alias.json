@@ -78,7 +78,7 @@
         "description": "数据库会话依赖的简短别名"
     },
     "app/dependencies/auth.py": {
-        "description": "Bearer JWT解析与认证依赖"
+        "description": "Bearer JWT解析与员工ID转换认证依赖"
     },
     "app/models": {
         "description": "SQLAlchemy ORM模型目录"

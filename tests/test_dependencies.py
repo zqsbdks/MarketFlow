@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core.config import settings
 from app.core.token import create_access_token
-from app.dependencies.auth import get_current_token_payload
+from app.dependencies.auth import get_current_employee_id, get_current_token_payload
 
 
 @pytest.mark.asyncio
@@ -85,3 +85,24 @@ async def test_current_token_payload_rejects_wrong_signature() -> None:
         await get_current_token_payload(credentials)
 
     assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_current_employee_id_returns_integer() -> None:
+    """数字字符串形式的 sub 应转换为员工整数 ID。"""
+
+    employee_id = await get_current_employee_id({"sub": "123"})
+
+    assert employee_id == 123
+
+
+@pytest.mark.asyncio
+async def test_current_employee_id_rejects_non_numeric_subject() -> None:
+    """无法转换为整数的 sub 应返回 401。"""
+
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_employee_id({"sub": "not-an-id"})
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "访问令牌中的员工标识无效"
+    assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
