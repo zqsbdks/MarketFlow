@@ -7,8 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import verify_password
 from app.core.token import create_access_token
-from app.crud.auth import get_employee_by_employee_no, update_employee_last_login
-from app.schemas.auth_responses import AuthLoginEmployee, AuthLoginResponse
+from app.crud.auth import (
+    get_employee_by_employee_no,
+    get_employee_by_id,
+    update_employee_last_login,
+)
+from app.schemas.auth_responses import (
+    AuthDepartmentResponse,
+    AuthLoginEmployee,
+    AuthLoginResponse,
+    AuthMeResponse,
+)
 
 
 # region 员工登录
@@ -44,12 +53,19 @@ async def auth_login_service(
     await db.commit()
 
     token = create_access_token(data={"sub": str(employee.id)})
+    department_response = None
+    if employee.department is not None:
+        department_response = AuthDepartmentResponse(
+            id=employee.department.id,
+            name=employee.department.name,
+        )
+
     employee_response = AuthLoginEmployee(
         id=employee.id,
         employee_no=employee.employee_no,
         name=employee.name,
         role=employee.role,
-        department_id=employee.department_id,
+        department=department_response,
         must_change_password=employee.must_change_password,
     )
 
@@ -61,4 +77,33 @@ async def auth_login_service(
 # endregion
 
 
-__all__ = ["auth_login_service"]
+# region 获取当前员工信息
+async def get_current_employee_info_service(employee_id: int, db: AsyncSession) -> AuthMeResponse:
+    """查询当前员工及其部门，并组装公开信息。"""
+
+    employee = await get_employee_by_id(employee_id=employee_id, db=db)
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="员工不存在",
+        )
+
+    department_response = None
+    if employee.department is not None:
+        department_response = AuthDepartmentResponse(
+            id=employee.department.id,
+            name=employee.department.name,
+        )
+
+    return AuthMeResponse(
+        id=employee.id,
+        employee_no=employee.employee_no,
+        name=employee.name,
+        role=employee.role,
+        department=department_response,
+        is_active=employee.is_active,
+    )
+# endregion
+
+
+__all__ = ["auth_login_service", "get_current_employee_info_service"]

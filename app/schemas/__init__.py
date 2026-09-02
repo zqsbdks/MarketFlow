@@ -4,12 +4,19 @@
 """
 
 from app.schemas.auth_requests import AuthLoginRequest
-from app.schemas.auth_responses import AuthLoginEmployee, AuthLoginResponse
+from app.schemas.auth_responses import (
+    AuthDepartmentResponse,
+    AuthLoginEmployee,
+    AuthLoginResponse,
+    AuthMeResponse,
+)
 from app.schemas.base import ResponseModel
 
 __all__ = [
+    "AuthDepartmentResponse",
     "AuthLoginEmployee",
     "AuthLoginRequest",
     "AuthLoginResponse",
+    "AuthMeResponse",
     "ResponseModel",
 ]

@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.employee import Employee
 
@@ -15,13 +16,15 @@ async def get_employee_by_employee_no(
 ) -> Employee | None:
     """按员工编号查询单个员工账号。"""
 
-    # 第一步：创建查询，表示从 employee 表中读取员工。
-    stmt = select(Employee)
-    # 第二步：只查找员工编号与登录输入一致的记录。
-    stmt = stmt.where(Employee.employee_no == employee_no)
+    stmt = (
+        select(Employee)
+        .options(selectinload(Employee.department))
+        .where(Employee.employee_no == employee_no)
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 # endregion
+
 
 
 # region 更新最后登录时间
@@ -38,4 +41,26 @@ async def update_employee_last_login(
 # endregion
 
 
-__all__ = ["get_employee_by_employee_no", "update_employee_last_login"]
+# region 按ID查询员工账号
+async def get_employee_by_id(
+    employee_id: int,
+    db: AsyncSession,
+) -> Employee | None:
+    """按员工 ID 查询员工，并加载所属部门的 ID 和名称。"""
+
+    stmt = (
+        select(Employee)
+        .options(selectinload(Employee.department))
+        .where(Employee.id == employee_id)
+    )
+    result = await db.execute(stmt)
+    employee = result.scalar_one_or_none()
+
+    return employee
+# endregion
+
+__all__ = [
+    "get_employee_by_employee_no",
+    "get_employee_by_id",
+    "update_employee_last_login",
+]

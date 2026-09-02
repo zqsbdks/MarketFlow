@@ -11,12 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import hash_password
 from app.core.token import create_access_token
+from app.dependencies.auth import get_current_token_payload
 from app.dependencies.db import get_db
 from app.main import create_app
+from app.models.department import Department
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole
-from app.schemas.auth_responses import AuthLoginEmployee, AuthLoginResponse
-from app.services.auth import auth_login_service
+from app.schemas.auth_responses import (
+    AuthDepartmentResponse,
+    AuthLoginEmployee,
+    AuthLoginResponse,
+    AuthMeResponse,
+)
+from app.services.auth import auth_login_service, get_current_employee_info_service
 
 
 def build_employee(*, is_active: bool = True) -> Employee:
@@ -52,7 +59,7 @@ def build_login_result(employee: Employee) -> AuthLoginResponse:
             employee_no=employee.employee_no,
             name=employee.name,
             role=employee.role,
-            department_id=employee.department_id,
+            department=None,
             must_change_password=employee.must_change_password,
         ),
     )
@@ -85,7 +92,7 @@ def test_login_returns_documented_response(monkeypatch) -> None:
         "employee_no": "E00001",
         "name": "店长",
         "role": "store_manager",
-        "department_id": None,
+        "department": None,
         "must_change_password": True,
     }
     payload = jwt.decode(
@@ -152,6 +159,9 @@ async def test_login_service_verifies_password_and_records_login(monkeypatch) ->
     """Service 只在有效账号密码登录时提交最后登录时间。"""
 
     employee = build_employee()
+    department = Department(id=1, code="MEAT", name="精肉部", is_active=True)
+    employee.department_id = department.id
+    employee.department = department
 
     async def get_employee(**_kwargs):
         return employee
@@ -163,6 +173,9 @@ async def test_login_service_verifies_password_and_records_login(monkeypatch) ->
 
     assert result.token_type == "bearer"
     assert result.employee.employee_no == employee.employee_no
+    assert result.employee.department is not None
+    assert result.employee.department.id == department.id
+    assert result.employee.department.name == department.name
     assert employee.last_login_at is not None
     session.flush.assert_awaited_once()
     session.commit.assert_awaited_once()
@@ -206,3 +219,98 @@ async def test_login_service_does_not_commit_inactive_employee(monkeypatch) -> N
     assert employee.last_login_at is None
     session.flush.assert_not_awaited()
     session.commit.assert_not_awaited()
+
+
+def test_get_current_employee_info_returns_documented_response(monkeypatch) -> None:
+    """当前员工接口返回统一外层和嵌套部门信息。"""
+
+    async def current_token_payload():
+        return {"sub": "1"}
+
+    async def get_employee_info(**_kwargs):
+        return AuthMeResponse(
+            id=1,
+            employee_no="E00001",
+            name="店长",
+            role=EmployeeRole.STORE_MANAGER,
+            department=AuthDepartmentResponse(id=1, name="精肉部"),
+            is_active=True,
+        )
+
+    monkeypatch.setattr("app.routers.auth.get_current_employee_info_service", get_employee_info)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_token_payload] = current_token_payload
+
+    with TestClient(application) as client:
+        response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "code": 200,
+        "message": "获取当前登录员工信息成功",
+        "data": {
+            "id": 1,
+            "employee_no": "E00001",
+            "name": "店长",
+            "role": "store_manager",
+            "department": {"id": 1, "name": "精肉部"},
+            "is_active": True,
+        },
+    }
+
+
+async def test_get_current_employee_info_service_builds_response(monkeypatch) -> None:
+    """Service 将员工及部门模型转换为当前员工响应。"""
+
+    department = Department(id=1, code="MEAT", name="精肉部", is_active=True)
+    employee = build_employee()
+    employee.department_id = department.id
+    employee.department = department
+
+    async def get_employee(**_kwargs):
+        return employee
+
+    monkeypatch.setattr("app.services.auth.get_employee_by_id", get_employee)
+    result = await get_current_employee_info_service(1, AsyncMock(spec=AsyncSession))
+
+    assert result.id == employee.id
+    assert result.department is not None
+    assert result.department.id == department.id
+    assert result.department.name == department.name
+
+
+async def test_get_current_employee_info_service_rejects_missing_employee(monkeypatch) -> None:
+    """Token 对应的员工不存在时返回 404。"""
+
+    async def get_employee(**_kwargs):
+        return None
+
+    monkeypatch.setattr("app.services.auth.get_employee_by_id", get_employee)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_employee_info_service(999, AsyncMock(spec=AsyncSession))
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "员工不存在"
+
+
+def test_get_current_employee_info_rejects_non_numeric_subject() -> None:
+    """Token 中的 sub 不是员工数字 ID 时返回 401。"""
+
+    async def invalid_token_payload():
+        return {"sub": "not-an-id"}
+
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_token_payload] = invalid_token_payload
+
+    with TestClient(application) as client:
+        response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": 401,
+        "message": "访问令牌中的员工标识无效",
+        "data": None,
+    }
