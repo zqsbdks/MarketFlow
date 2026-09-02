@@ -119,6 +119,9 @@
     "app/routers/auth.py": {
         "description": "员工登录与当前员工信息API路由"
     },
+    "app/routers/employees.py": {
+        "description": "店长创建员工API路由"
+    },
     "app/services": {
         "description": "登录、查询与统计业务服务层"
     },
@@ -128,14 +131,26 @@
     "app/services/auth.py": {
         "description": "员工登录认证与当前员工信息业务逻辑"
     },
+    "app/services/employees.py": {
+        "description": "员工创建权限与临时密码业务逻辑"
+    },
     "app/crud/auth.py": {
         "description": "按员工编号或ID查询账号的数据访问函数"
+    },
+    "app/crud/employees.py": {
+        "description": "员工创建与部门查询数据访问函数"
     },
     "app/schemas/auth_requests.py": {
         "description": "员工登录请求Pydantic模型"
     },
     "app/schemas/auth_responses.py": {
         "description": "员工登录令牌与当前员工信息响应模型"
+    },
+    "app/schemas/employees_requests.py": {
+        "description": "创建员工请求与姓名空格校验模型"
+    },
+    "app/schemas/employees_responses.py": {
+        "description": "创建员工与临时密码响应模型"
     },
     "app/schemas": {
         "description": "Pydantic请求与响应模型目录"
@@ -173,6 +188,9 @@
     "alembic/versions/20260901_0003_add_chinese_table_comments.py": {
         "description": "为六张业务表添加中文表说明的迁移"
     },
+    "alembic/versions/20260902_0004_localize_employee_roles.py": {
+        "description": "将员工角色数据与检查约束转换为中文的迁移"
+    },
     "tests": {
         "description": "pytest单元测试与集成测试"
     },
@@ -184,6 +202,9 @@
     },
     "tests/test_auth.py": {
         "description": "员工登录成功、失败、停用与密码验证测试"
+    },
+    "tests/test_employees.py": {
+        "description": "创建员工接口、业务规则与编号生成测试"
     },
     "tests/test_config.py": {
         "description": "应用配置加载与隔离性测试"

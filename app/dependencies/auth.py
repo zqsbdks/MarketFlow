@@ -16,6 +16,7 @@ from app.core.config import settings
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+# region 验证JWT载荷
 async def get_current_token_payload(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, Any]:
@@ -64,6 +65,7 @@ async def get_current_token_payload(
         )
 
     return payload
+# endregion
 
 
 # region 获取当前员工ID
@@ -81,6 +83,5 @@ async def get_current_employee_id(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 # endregion
-
 
 __all__ = ["get_current_employee_id", "get_current_token_payload"]

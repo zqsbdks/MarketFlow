@@ -95,7 +95,7 @@ def test_login_returns_documented_response(monkeypatch) -> None:
         "id": 1,
         "employee_no": "E00001",
         "name": "店长",
-        "role": "store_manager",
+        "role": "店长",
         "department": None,
         "must_change_password": True,
     }
@@ -257,7 +257,7 @@ def test_get_current_employee_info_returns_documented_response(monkeypatch) -> N
             "id": 1,
             "employee_no": "E00001",
             "name": "店长",
-            "role": "store_manager",
+            "role": "店长",
             "department": {"id": 1, "name": "精肉部"},
             "is_active": True,
         },

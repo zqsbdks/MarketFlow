@@ -200,8 +200,8 @@ def test_all_relationship_mappers_can_be_configured() -> None:
     configure_mappers()
 
 
-def test_initial_alembic_revision_is_the_only_head() -> None:
-    """首个迁移是当前唯一的 Alembic 版本头。"""
+def test_latest_alembic_revision_is_the_only_head() -> None:
+    """员工角色中文化迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260901_0003"]
+    assert script.get_heads() == ["20260902_0004"]

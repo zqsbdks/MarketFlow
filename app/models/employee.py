@@ -31,11 +31,11 @@ class Employee(TimestampMixin, Base):
     __tablename__ = "employee"
     __table_args__ = (
         CheckConstraint(
-            "role = 'store_manager' OR department_id IS NOT NULL",
+            "role = '店长' OR department_id IS NOT NULL",
             name="ck_employee_department_required",
         ),
         CheckConstraint(
-            "role IN ('store_manager', 'regular_employee', 'contract_worker')",
+            "role IN ('店长', '正式员工', '契约工')",
             name="employee_role",
         ),
         UniqueConstraint("employee_no", name="uq_employee_employee_no"),
