@@ -14,11 +14,13 @@ from app.schemas.employees_requests import (
 from app.schemas.employees_responses import (
     EmployeesCreateResponse,
     EmployeesListResponse,
+    EmployeesResetPasswordResponse,
     EmployeesStatusUpdateResponse,
 )
 from app.services.employees import (
     create_employee_service,
     get_list_employees_service,
+    reset_employee_password_service,
     update_employee_status_service,
 )
 
@@ -114,6 +116,35 @@ async def update_employee_status(
     return ResponseModel[EmployeesStatusUpdateResponse](
         message="员工状态更新成功",
         data=updated_employee,
+    )
+
+
+# endregion
+
+
+# region 重置员工密码接口
+@employees_router.put(
+    "/reset-password/{employee_id}",
+    response_model=ResponseModel[EmployeesResetPasswordResponse],
+    summary="重置员工密码",
+    description="店长将指定员工密码重置为临时密码。",
+)
+async def reset_employee_password(
+    employee_id: int = Path(..., description="员工ID", ge=1),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[EmployeesResetPasswordResponse]:
+    """重置指定员工密码并返回一次性临时密码。"""
+
+    employee = await reset_employee_password_service(
+        employee_id=employee_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[EmployeesResetPasswordResponse](
+        message="员工密码重置成功",
+        data=employee,
     )
 
 

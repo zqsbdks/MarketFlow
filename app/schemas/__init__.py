@@ -20,6 +20,7 @@ from app.schemas.employees_responses import (
     EmployeesCreateResponse,
     EmployeesItemResponse,
     EmployeesListResponse,
+    EmployeesResetPasswordResponse,
     EmployeesStatusUpdateResponse,
 )
 
@@ -35,6 +36,7 @@ __all__ = [
     "EmployeesItemResponse",
     "EmployeesListRequest",
     "EmployeesListResponse",
+    "EmployeesResetPasswordResponse",
     "EmployeesStatusUpdateRequest",
     "EmployeesStatusUpdateResponse",
     "ResponseModel",

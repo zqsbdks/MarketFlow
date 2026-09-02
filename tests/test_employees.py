@@ -9,7 +9,11 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password, verify_password
-from app.crud.employees import create_employee, update_employee_status
+from app.crud.employees import (
+    create_employee,
+    reset_employee_password,
+    update_employee_status,
+)
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
@@ -20,12 +24,14 @@ from app.schemas.employees_requests import EmployeesCreateRequest
 from app.schemas.employees_responses import (
     EmployeesCreateResponse,
     EmployeesListResponse,
+    EmployeesResetPasswordResponse,
     EmployeesStatusUpdateResponse,
 )
 from app.services.employees import (
     DEFAULT_EMPLOYEE_PASSWORD,
     create_employee_service,
     get_list_employees_service,
+    reset_employee_password_service,
     update_employee_status_service,
 )
 
@@ -558,5 +564,137 @@ async def test_update_employee_status_crud_flushes_change() -> None:
 
     assert result is employee
     assert result.is_active is False
+    session.flush.assert_awaited_once()
+    session.commit.assert_not_awaited()
+
+
+def test_reset_employee_password_returns_temporary_password(monkeypatch) -> None:
+    """密码重置接口返回统一响应和一次性临时密码。"""
+
+    reset_service = AsyncMock(
+        return_value=EmployeesResetPasswordResponse(
+            id=2,
+            temporary_password=DEFAULT_EMPLOYEE_PASSWORD,
+            must_change_password=True,
+        )
+    )
+    monkeypatch.setattr("app.routers.employees.reset_employee_password_service", reset_service)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_manager_id
+
+    with TestClient(application) as client:
+        response = client.put("/api/v1/employees/reset-password/2")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "code": 200,
+        "message": "员工密码重置成功",
+        "data": {
+            "id": 2,
+            "temporary_password": "123456",
+            "must_change_password": True,
+        },
+    }
+    reset_service.assert_awaited_once_with(
+        employee_id=2,
+        current_employee_id=1,
+        db=None,
+    )
+
+
+async def test_reset_employee_password_service_updates_hash_and_flag(monkeypatch) -> None:
+    """店长重置其他员工密码后提交新哈希和首次修改标记。"""
+
+    manager = build_employee(
+        employee_id=1,
+        employee_no="E00001",
+        role=EmployeeRole.STORE_MANAGER,
+        must_change_password=False,
+    )
+    target = build_employee(
+        employee_id=2,
+        employee_no="E00002",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
+        must_change_password=False,
+    )
+    employees = iter([manager, target])
+
+    async def get_employee(**_kwargs):
+        return next(employees)
+
+    async def reset_password(*, employee, password_hash, **_kwargs):
+        employee.password_hash = password_hash
+        employee.must_change_password = True
+        return employee
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
+    monkeypatch.setattr("app.services.employees.reset_employee_password", reset_password)
+    session = AsyncMock(spec=AsyncSession)
+
+    result = await reset_employee_password_service(
+        employee_id=target.id,
+        current_employee_id=manager.id,
+        db=session,
+    )
+
+    assert verify_password(DEFAULT_EMPLOYEE_PASSWORD, target.password_hash)
+    assert target.must_change_password is True
+    assert result.temporary_password == DEFAULT_EMPLOYEE_PASSWORD
+    assert result.must_change_password is True
+    session.commit.assert_awaited_once()
+
+
+async def test_reset_employee_password_service_rejects_self_reset(monkeypatch) -> None:
+    """店长不能通过管理接口重置自己的密码。"""
+
+    manager = build_employee(
+        employee_id=1,
+        employee_no="E00001",
+        role=EmployeeRole.STORE_MANAGER,
+        must_change_password=False,
+    )
+
+    async def get_employee(**_kwargs):
+        return manager
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
+    session = AsyncMock(spec=AsyncSession)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await reset_employee_password_service(
+            employee_id=manager.id,
+            current_employee_id=manager.id,
+            db=session,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "不能重置自己的密码"
+    session.commit.assert_not_awaited()
+
+
+async def test_reset_employee_password_crud_flushes_change() -> None:
+    """CRUD 保存临时密码哈希和首次修改标记，但不提交事务。"""
+
+    employee = build_employee(
+        employee_id=2,
+        employee_no="E00002",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
+        must_change_password=False,
+    )
+    session = AsyncMock(spec=AsyncSession)
+    temporary_password_hash = hash_password(DEFAULT_EMPLOYEE_PASSWORD)
+
+    result = await reset_employee_password(
+        employee=employee,
+        password_hash=temporary_password_hash,
+        db=session,
+    )
+
+    assert result is employee
+    assert verify_password(DEFAULT_EMPLOYEE_PASSWORD, result.password_hash)
+    assert result.must_change_password is True
     session.flush.assert_awaited_once()
     session.commit.assert_not_awaited()

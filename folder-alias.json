@@ -120,7 +120,7 @@
         "description": "员工登录与当前员工信息API路由"
     },
     "app/routers/employees.py": {
-        "description": "店长创建、查询与修改员工状态API路由"
+        "description": "店长创建、查询、修改状态与重置密码API路由"
     },
     "app/services": {
         "description": "登录、查询与统计业务服务层"
@@ -132,13 +132,13 @@
         "description": "员工登录认证与当前员工信息业务逻辑"
     },
     "app/services/employees.py": {
-        "description": "员工创建、列表查询与状态修改业务逻辑"
+        "description": "员工创建、查询、状态修改与密码重置业务逻辑"
     },
     "app/crud/auth.py": {
         "description": "按员工编号或ID查询账号的数据访问函数"
     },
     "app/crud/employees.py": {
-        "description": "员工创建、查询与状态修改数据访问函数"
+        "description": "员工创建、查询、状态修改与密码重置数据访问函数"
     },
     "app/schemas/auth_requests.py": {
         "description": "员工登录请求Pydantic模型"
@@ -150,7 +150,7 @@
         "description": "员工创建、列表筛选与状态修改请求模型"
     },
     "app/schemas/employees_responses.py": {
-        "description": "员工创建、列表分页与状态修改响应模型"
+        "description": "员工创建、列表、状态修改与密码重置响应模型"
     },
     "app/schemas": {
         "description": "Pydantic请求与响应模型目录"

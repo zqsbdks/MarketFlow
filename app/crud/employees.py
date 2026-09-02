@@ -115,9 +115,28 @@ async def create_employee(
 # endregion
 
 
+# region 重置员工密码
+async def reset_employee_password(
+    employee: Employee,
+    password_hash: str,
+    db: AsyncSession,
+) -> Employee:
+    """重置员工密码，并把变更发送到当前事务。"""
+
+    employee.password_hash = password_hash
+    employee.must_change_password = True
+    # CRUD 只执行 flush，最终提交或回滚由 Service 控制。
+    await db.flush()
+    return employee
+
+
+# endregion
+
+
 __all__ = [
     "create_employee",
     "get_department_by_id",
     "get_list_employees",
+    "reset_employee_password",
     "update_employee_status",
 ]

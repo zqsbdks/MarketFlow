@@ -84,9 +84,32 @@ class EmployeesStatusUpdateResponse(BaseModel):
 # endregion
 
 
+# region 重置员工密码响应
+class EmployeesResetPasswordResponse(BaseModel):
+    """重置成功后返回员工 ID、临时密码和首次修改标记。"""
+
+    id: int = Field(..., description="员工ID", ge=1)
+    temporary_password: str = Field(
+        "123456",
+        description="临时密码",
+        min_length=1,
+        max_length=20,
+    )
+    must_change_password: bool = Field(
+        True,
+        description="是否需要修改密码",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# endregion
+
+
 __all__ = [
     "EmployeesCreateResponse",
     "EmployeesItemResponse",
     "EmployeesListResponse",
+    "EmployeesResetPasswordResponse",
     "EmployeesStatusUpdateResponse",
 ]

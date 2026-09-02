@@ -13,6 +13,7 @@ from app.crud.employees import (
     create_employee,
     get_department_by_id,
     get_list_employees,
+    reset_employee_password,
     update_employee_status,
 )
 
@@ -22,6 +23,7 @@ __all__ = [
     "get_employee_by_id",
     "get_department_by_id",
     "get_list_employees",
+    "reset_employee_password",
     "update_employee_status",
     "update_employee_last_login",
 ]
