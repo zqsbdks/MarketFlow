@@ -17,8 +17,12 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole
 from app.schemas.employees_requests import EmployeesCreateRequest
-from app.schemas.employees_responses import EmployeesCreateResponse
-from app.services.employees import DEFAULT_EMPLOYEE_PASSWORD, create_employee_service
+from app.schemas.employees_responses import EmployeesCreateResponse, EmployeesListResponse
+from app.services.employees import (
+    DEFAULT_EMPLOYEE_PASSWORD,
+    create_employee_service,
+    get_list_employees_service,
+)
 
 
 def build_employee(
@@ -273,3 +277,130 @@ async def test_create_employee_crud_generates_employee_number() -> None:
     assert employee.must_change_password is True
     assert session.flush.await_count == 2
     session.commit.assert_not_awaited()
+
+
+def test_get_list_employees_uses_query_parameters(monkeypatch) -> None:
+    """员工列表接口按照用户定义的查询参数和响应格式返回。"""
+
+    received: dict[str, object] = {}
+
+    async def get_list(**kwargs):
+        received.update(kwargs)
+        return EmployeesListResponse(
+            items=[],
+            page=2,
+            page_size=5,
+            total=0,
+            total_pages=0,
+        )
+
+    monkeypatch.setattr("app.routers.employees.get_list_employees_service", get_list)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_manager_id
+
+    with TestClient(application) as client:
+        response = client.get(
+            "/api/v1/employees/list",
+            params={
+                "page": 2,
+                "page_size": 5,
+                "department_id": 1,
+                "role": "正式员工",
+                "is_active": True,
+            },
+        )
+
+    assert response.status_code == 200
+    assert received["page"] == 2
+    assert received["page_size"] == 5
+    assert received["department_id"] == 1
+    assert received["role"] == EmployeeRole.REGULAR_EMPLOYEE
+    assert received["is_active"] is True
+    assert response.json() == {
+        "code": 200,
+        "message": "获取员工列表成功",
+        "data": {
+            "items": [],
+            "page": 2,
+            "page_size": 5,
+            "total": 0,
+            "total_pages": 0,
+        },
+    }
+
+
+async def test_get_list_employees_service_builds_items_and_pages(monkeypatch) -> None:
+    """Service 组装部门名称并计算总页数。"""
+
+    manager = build_employee(
+        employee_id=1,
+        employee_no="E00001",
+        role=EmployeeRole.STORE_MANAGER,
+        must_change_password=False,
+    )
+    department = Department(id=1, code="MEAT", name="精肉部", is_active=True)
+    employee = build_employee(
+        employee_id=2,
+        employee_no="E00002",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
+    )
+    employee.department = department
+
+    async def get_current(**_kwargs):
+        return manager
+
+    async def get_list(**_kwargs):
+        return [employee], 21
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_current)
+    monkeypatch.setattr("app.services.employees.get_list_employees", get_list)
+
+    result = await get_list_employees_service(
+        page=2,
+        page_size=10,
+        department_id=1,
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        is_active=True,
+        current_employee_id=manager.id,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.page == 2
+    assert result.total == 21
+    assert result.total_pages == 3
+    assert len(result.items) == 1
+    assert result.items[0].department_name == "精肉部"
+    assert result.items[0].role == EmployeeRole.REGULAR_EMPLOYEE
+
+
+async def test_get_list_employees_service_rejects_non_manager(monkeypatch) -> None:
+    """非店长不能查看员工列表。"""
+
+    employee = build_employee(
+        employee_id=2,
+        employee_no="E00002",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
+        must_change_password=False,
+    )
+
+    async def get_current(**_kwargs):
+        return employee
+
+    monkeypatch.setattr("app.services.employees.get_employee_by_id", get_current)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await get_list_employees_service(
+            page=1,
+            page_size=10,
+            department_id=None,
+            role=None,
+            is_active=None,
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "只有店长可以查看员工列表"

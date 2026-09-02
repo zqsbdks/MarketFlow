@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.employees_requests import EmployeesCreateRequest
-from app.schemas.employees_responses import EmployeesCreateResponse
-from app.services.employees import create_employee_service
+from app.schemas.employees_requests import EmployeesCreateRequest, EmployeesListRequest
+from app.schemas.employees_responses import EmployeesCreateResponse, EmployeesListResponse
+from app.services.employees import create_employee_service, get_list_employees_service
 
 employees_router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -41,5 +41,34 @@ async def create_employee(
     )
 # endregion
 
+# region 获取员工列表接口
+@employees_router.get(
+    "/list",
+    response_model=ResponseModel[EmployeesListResponse],
+    summary="获取员工列表",
+    description="获取所有员工的列表。",
+)
+async def get_list_employees(
+    request: EmployeesListRequest = Depends(),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[EmployeesListResponse]:
+    """按照分页和筛选条件返回员工列表。"""
+
+    employees = await get_list_employees_service(
+        page=request.page,
+        page_size=request.page_size,
+        department_id=request.department_id,
+        role=request.role,
+        is_active=request.is_active,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[EmployeesListResponse](
+        message="获取员工列表成功",
+        data=employees,
+    )
+# endregion
 
 __all__ = ["employees_router"]

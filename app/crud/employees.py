@@ -2,7 +2,9 @@
 
 from uuid import uuid4
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.department import Department
 from app.models.employee import Employee
@@ -17,6 +19,45 @@ async def get_department_by_id(
     """按主键查询部门。"""
 
     return await db.get(Department, department_id)
+# endregion
+
+
+# region 查询员工列表
+async def get_list_employees(
+    page: int,
+    page_size: int,
+    department_id: int | None,
+    role: EmployeeRole | None,
+    is_active: bool | None,
+    db: AsyncSession,
+) -> tuple[list[Employee], int]:
+    """按条件分页查询员工，并返回当前页记录和总数量。"""
+
+    conditions = []
+    if department_id is not None:
+        conditions.append(Employee.department_id == department_id)
+    if role is not None:
+        conditions.append(Employee.role == role)
+    if is_active is not None:
+        conditions.append(Employee.is_active == is_active)
+
+    count_stmt = select(func.count(Employee.id)).where(*conditions)
+    count_result = await db.execute(count_stmt)
+    total = count_result.scalar_one()
+
+    offset = (page - 1) * page_size
+    list_stmt = (
+        select(Employee)
+        .options(selectinload(Employee.department))
+        .where(*conditions)
+        .order_by(Employee.id)
+        .offset(offset)
+        .limit(page_size)
+    )
+    list_result = await db.execute(list_stmt)
+    employees = list(list_result.scalars().all())
+
+    return employees, total
 # endregion
 
 
@@ -51,4 +92,4 @@ async def create_employee(
 # endregion
 
 
-__all__ = ["create_employee", "get_department_by_id"]
+__all__ = ["create_employee", "get_department_by_id", "get_list_employees"]

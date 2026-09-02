@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.enums import EmployeeRole
+
 
 # region 创建员工响应
 class EmployeesCreateResponse(BaseModel):
@@ -29,4 +31,40 @@ class EmployeesCreateResponse(BaseModel):
 # endregion
 
 
-__all__ = ["EmployeesCreateResponse"]
+# region 员工列表项
+class EmployeesItemResponse(BaseModel):
+    """员工列表中的单个员工公开信息。"""
+
+    id: int = Field(..., description="员工ID", ge=1)
+    employee_no: str = Field(
+        ...,
+        description="员工编号",
+        min_length=1,
+        max_length=20,
+    )
+    name: str = Field(..., description="员工姓名", min_length=1, max_length=50)
+    role: EmployeeRole = Field(..., description="员工角色")
+    department_name: str | None = Field(None, description="所属部门名称")
+    is_active: bool = Field(..., description="是否启用")
+
+    model_config = ConfigDict(from_attributes=True)
+# endregion
+
+
+# region 员工列表响应
+class EmployeesListResponse(BaseModel):
+    """员工列表及分页信息。"""
+
+    items: list[EmployeesItemResponse] = Field(..., description="员工列表")
+    page: int = Field(..., description="当前页码", ge=1)
+    page_size: int = Field(..., description="每页数量", ge=1)
+    total: int = Field(..., description="员工总数", ge=0)
+    total_pages: int = Field(..., description="总页数", ge=0)
+# endregion
+
+
+__all__ = [
+    "EmployeesCreateResponse",
+    "EmployeesItemResponse",
+    "EmployeesListResponse",
+]

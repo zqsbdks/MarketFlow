@@ -5,9 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.crud.auth import get_employee_by_id
-from app.crud.employees import create_employee, get_department_by_id
+from app.crud.employees import create_employee, get_department_by_id, get_list_employees
 from app.models.enums import EmployeeRole
-from app.schemas.employees_responses import EmployeesCreateResponse
+from app.schemas.employees_responses import (
+    EmployeesCreateResponse,
+    EmployeesItemResponse,
+    EmployeesListResponse,
+)
 
 DEFAULT_EMPLOYEE_PASSWORD = "123456"
 
@@ -90,4 +94,87 @@ async def create_employee_service(
 # endregion
 
 
-__all__ = ["DEFAULT_EMPLOYEE_PASSWORD", "create_employee_service"]
+# region 获取员工列表
+async def get_list_employees_service(
+    page: int,
+    page_size: int,
+    department_id: int | None,
+    role: EmployeeRole | None,
+    is_active: bool | None,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> EmployeesListResponse:
+    """验证店长权限，并返回经过筛选和分页的员工列表。"""
+
+    current_employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if current_employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    if current_employee.role != EmployeeRole.STORE_MANAGER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有店长可以查看员工列表",
+        )
+
+    employees, total = await get_list_employees(
+        page=page,
+        page_size=page_size,
+        department_id=department_id,
+        role=role,
+        is_active=is_active,
+        db=db,
+    )
+
+    items = []
+    for employee in employees:
+        department_name = None
+        if employee.department is not None:
+            department_name = employee.department.name
+
+        items.append(
+            EmployeesItemResponse(
+                id=employee.id,
+                employee_no=employee.employee_no,
+                name=employee.name,
+                role=employee.role,
+                department_name=department_name,
+                is_active=employee.is_active,
+            )
+        )
+
+    total_pages = (total + page_size - 1) // page_size
+
+    return EmployeesListResponse(
+        items=items,
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )
+# endregion
+
+
+__all__ = [
+    "DEFAULT_EMPLOYEE_PASSWORD",
+    "create_employee_service",
+    "get_list_employees_service",
+]

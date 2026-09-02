@@ -18,4 +18,16 @@ class EmployeesCreateRequest(BaseModel):
 # endregion
 
 
-__all__ = ["EmployeesCreateRequest"]
+# region 员工列表请求
+class EmployeesListRequest(BaseModel):
+    """员工列表的分页及可选筛选条件。"""
+
+    page: int = Field(1, description="页码", ge=1)
+    page_size: int = Field(10, description="每页数量", ge=1, le=100)
+    department_id: int | None = Field(None, description="所属部门ID", ge=1)
+    role: EmployeeRole | None = Field(None, description="员工角色")
+    is_active: bool | None = Field(None, description="是否启用")
+# endregion
+
+
+__all__ = ["EmployeesCreateRequest", "EmployeesListRequest"]
