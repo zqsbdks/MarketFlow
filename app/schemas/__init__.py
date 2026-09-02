@@ -23,6 +23,8 @@ from app.schemas.employees_responses import (
     EmployeesResetPasswordResponse,
     EmployeesStatusUpdateResponse,
 )
+from app.schemas.products_requests import ProductsListRequest
+from app.schemas.products_responses import ProductsItemResponse, ProductsListResponse
 
 __all__ = [
     "AuthDepartmentResponse",
@@ -39,5 +41,8 @@ __all__ = [
     "EmployeesResetPasswordResponse",
     "EmployeesStatusUpdateRequest",
     "EmployeesStatusUpdateResponse",
+    "ProductsItemResponse",
+    "ProductsListRequest",
+    "ProductsListResponse",
     "ResponseModel",
 ]

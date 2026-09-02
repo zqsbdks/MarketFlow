@@ -122,6 +122,9 @@
     "app/routers/employees.py": {
         "description": "店长创建、查询、修改状态与重置密码API路由"
     },
+    "app/routers/products.py": {
+        "description": "商品列表筛选与分页查询API路由"
+    },
     "app/services": {
         "description": "登录、查询与统计业务服务层"
     },
@@ -134,11 +137,17 @@
     "app/services/employees.py": {
         "description": "员工创建、查询、状态修改与密码重置业务逻辑"
     },
+    "app/services/products.py": {
+        "description": "商品列表权限验证与响应组装业务逻辑"
+    },
     "app/crud/auth.py": {
         "description": "按员工编号或ID查询账号的数据访问函数"
     },
     "app/crud/employees.py": {
         "description": "员工创建、查询、状态修改与密码重置数据访问函数"
+    },
+    "app/crud/products.py": {
+        "description": "商品筛选、关系预加载与分页查询数据访问函数"
     },
     "app/schemas/auth_requests.py": {
         "description": "员工登录请求Pydantic模型"
@@ -151,6 +160,12 @@
     },
     "app/schemas/employees_responses.py": {
         "description": "员工创建、列表、状态修改与密码重置响应模型"
+    },
+    "app/schemas/products_requests.py": {
+        "description": "商品列表分页与筛选查询参数模型"
+    },
+    "app/schemas/products_responses.py": {
+        "description": "商品列表项与分页结果响应模型"
     },
     "app/schemas": {
         "description": "Pydantic请求与响应模型目录"
@@ -205,6 +220,9 @@
     },
     "tests/test_employees.py": {
         "description": "创建员工与员工列表接口及业务规则测试"
+    },
+    "tests/test_products.py": {
+        "description": "商品列表字段、业务组装与路由响应测试"
     },
     "tests/test_config.py": {
         "description": "应用配置加载与隔离性测试"

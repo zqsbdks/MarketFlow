@@ -8,11 +8,13 @@ from fastapi import APIRouter
 
 from app.routers.auth import auth_router
 from app.routers.employees import employees_router
+from app.routers.products import products_router
 
 # 该对象最终在 app.main 中统一添加 /api/v1 前缀。
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
 api_router.include_router(employees_router)
+api_router.include_router(products_router)
 
-__all__ = ["api_router", "auth_router", "employees_router"]
+__all__ = ["api_router", "auth_router", "employees_router", "products_router"]
