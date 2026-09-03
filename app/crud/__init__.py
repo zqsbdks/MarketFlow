@@ -19,7 +19,7 @@ from app.crud.employees import (
     update_employee_status,
 )
 from app.crud.products import get_product_by_id, get_products_list
-from app.crud.sales import get_sales_list
+from app.crud.sales import get_sales_detail, get_sales_list
 
 __all__ = [
     "create_employee",
@@ -31,6 +31,7 @@ __all__ = [
     "get_list_employees",
     "get_product_by_id",
     "get_products_list",
+    "get_sales_detail",
     "get_sales_list",
     "reset_employee_password",
     "update_employee_status",

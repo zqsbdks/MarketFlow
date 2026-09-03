@@ -17,8 +17,8 @@ from app.models.enums import EmployeeRole, ProductStatus, SaleSource
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
-from app.schemas.sales_responses import SalesListResponse
-from app.services.sales import get_sales_list_service
+from app.schemas.sales_responses import SaleDetailResponse, SalesListResponse
+from app.services.sales import get_sales_detail_service, get_sales_list_service
 
 
 def build_employee() -> Employee:
@@ -185,6 +185,55 @@ async def test_sales_list_service_rejects_time_outside_business_hours(monkeypatc
     get_sales.assert_not_awaited()
 
 
+async def test_sales_detail_service_uses_product_snapshot(monkeypatch) -> None:
+    """销售单详情使用成交时保存的商品名称和价格。"""
+
+    async def get_employee(**_kwargs):
+        return build_employee()
+
+    async def get_sale(**_kwargs):
+        return build_sale()
+
+    monkeypatch.setattr("app.services.sales.get_employee_by_id", get_employee)
+    monkeypatch.setattr("app.services.sales.get_sales_detail", get_sale)
+
+    result = await get_sales_detail_service(
+        sale_no="S202609010001",
+        current_employee_id=2,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.sale_no == "S202609010001"
+    assert result.total_amount == Decimal("45.00")
+    assert len(result.items) == 2
+    assert result.items[0].product_name == "商品一"
+    assert result.items[0].quantity == 2
+    assert result.items[0].subtotal == Decimal("30.00")
+
+
+async def test_sales_detail_service_returns_404_when_missing(monkeypatch) -> None:
+    """销售单号不存在时返回 404。"""
+
+    async def get_employee(**_kwargs):
+        return build_employee()
+
+    async def get_sale(**_kwargs):
+        return None
+
+    monkeypatch.setattr("app.services.sales.get_employee_by_id", get_employee)
+    monkeypatch.setattr("app.services.sales.get_sales_detail", get_sale)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await get_sales_detail_service(
+            sale_no="S999",
+            current_employee_id=2,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "销售单不存在"
+
+
 # endregion
 
 
@@ -219,6 +268,38 @@ def test_sales_list_route_returns_documented_response(monkeypatch) -> None:
             "page_size": 10,
             "total": 0,
             "total_pages": 0,
+        },
+    }
+
+
+def test_sales_detail_route_returns_documented_response(monkeypatch) -> None:
+    """销售单详情接口返回销售单和商品明细。"""
+
+    async def get_sale(**_kwargs):
+        return SaleDetailResponse(
+            sale_no="S202609010001",
+            sold_at=datetime(2026, 9, 1, 10, 20),
+            total_amount=Decimal("45.00"),
+            items=[],
+        )
+
+    monkeypatch.setattr("app.routers.sales.get_sales_detail_service", get_sale)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_employee_id
+
+    with TestClient(application) as client:
+        response = client.get("/api/v1/sales/S202609010001")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "code": 200,
+        "message": "获取销售单详情成功",
+        "data": {
+            "sale_no": "S202609010001",
+            "sold_at": "2026-09-01T10:20:00",
+            "total_amount": "45.00",
+            "items": [],
         },
     }
 

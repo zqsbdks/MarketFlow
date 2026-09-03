@@ -7,8 +7,13 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
-from app.crud.sales import get_sales_list
-from app.schemas.sales_responses import SalesItemResponse, SalesListResponse
+from app.crud.sales import get_sales_detail, get_sales_list
+from app.schemas.sales_responses import (
+    SaleDetailItemResponse,
+    SaleDetailResponse,
+    SalesItemResponse,
+    SalesListResponse,
+)
 
 BUSINESS_OPENING_TIME = time(9, 0)
 BUSINESS_CLOSING_TIME = time(21, 0)
@@ -111,8 +116,69 @@ async def get_sales_list_service(
 # endregion
 
 
+# region 获取销售单详情
+async def get_sales_detail_service(
+    sale_no: str,
+    db: AsyncSession,
+    current_employee_id: int,
+) -> SaleDetailResponse:
+    """验证当前员工，并组装指定销售单及其商品明细。"""
+
+    employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+
+    if employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    sale = await get_sales_detail(sale_no=sale_no, db=db)
+    if sale is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="销售单不存在",
+        )
+
+    # 逐条读取成交快照，避免商品改名或改价影响历史销售详情。
+    detail_items: list[SaleDetailItemResponse] = []
+    for item in sale.items:
+        detail_item = SaleDetailItemResponse(
+            product_name=item.product_name_snapshot,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            subtotal=item.subtotal,
+        )
+        detail_items.append(detail_item)
+
+    return SaleDetailResponse(
+        sale_no=sale.sale_no,
+        sold_at=sale.sold_at,
+        total_amount=sale.total_amount,
+        items=detail_items,
+    )
+
+
+# endregion
+
+
 __all__ = [
     "BUSINESS_CLOSING_TIME",
     "BUSINESS_OPENING_TIME",
+    "get_sales_detail_service",
     "get_sales_list_service",
 ]

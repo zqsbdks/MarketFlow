@@ -57,4 +57,19 @@ async def get_sales_list(
 # endregion
 
 
-__all__ = ["get_sales_list"]
+# region 根据销售单号获取详情
+async def get_sales_detail(
+    db: AsyncSession,
+    sale_no: str,
+) -> Sale | None:
+    """根据唯一销售单号查询销售单，并提前加载商品明细。"""
+
+    detail_statement = select(Sale).where(Sale.sale_no == sale_no).options(selectinload(Sale.items))
+    detail_result = await db.scalar(detail_statement)
+    return detail_result
+
+
+# endregion
+
+
+__all__ = ["get_sales_detail", "get_sales_list"]

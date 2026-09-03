@@ -35,7 +35,12 @@ from app.schemas.products_responses import (
     ProductsListResponse,
 )
 from app.schemas.sales_requests import SalesListRequest
-from app.schemas.sales_responses import SalesItemResponse, SalesListResponse
+from app.schemas.sales_responses import (
+    SaleDetailItemResponse,
+    SaleDetailResponse,
+    SalesItemResponse,
+    SalesListResponse,
+)
 
 __all__ = [
     "AuthDepartmentResponse",
@@ -62,6 +67,8 @@ __all__ = [
     "ProductsListRequest",
     "ProductsListResponse",
     "ResponseModel",
+    "SaleDetailItemResponse",
+    "SaleDetailResponse",
     "SalesItemResponse",
     "SalesListRequest",
     "SalesListResponse",
