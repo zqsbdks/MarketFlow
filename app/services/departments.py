@@ -42,14 +42,16 @@ async def get_departments_list_service(
 
     departments = await get_departments_list(db=db)
 
-    # 只公开接口文档要求的部门 ID 和名称。
-    return [
-        DepartmentItemResponse(
+    # 创建空列表，再逐个转换部门，便于查看每一步的数据变化。
+    department_items: list[DepartmentItemResponse] = []
+    for department in departments:
+        department_item = DepartmentItemResponse(
             id=department.id,
             name=department.name,
         )
-        for department in departments
-    ]
+        department_items.append(department_item)
+
+    return department_items
 
 
 # endregion

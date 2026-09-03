@@ -11,6 +11,8 @@ from app.schemas.auth_responses import (
     AuthMeResponse,
 )
 from app.schemas.base import ResponseModel
+from app.schemas.categories_requests import CategoryListRequest
+from app.schemas.categories_responses import CategoriesItemResponse
 from app.schemas.departments_responses import DepartmentItemResponse
 from app.schemas.employees_requests import (
     EmployeesCreateRequest,
@@ -40,6 +42,8 @@ __all__ = [
     "AuthLoginResponse",
     "AuthMeResponse",
     "AuthPasswordChangeRequest",
+    "CategoriesItemResponse",
+    "CategoryListRequest",
     "CategoryResponse",
     "DepartmentResponse",
     "DepartmentItemResponse",
