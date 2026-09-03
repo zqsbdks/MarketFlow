@@ -11,6 +11,7 @@ from app.schemas.auth_responses import (
     AuthMeResponse,
 )
 from app.schemas.base import ResponseModel
+from app.schemas.departments_responses import DepartmentItemResponse
 from app.schemas.employees_requests import (
     EmployeesCreateRequest,
     EmployeesListRequest,
@@ -41,6 +42,7 @@ __all__ = [
     "AuthPasswordChangeRequest",
     "CategoryResponse",
     "DepartmentResponse",
+    "DepartmentItemResponse",
     "EmployeesCreateRequest",
     "EmployeesCreateResponse",
     "EmployeesItemResponse",

@@ -119,6 +119,12 @@
     "app/routers/auth.py": {
         "description": "员工登录与当前员工信息API路由"
     },
+    "app/routers/categories.py": {
+        "description": "商品分类查询API路由"
+    },
+    "app/routers/departments.py": {
+        "description": "部门查询API路由"
+    },
     "app/routers/employees.py": {
         "description": "店长创建、查询、修改状态与重置密码API路由"
     },
@@ -134,6 +140,12 @@
     "app/services/auth.py": {
         "description": "员工登录认证与当前员工信息业务逻辑"
     },
+    "app/services/categories.py": {
+        "description": "商品分类查询业务逻辑"
+    },
+    "app/services/departments.py": {
+        "description": "部门查询业务逻辑"
+    },
     "app/services/employees.py": {
         "description": "员工创建、查询、状态修改与密码重置业务逻辑"
     },
@@ -142,6 +154,12 @@
     },
     "app/crud/auth.py": {
         "description": "按员工编号或ID查询账号的数据访问函数"
+    },
+    "app/crud/categories.py": {
+        "description": "商品分类查询数据访问函数"
+    },
+    "app/crud/departments.py": {
+        "description": "部门查询数据访问函数"
     },
     "app/crud/employees.py": {
         "description": "员工创建、查询、状态修改与密码重置数据访问函数"
@@ -154,6 +172,18 @@
     },
     "app/schemas/auth_responses.py": {
         "description": "员工登录令牌与当前员工信息响应模型"
+    },
+    "app/schemas/categories_requests.py": {
+        "description": "商品分类查询参数模型"
+    },
+    "app/schemas/categories_responses.py": {
+        "description": "商品分类查询响应模型"
+    },
+    "app/schemas/departments_requests.py": {
+        "description": "部门查询参数模型"
+    },
+    "app/schemas/departments_responses.py": {
+        "description": "部门查询响应模型"
     },
     "app/schemas/employees_requests.py": {
         "description": "员工创建、列表筛选与状态修改请求模型"

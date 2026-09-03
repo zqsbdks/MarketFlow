@@ -5,6 +5,7 @@ from app.services.auth import (
     change_password_service,
     get_current_employee_info_service,
 )
+from app.services.departments import get_departments_list_service
 from app.services.employees import (
     create_employee_service,
     get_list_employees_service,
@@ -18,6 +19,7 @@ __all__ = [
     "change_password_service",
     "create_employee_service",
     "get_current_employee_info_service",
+    "get_departments_list_service",
     "get_list_employees_service",
     "get_product_detail_service",
     "get_products_list_service",

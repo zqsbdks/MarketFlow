@@ -7,6 +7,8 @@
 from fastapi import APIRouter
 
 from app.routers.auth import auth_router
+from app.routers.categories import categories_router
+from app.routers.departments import departments_router
 from app.routers.employees import employees_router
 from app.routers.products import products_router
 
@@ -14,7 +16,16 @@ from app.routers.products import products_router
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
+api_router.include_router(departments_router)
+api_router.include_router(categories_router)
 api_router.include_router(employees_router)
 api_router.include_router(products_router)
 
-__all__ = ["api_router", "auth_router", "employees_router", "products_router"]
+__all__ = [
+    "api_router",
+    "auth_router",
+    "categories_router",
+    "departments_router",
+    "employees_router",
+    "products_router",
+]
