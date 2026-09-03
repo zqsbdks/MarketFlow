@@ -131,6 +131,9 @@
     "app/routers/products.py": {
         "description": "商品列表筛选与分页查询API路由"
     },
+    "app/routers/sales.py": {
+        "description": "销售记录API路由"
+    },
     "app/services": {
         "description": "登录、查询与统计业务服务层"
     },
@@ -152,6 +155,9 @@
     "app/services/products.py": {
         "description": "商品列表权限验证与响应组装业务逻辑"
     },
+    "app/services/sales.py": {
+        "description": "销售记录业务逻辑"
+    },
     "app/crud/auth.py": {
         "description": "按员工编号或ID查询账号的数据访问函数"
     },
@@ -166,6 +172,9 @@
     },
     "app/crud/products.py": {
         "description": "商品筛选、关系预加载与分页查询数据访问函数"
+    },
+    "app/crud/sales.py": {
+        "description": "销售记录数据访问函数"
     },
     "app/schemas/auth_requests.py": {
         "description": "员工登录请求Pydantic模型"
@@ -196,6 +205,12 @@
     },
     "app/schemas/products_responses.py": {
         "description": "商品列表项与分页结果响应模型"
+    },
+    "app/schemas/sales_requests.py": {
+        "description": "销售记录查询参数模型"
+    },
+    "app/schemas/sales_responses.py": {
+        "description": "销售记录响应模型"
     },
     "app/schemas": {
         "description": "Pydantic请求与响应模型目录"
@@ -253,6 +268,9 @@
     },
     "tests/test_products.py": {
         "description": "商品列表字段、业务组装与路由响应测试"
+    },
+    "tests/test_sales.py": {
+        "description": "销售单列表汇总、日期校验与路由响应测试"
     },
     "tests/test_config.py": {
         "description": "应用配置加载与隔离性测试"
