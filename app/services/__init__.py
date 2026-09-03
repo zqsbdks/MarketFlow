@@ -14,6 +14,7 @@ from app.services.employees import (
     update_employee_status_service,
 )
 from app.services.products import get_product_detail_service, get_products_list_service
+from app.services.reports import overview_service
 from app.services.sales import get_sales_detail_service, get_sales_list_service
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "get_list_employees_service",
     "get_product_detail_service",
     "get_products_list_service",
+    "overview_service",
     "get_sales_detail_service",
     "get_sales_list_service",
     "reset_employee_password_service",

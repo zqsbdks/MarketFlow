@@ -134,6 +134,9 @@
     "app/routers/sales.py": {
         "description": "销售记录API路由"
     },
+    "app/routers/reports.py": {
+        "description": "营业概览、部门对比和销售排行API路由"
+    },
     "app/services": {
         "description": "登录、查询与统计业务服务层"
     },
@@ -158,6 +161,9 @@
     "app/services/sales.py": {
         "description": "销售记录业务逻辑"
     },
+    "app/services/reports.py": {
+        "description": "营业报表权限验证与响应组装业务逻辑"
+    },
     "app/crud/auth.py": {
         "description": "按员工编号或ID查询账号的数据访问函数"
     },
@@ -175,6 +181,9 @@
     },
     "app/crud/sales.py": {
         "description": "销售记录数据访问函数"
+    },
+    "app/crud/reports.py": {
+        "description": "营业数据汇总、分组与排行查询函数"
     },
     "app/schemas/auth_requests.py": {
         "description": "员工登录请求Pydantic模型"
@@ -211,6 +220,12 @@
     },
     "app/schemas/sales_responses.py": {
         "description": "销售记录响应模型"
+    },
+    "app/schemas/reports_requests.py": {
+        "description": "营业报表时间、部门与排行查询参数模型"
+    },
+    "app/schemas/reports_responses.py": {
+        "description": "营业概览、部门对比与排行响应模型"
     },
     "app/schemas": {
         "description": "Pydantic请求与响应模型目录"
@@ -271,6 +286,9 @@
     },
     "tests/test_sales.py": {
         "description": "销售单列表汇总、日期校验与路由响应测试"
+    },
+    "tests/test_reports.py": {
+        "description": "营业概览业务校验与统一响应格式测试"
     },
     "tests/test_config.py": {
         "description": "应用配置加载与隔离性测试"
