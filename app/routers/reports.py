@@ -75,6 +75,7 @@ async def get_sales_rankings(
         start_date=request.start_date,
         end_date=request.end_date,
         department_id=request.department_id,
+        category_id=request.category_id,
         group_by=request.group_by,
         sort_by=request.sort_by,
         sort_order=request.sort_order,

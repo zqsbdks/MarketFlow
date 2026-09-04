@@ -205,3 +205,8 @@ $RECYCLE.BIN/
 
 # Project-generated dependency snapshot
 requirements-freeze.txt
+
+# Vue / Vite frontend
+node_modules/
+frontend/dist/
+frontend/.env

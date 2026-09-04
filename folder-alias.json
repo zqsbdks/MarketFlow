@@ -266,6 +266,39 @@
     "alembic/versions/20260902_0004_localize_employee_roles.py": {
         "description": "将员工角色数据与检查约束转换为中文的迁移"
     },
+    "frontend": {
+        "description": "Vue 3 门店经营管理前端"
+    },
+    "frontend/src": {
+        "description": "前端业务源码"
+    },
+    "frontend/src/api": {
+        "description": "FastAPI 接口请求与统一错误处理"
+    },
+    "frontend/src/components": {
+        "description": "前端通用展示组件"
+    },
+    "frontend/src/layouts": {
+        "description": "经营管理台整体布局"
+    },
+    "frontend/src/router": {
+        "description": "页面路由与登录权限守卫"
+    },
+    "frontend/src/stores": {
+        "description": "Pinia 登录状态管理"
+    },
+    "frontend/src/types": {
+        "description": "后端接口 TypeScript 类型"
+    },
+    "frontend/src/views": {
+        "description": "登录、总览、部门、商品、销售与员工页面"
+    },
+    "frontend/package.json": {
+        "description": "前端依赖与开发构建命令"
+    },
+    "frontend/README.md": {
+        "description": "前端启动与构建说明"
+    },
     "tests": {
         "description": "pytest单元测试与集成测试"
     },
@@ -311,8 +344,14 @@
     "scripts/freeze_requirements.py": {
         "description": "使用当前虚拟环境生成依赖快照"
     },
+    "scripts/bootstrap_manager.py": {
+        "description": "为空数据库创建首个店长登录账号"
+    },
     "scripts/check_database.py": {
         "description": "检查MySQL连接和数据库基本可用性"
+    },
+    "scripts/seed_demo_data.py": {
+        "description": "幂等生成部门、员工、分类、商品和最近七天销售演示数据"
     },
     "scripts/setup.py": {
         "description": "跨平台初始化环境、依赖与项目配置"

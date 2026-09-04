@@ -166,6 +166,7 @@ async def get_rankings(
     start_date: datetime | None,
     end_date: datetime | None,
     department_id: int | None,
+    category_id: int | None,
     group_by: RankingGroupBy,
     sort_by: RankingSortBy,
     sort_order: RankingSortOrder,
@@ -181,6 +182,10 @@ async def get_rankings(
         conditions.append(Sale.sold_at <= end_date)
     if department_id is not None:
         conditions.append(SaleItem.department_id == department_id)
+    if category_id is not None:
+        # 销售明细保存商品ID，通过商品所属分类筛选对应明细。
+        product_ids = select(Product.id).where(Product.category_id == category_id)
+        conditions.append(SaleItem.product_id.in_(product_ids))
 
     # 两种排行都需要计算累计销售数量和累计销售金额。
     total_quantity = func.sum(SaleItem.quantity).label("quantity")

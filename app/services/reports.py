@@ -7,6 +7,7 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
+from app.crud.categories import get_category_by_id
 from app.crud.employees import get_department_by_id
 from app.crud.reports import get_departments_reports, get_rankings, get_reports
 from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
@@ -186,6 +187,7 @@ async def get_rankings_service(
     start_date: datetime | None,
     end_date: datetime | None,
     department_id: int | None,
+    category_id: int | None,
     group_by: RankingGroupBy,
     sort_by: RankingSortBy,
     sort_order: RankingSortOrder,
@@ -247,12 +249,26 @@ async def get_rankings_service(
                 detail="部门不存在",
             )
 
+    if category_id is not None:
+        category = await get_category_by_id(category_id=category_id, db=db)
+        if category is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="商品分类不存在",
+            )
+        if department_id is not None and category.department_id != department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="商品分类不属于所选部门",
+            )
+
     offset = (page - 1) * page_size
     ranking_values, total = await get_rankings(
         db=db,
         start_date=start_date,
         end_date=end_date,
         department_id=department_id,
+        category_id=category_id,
         group_by=group_by,
         sort_by=sort_by,
         sort_order=sort_order,

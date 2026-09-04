@@ -181,6 +181,7 @@ async def test_rankings_service_builds_paginated_ranking(monkeypatch) -> None:
         start_date=None,
         end_date=None,
         department_id=None,
+        category_id=None,
         group_by=RankingGroupBy.PRODUCT,
         sort_by=RankingSortBy.QUANTITY,
         sort_order=RankingSortOrder.DESC,
@@ -306,6 +307,7 @@ def test_rankings_route_returns_documented_response(monkeypatch) -> None:
             "/api/v1/reports/rankings",
             params={
                 "department_id": 1,
+                "category_id": 2,
                 "group_by": "category",
                 "sort_by": "amount",
                 "sort_order": "asc",
@@ -316,6 +318,7 @@ def test_rankings_route_returns_documented_response(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert received["department_id"] == 1
+    assert received["category_id"] == 2
     assert received["group_by"] == RankingGroupBy.CATEGORY
     assert received["sort_by"] == RankingSortBy.AMOUNT
     assert received["sort_order"] == RankingSortOrder.ASC

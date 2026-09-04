@@ -1,0 +1,114 @@
+/* MarketFlow 视觉主题：深色经营驾驶舱与横向悬浮导航。 */
+:root {
+  color: #f5f7f2;
+  background: #0b0c0f;
+  --ink: #f5f7f2;
+  --muted: #9297a1;
+  --line: #2a2d34;
+  --paper: #15171c;
+  --green: #c8ff5a;
+  --green-dark: #a8db45;
+  --orange: #ff835f;
+  --blue: #7887ff;
+  --sidebar: #111318;
+  --sidebar-soft: #22252c;
+  --shadow: 0 18px 60px rgba(0, 0, 0, .24);
+}
+
+body { background: #0b0c0f; }
+
+/* 顶部导航取代传统侧边栏。 */
+.sidebar {
+  inset: 18px 24px auto;
+  width: calc(100% - 48px);
+  height: 70px;
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 12px;
+  background: #121419;
+  border: 1px solid #292c33;
+  border-radius: 14px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .28);
+}
+
+.brand-block { flex: 0 0 auto; gap: 10px; padding: 0 14px 0 2px; border-right: 1px solid #2a2d34; }
+.brand-mark { width: 40px; height: 40px; color: #0d100c; background: #c8ff5a; border-radius: 8px; }
+.brand-block strong { font-size: 16px; letter-spacing: -.03em; }
+.brand-block span { color: #717680; font-size: 8px; }
+.store-chip { order: 3; min-width: 176px; margin-left: auto; padding: 9px 11px; background: #191c21; border-color: #2e3239; border-radius: 8px; }
+.live-dot { background: #c8ff5a; box-shadow: 0 0 0 4px rgba(200,255,90,.1); }
+.main-nav { display: flex; align-items: center; gap: 3px; margin: 0; }
+.main-nav > p { display: none; }
+.main-nav a { gap: 8px; margin: 0; padding: 11px 13px; color: #8f949e; border-radius: 7px; font-size: 12px; }
+.main-nav a.active { color: #0b0d0c; background: #c8ff5a; }
+.main-nav a.active::before { display: none; }
+.sidebar-footer { order: 4; width: auto; margin: 0; padding: 0 0 0 12px; border: 0; border-left: 1px solid #2a2d34; }
+.employee-avatar { width: 34px; height: 34px; color: #dbe3dc; background: #32363d; }
+.employee-meta { max-width: 105px; }.employee-meta span { color: #747a84; }
+.main-area { width: 100%; margin-left: 0; padding-top: 104px; }
+.page-container { width: min(1480px, 100%); padding: 34px 34px 70px; }
+
+/* 更偏编辑式的数据排版。 */
+.page-header { margin-bottom: 32px; }
+.page-header h1 { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: clamp(34px, 4vw, 56px); font-weight: 750; letter-spacing: -.065em; }
+.page-description { color: #858a94; }
+.eyebrow { color: #c8ff5a; letter-spacing: .2em; }
+.panel, .stat-card { background: #15171c; border-color: #292c33; box-shadow: none; }
+.panel { border-radius: 14px; }
+.stat-card { min-height: 176px; border-radius: 14px; }
+.stat-card::after { top: auto; bottom: 0; width: 100%; height: 2px; }
+.stat-card p { color: #898e98; }
+.stat-card strong { font-family: Arial, sans-serif; font-weight: 700; letter-spacing: -.055em; }
+.stat-card > span { color: #6f747d; }
+.stat-icon { border-radius: 7px; }
+.tone-green { --accent: #c8ff5a; }.tone-orange { --accent: #ff835f; }.tone-blue { --accent: #7887ff; }.tone-ink { --accent: #d4d7de; }
+.chart-panel { background: #121419; }.department-chart { height: 320px; }
+.panel-heading h2 { font-family: Arial, "Microsoft YaHei", sans-serif; font-weight: 700; letter-spacing: -.035em; }
+.department-links { border-color: #292c33; }.department-links button { color: #eef0ec; border-color: #292c33; }.department-links button:hover { background: #1c1f25; }.department-links span { color: #777c86; }
+.ranking-list li { border-color: #292c33; }.ranking-list small, .rank-number { color: #737984; }
+.text-button { color: #c8ff5a; }.text-button.muted { color: #9297a1; }
+.insight-strip { color: #0d100e; background: #c8ff5a; border-radius: 12px; }.insight-icon { color: #0d100e; border-color: rgba(13,16,14,.28); }.insight-strip .eyebrow, .insight-strip span { color: #354328; }
+
+input, select { color: #eef0ed; background: #111318; border-color: #30333a; }
+input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: .7; }
+.field.inline, .search-field { background: #111318; border-color: #30333a; }
+.primary-button { color: #0d100c; background: #c8ff5a; border-color: #c8ff5a; }.primary-button:hover { background: #aeeb3e; }
+.secondary-button { color: #eef0ed; background: #1a1d22; border-color: #343840; }
+.filter-panel { background: #121419; }
+.record-count, .filter-label { color: #8d929c; }
+th { color: #777d87; background: #111318; border-color: #2a2d34; }
+td { color: #a8adb6; border-color: #292c33; }td strong { color: #f3f4f1; }tbody tr:hover { background: #1a1d22; }
+.block, .product-cell small { color: #717781; }.product-cell > span { color: #d7ff8b; background: #29331f; }.employee-cell > span { color: #d7ff8b; background: #29331f; }
+.stock-badge { color: #c8ff5a; background: #26331d; }.stock-badge.low { color: #ff9d7c; background: #38251f; }.status-badge.on_sale { color: #c8ff5a; background: #25321d; }.status-badge.stopped { color: #ff9a87; background: #38221f; }
+.pagination { color: #7f858f; background: #111318; }.pagination button { color: #dfe2dd; background: #1c1f25; border-color: #33363e; }
+.table-rank { color: #0c100b; background: #c8ff5a; }.segmented-controls button { color: #8f949e; background: #202329; }.segmented-controls button.active { color: #0b0d0c; background: #c8ff5a; }
+.modal-backdrop { background: rgba(4,5,7,.8); }.modal-panel, .modal-panel > header { background: #16181d; }.modal-panel > header, .detail-hero, .receipt-lines > div { border-color: #2b2e35; }.modal-panel h2 { font-family: Arial, sans-serif; font-weight: 700; }.detail-hero > span { color: #d7ff8b; background: #29331f; }.detail-sheet dl, .credential-card dl { background: #2d3037; }.detail-sheet dl div, .credential-card dl div { background: #17191e; }.detail-sheet dt, .credential-card dt, .receipt-head p { color: #7f858f; }.detail-sheet dd, .credential-card dd { color: #f4f5f2; }
+.credential-card > p, .credential-card small, .form-tip, .security-note { color: #858a94; }.success-icon, .password-icon { color: #c8ff5a; background: #26331d; }
+.alert.error, .form-error { color: #ffac9c; background: #321e1c; border-color: #ff785e; }
+.spinner { border-color: #343840; border-top-color: #c8ff5a; }
+
+/* 新登录页：深色画布、超大字标与悬浮浅色认证面板。 */
+.login-page { position: relative; min-height: 100vh; display: block; overflow: hidden; color: #f5f7f2; background: #0a0b0e; }
+.login-page::before { content: "MARKET / FLOW"; position: absolute; right: 3vw; top: 25px; color: #252830; font-size: 11px; font-weight: 800; letter-spacing: .28em; }
+.login-story { position: absolute; inset: 0; min-height: 100vh; padding: 48px 5.5vw; background: transparent; }
+.login-story::before { content: "04"; right: auto; left: 48%; bottom: -9vh; color: #12151a; font-family: Arial, sans-serif; font-size: 52vw; font-weight: 900; line-height: .72; }
+.login-brand { position: relative; z-index: 1; }.login-brand svg { color: #c8ff5a; }.story-copy { position: relative; z-index: 1; max-width: 780px; margin: auto 0; }
+.story-copy h1 { margin-bottom: 24px; font-family: Arial, "Microsoft YaHei", sans-serif; font-size: clamp(55px, 7.4vw, 112px); font-weight: 800; line-height: .92; letter-spacing: -.075em; }.story-copy h1 em { color: #c8ff5a; font-style: normal; }.story-copy > p:last-child { max-width: 440px; color: #8c929c; font-size: 14px; }
+.story-metrics { position: relative; z-index: 1; gap: 12px; margin-bottom: 5px; }.story-metrics div { min-width: 142px; padding: 13px 15px; color: #aeb3bc; background: #121419; border: 1px solid #292c33; border-radius: 8px; }.story-metrics b { color: #c8ff5a; font-size: 18px; }.story-metrics svg { color: #c8ff5a; }.story-footnote { display: none; }
+.login-form-side { position: relative; z-index: 3; width: min(440px, calc(100% - 36px)); min-height: auto; margin: 50vh 5vw 0 auto; padding: 0; transform: translateY(-50%); }
+.login-card { width: 100%; padding: 34px; color: #15171a; background: #f3f3ed; border: 1px solid #fff; border-radius: 16px; box-shadow: 0 35px 100px rgba(0,0,0,.4); }.login-card .eyebrow { color: #526343; }.login-card h2 { font-family: Arial, "Microsoft YaHei", sans-serif; font-size: 34px; font-weight: 750; }.login-card .form-intro { color: #6e736f; }.login-card label > span { color: #555b57; }.login-card input { color: #15171a; background: white; border-color: #d5d8d2; }.login-card .password-input { background: white; border-color: #d5d8d2; }.login-card .primary-button { color: #f7f8f4; background: #151a17; border-color: #151a17; }.login-card .primary-button:hover { background: #2b332e; }.login-card .security-note { color: #858b87; }
+.password-page, .not-found { background: #0b0c0f; }.password-card { background: #15171c; border-top-color: #c8ff5a; }.dark-text { color: #f5f7f2; }
+
+@media (max-width: 1180px) {
+  .sidebar { gap: 8px; }.store-chip { min-width: 150px; }.employee-meta { display: none; }.main-nav a { padding: 11px 10px; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { inset: 0 auto 0 0; width: 260px; height: 100vh; flex-direction: column; align-items: stretch; gap: 0; padding: 22px 18px; border: 0; border-radius: 0; transform: translateX(-100%); }.sidebar.open { transform: translateX(0); }.brand-block { padding: 0 5px 22px; border: 0; }.store-chip { order: initial; margin: 0; }.main-nav { display: block; margin-top: 25px; }.main-nav a { margin: 4px 0; padding: 12px; }.sidebar-footer { order: initial; width: 100%; margin-top: auto; padding: 16px 0 0; border-left: 0; border-top: 1px solid #2a2d34; }.employee-meta { display: block; }.main-area { padding-top: 0; }.mobile-bar { color: #f4f5f2; background: rgba(15,17,21,.94); border-color: #292c33; }.login-form-side { margin-right: 30px; }.story-copy { max-width: 58%; }.story-copy h1 { font-size: clamp(50px, 8vw, 78px); }
+}
+
+@media (max-width: 700px) {
+  .page-container { padding: 24px 15px 45px; }.page-header h1 { font-size: 39px; }.stat-grid, .stat-grid.three { grid-template-columns: 1fr; }.stat-card { min-height: 150px; }
+  .login-story { display: block; position: relative; min-height: 255px; padding: 28px 24px; }.login-story .story-copy { max-width: 100%; margin-top: 70px; }.story-copy h1 { font-size: 45px; }.story-copy > p:last-child, .story-metrics, .story-footnote { display: none; }.login-form-side { width: calc(100% - 28px); margin: -12px auto 0; padding-bottom: 24px; transform: none; }.login-card { padding: 27px 23px; }.mobile-login-brand { display: none; }.login-card h2 { font-size: 30px; }
+}

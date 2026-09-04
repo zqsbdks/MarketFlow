@@ -63,6 +63,11 @@ class RankingsRequest(BaseModel):
         description="部门ID，不传时统计整个店铺",
         ge=1,
     )
+    category_id: int | None = Field(
+        None,
+        description="商品分类ID，不传时统计全部分类",
+        ge=1,
+    )
     group_by: RankingGroupBy = Field(
         RankingGroupBy.PRODUCT,
         description="汇总方式：product按商品，category按分类",

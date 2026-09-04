@@ -9,7 +9,7 @@ from app.crud.auth import (
     get_employee_by_id,
     update_employee_last_login,
 )
-from app.crud.categories import get_categories_list
+from app.crud.categories import get_categories_list, get_category_by_id
 from app.crud.departments import get_departments_list
 from app.crud.employees import (
     create_employee,
@@ -30,6 +30,7 @@ __all__ = [
     "get_departments_list",
     "get_departments_reports",
     "get_categories_list",
+    "get_category_by_id",
     "get_list_employees",
     "get_product_by_id",
     "get_products_list",
