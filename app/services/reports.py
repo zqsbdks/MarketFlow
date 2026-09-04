@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.employees import get_department_by_id
-from app.crud.reports import get_reports
-from app.schemas.reports_responses import ReportResponse
+from app.crud.reports import get_departments_reports, get_reports
+from app.schemas.reports_responses import DepartmentResponse, ReportResponse
 
 BUSINESS_OPENING_TIME = time(9, 0)
 BUSINESS_CLOSING_TIME = time(21, 0)
@@ -99,8 +99,83 @@ async def overview_service(
 # endregion
 
 
+# region 获取部门营业对比
+async def get_departments_service(
+    db: AsyncSession,
+    employee_id: int,
+    start_time: datetime | None,
+    end_time: datetime | None,
+) -> list[DepartmentResponse]:
+    """验证员工和查询时间，并返回所有部门的营业对比数据。"""
+
+    employee = await get_employee_by_id(employee_id=employee_id, db=db)
+    if employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+
+    if employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    if start_time is not None:
+        selected_start_time = start_time.time()
+        if not BUSINESS_OPENING_TIME <= selected_start_time <= BUSINESS_CLOSING_TIME:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="开始时间必须在 09:00 至 21:00 之间",
+            )
+
+    if end_time is not None:
+        selected_end_time = end_time.time()
+        if not BUSINESS_OPENING_TIME <= selected_end_time <= BUSINESS_CLOSING_TIME:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="结束时间必须在 09:00 至 21:00 之间",
+            )
+
+    if start_time is not None and end_time is not None and start_time >= end_time:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="开始时间必须早于结束时间",
+        )
+
+    department_values = await get_departments_reports(
+        db=db,
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    departments: list[DepartmentResponse] = []
+    for department_id, department_name, revenue, gross_profit, sales_quantity in department_values:
+        department = DepartmentResponse(
+            department_id=department_id,
+            department_name=department_name,
+            revenue=revenue,
+            gross_profit=gross_profit,
+            sales_quantity=sales_quantity,
+        )
+        departments.append(department)
+
+    return departments
+
+
+# endregion
+
+
 __all__ = [
     "BUSINESS_CLOSING_TIME",
     "BUSINESS_OPENING_TIME",
+    "get_departments_service",
     "overview_service",
 ]

@@ -6,10 +6,12 @@ from decimal import Decimal
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.department import Department
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 
 ReportValues = tuple[Decimal, Decimal, Decimal, int, int]
+DepartmentReportValues = tuple[int, str, Decimal, Decimal, int]
 
 
 # region 获取营业概览
@@ -93,4 +95,70 @@ async def get_reports(
 # endregion
 
 
-__all__ = ["ReportValues", "get_reports"]
+async def get_departments_reports(
+    db: AsyncSession,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> list[DepartmentReportValues]:
+    """一次查询所有部门的营收、毛利润和销售数量。"""
+
+    # 先按部门汇总符合时间条件的销售明细。
+    department_summary_statement = (
+        select(
+            SaleItem.department_id.label("department_id"),
+            func.sum(SaleItem.subtotal).label("revenue"),
+            func.sum(SaleItem.subtotal - SaleItem.cost_subtotal).label("gross_profit"),
+            func.sum(SaleItem.quantity).label("sales_quantity"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .group_by(SaleItem.department_id)
+    )
+
+    if start_time is not None:
+        department_summary_statement = department_summary_statement.where(
+            Sale.sold_at >= start_time
+        )
+    if end_time is not None:
+        department_summary_statement = department_summary_statement.where(Sale.sold_at <= end_time)
+
+    department_summary = department_summary_statement.subquery()
+
+    # 从部门表开始做左连接，因此没有销售记录的部门也会返回，金额和数量为 0。
+    statement = (
+        select(
+            Department.id,
+            Department.name,
+            func.coalesce(department_summary.c.revenue, 0),
+            func.coalesce(department_summary.c.gross_profit, 0),
+            func.coalesce(department_summary.c.sales_quantity, 0),
+        )
+        .outerjoin(
+            department_summary,
+            department_summary.c.department_id == Department.id,
+        )
+        .order_by(Department.id.asc())
+    )
+
+    result = await db.execute(statement)
+    rows = result.all()
+
+    departments: list[DepartmentReportValues] = []
+    for department_id, department_name, revenue, gross_profit, sales_quantity in rows:
+        department = (
+            int(department_id),
+            str(department_name),
+            Decimal(revenue),
+            Decimal(gross_profit),
+            int(sales_quantity),
+        )
+        departments.append(department)
+
+    return departments
+
+
+__all__ = [
+    "DepartmentReportValues",
+    "ReportValues",
+    "get_departments_reports",
+    "get_reports",
+]

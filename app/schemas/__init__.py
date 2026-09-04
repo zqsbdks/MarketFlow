@@ -34,7 +34,10 @@ from app.schemas.products_responses import (
     ProductsItemResponse,
     ProductsListResponse,
 )
-from app.schemas.reports_requests import ReportRequest
+from app.schemas.reports_requests import DepartmentRequest, ReportRequest
+from app.schemas.reports_responses import (
+    DepartmentResponse as ReportDepartmentResponse,
+)
 from app.schemas.reports_responses import ReportResponse
 from app.schemas.sales_requests import SalesListRequest
 from app.schemas.sales_responses import (
@@ -56,6 +59,7 @@ __all__ = [
     "CategoryResponse",
     "DepartmentResponse",
     "DepartmentItemResponse",
+    "DepartmentRequest",
     "EmployeesCreateRequest",
     "EmployeesCreateResponse",
     "EmployeesItemResponse",
@@ -70,6 +74,7 @@ __all__ = [
     "ProductsListResponse",
     "ResponseModel",
     "ReportRequest",
+    "ReportDepartmentResponse",
     "ReportResponse",
     "SaleDetailItemResponse",
     "SaleDetailResponse",

@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
-from app.schemas.reports_responses import ReportResponse
-from app.services.reports import overview_service
+from app.schemas.reports_responses import DepartmentResponse, ReportResponse
+from app.services.reports import get_departments_service, overview_service
 
 
 def build_employee() -> SimpleNamespace:
@@ -120,6 +120,37 @@ async def test_overview_service_rejects_time_before_opening(monkeypatch) -> None
     get_reports.assert_not_awaited()
 
 
+async def test_departments_service_builds_all_department_items(monkeypatch) -> None:
+    """部门对比 Service 将查询结果逐项转换为响应模型。"""
+
+    async def get_employee(**_kwargs):
+        return build_employee()
+
+    async def get_department_reports(**_kwargs):
+        return [
+            (1, "精肉部", Decimal("8200.00"), Decimal("2500.00"), 210),
+            (2, "熟食部", Decimal("6500.00"), Decimal("2300.00"), 180),
+        ]
+
+    monkeypatch.setattr("app.services.reports.get_employee_by_id", get_employee)
+    monkeypatch.setattr(
+        "app.services.reports.get_departments_reports",
+        get_department_reports,
+    )
+
+    result = await get_departments_service(
+        db=AsyncMock(spec=AsyncSession),
+        employee_id=2,
+        start_time=None,
+        end_time=None,
+    )
+
+    assert len(result) == 2
+    assert result[0].department_name == "精肉部"
+    assert result[0].revenue == Decimal("8200.00")
+    assert result[1].sales_quantity == 180
+
+
 # endregion
 
 
@@ -162,6 +193,47 @@ def test_overview_route_returns_documented_response(monkeypatch) -> None:
             "sales_quantity": 7,
             "sale_count": 3,
         },
+    }
+
+
+def test_departments_route_returns_documented_response(monkeypatch) -> None:
+    """部门销售对比接口返回统一响应格式。"""
+
+    async def get_departments(**_kwargs):
+        return [
+            DepartmentResponse(
+                department_id=1,
+                department_name="精肉部",
+                revenue=Decimal("8200.00"),
+                gross_profit=Decimal("2500.00"),
+                sales_quantity=210,
+            )
+        ]
+
+    monkeypatch.setattr(
+        "app.routers.reports.get_departments_service",
+        get_departments,
+    )
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_employee_id
+
+    with TestClient(application) as client:
+        response = client.get("/api/v1/reports/departments")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "code": 200,
+        "message": "获取部门销售对比数据成功",
+        "data": [
+            {
+                "department_id": 1,
+                "department_name": "精肉部",
+                "revenue": "8200.00",
+                "gross_profit": "2500.00",
+                "sales_quantity": 210,
+            }
+        ],
     }
 
 

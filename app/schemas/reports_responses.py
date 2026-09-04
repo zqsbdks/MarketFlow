@@ -21,4 +21,16 @@ class ReportResponse(BaseModel):
 # endregion
 
 
-__all__ = ["ReportResponse"]
+class DepartmentResponse(BaseModel):
+    """单个部门的营业对比数据。"""
+
+    department_id: int = Field(..., description="部门ID", ge=1)
+    department_name: str = Field(..., description="部门名称", min_length=1, max_length=50)
+    revenue: Decimal = Field(..., description="部门营收", ge=0)
+    gross_profit: Decimal = Field(..., description="部门毛利")
+    sales_quantity: int = Field(..., description="部门销售数量", ge=0)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+__all__ = ["DepartmentResponse", "ReportResponse"]

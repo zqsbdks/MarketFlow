@@ -27,4 +27,17 @@ class ReportRequest(BaseModel):
 # endregion
 
 
-__all__ = ["ReportRequest"]
+class DepartmentRequest(BaseModel):
+    """部门营业对比的可选时间范围。"""
+
+    start_time: datetime | None = Field(
+        None,
+        description="开始时间，允许范围为每天 09:00 至 21:00",
+    )
+    end_time: datetime | None = Field(
+        None,
+        description="结束时间，允许范围为每天 09:00 至 21:00",
+    )
+
+
+__all__ = ["DepartmentRequest", "ReportRequest"]
