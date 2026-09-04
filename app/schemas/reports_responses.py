@@ -21,6 +21,7 @@ class ReportResponse(BaseModel):
 # endregion
 
 
+# region 部门销售对比响应
 class DepartmentResponse(BaseModel):
     """单个部门的营业对比数据。"""
 
@@ -33,4 +34,40 @@ class DepartmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ["DepartmentResponse", "ReportResponse"]
+# endregion
+
+
+# region 销售排行响应
+class RankingItemResponse(BaseModel):
+    """销售排行中的一个商品或商品分类。"""
+
+    rank: int = Field(..., description="当前排序名次", ge=1)
+    id: int = Field(..., description="商品ID或商品分类ID", ge=1)
+    name: str = Field(..., description="商品名称或商品分类名称", min_length=1)
+    quantity: int = Field(..., description="累计销售数量", ge=0)
+    amount: Decimal = Field(..., description="累计销售金额", ge=0)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RankingsResponse(BaseModel):
+    """销售排行列表及分页信息。"""
+
+    items: list[RankingItemResponse] = Field(..., description="销售排行列表")
+    page: int = Field(..., description="当前页码", ge=1)
+    page_size: int = Field(..., description="每页数量", ge=1, le=100)
+    total: int = Field(..., description="参与排行的商品或分类总数", ge=0)
+    total_pages: int = Field(..., description="总页数", ge=0)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# endregion
+
+
+__all__ = [
+    "DepartmentResponse",
+    "RankingItemResponse",
+    "RankingsResponse",
+    "ReportResponse",
+]

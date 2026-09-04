@@ -9,7 +9,14 @@ from app.models.base import Base
 from app.models.category import Category
 from app.models.department import Department
 from app.models.employee import Employee
-from app.models.enums import EmployeeRole, ProductStatus, SaleSource
+from app.models.enums import (
+    EmployeeRole,
+    ProductStatus,
+    RankingGroupBy,
+    RankingSortBy,
+    RankingSortOrder,
+    SaleSource,
+)
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
@@ -23,6 +30,9 @@ __all__ = [
     "EmployeeRole",
     "Product",
     "ProductStatus",
+    "RankingGroupBy",
+    "RankingSortBy",
+    "RankingSortOrder",
     "Sale",
     "SaleItem",
     "SaleSource",

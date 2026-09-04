@@ -13,8 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
-from app.schemas.reports_responses import DepartmentResponse, ReportResponse
-from app.services.reports import get_departments_service, overview_service
+from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
+from app.schemas.reports_responses import (
+    DepartmentResponse,
+    RankingsResponse,
+    ReportResponse,
+)
+from app.services.reports import (
+    get_departments_service,
+    get_rankings_service,
+    overview_service,
+)
 
 
 def build_employee() -> SimpleNamespace:
@@ -151,6 +160,41 @@ async def test_departments_service_builds_all_department_items(monkeypatch) -> N
     assert result[1].sales_quantity == 180
 
 
+async def test_rankings_service_builds_paginated_ranking(monkeypatch) -> None:
+    """销售排行 Service 生成连续名次和分页信息。"""
+
+    async def get_employee(**_kwargs):
+        return build_employee()
+
+    async def get_ranking_values(**_kwargs):
+        return [
+            (1, "牛肉", 6, Decimal("238.80")),
+            (2, "猪肉", 5, Decimal("194.00")),
+        ], 12
+
+    monkeypatch.setattr("app.services.reports.get_employee_by_id", get_employee)
+    monkeypatch.setattr("app.services.reports.get_rankings", get_ranking_values)
+
+    result = await get_rankings_service(
+        db=AsyncMock(spec=AsyncSession),
+        employee_id=2,
+        start_date=None,
+        end_date=None,
+        department_id=None,
+        group_by=RankingGroupBy.PRODUCT,
+        sort_by=RankingSortBy.QUANTITY,
+        sort_order=RankingSortOrder.DESC,
+        page=2,
+        page_size=10,
+    )
+
+    assert result.items[0].rank == 11
+    assert result.items[0].name == "牛肉"
+    assert result.items[0].quantity == 6
+    assert result.total == 12
+    assert result.total_pages == 2
+
+
 # endregion
 
 
@@ -235,6 +279,73 @@ def test_departments_route_returns_documented_response(monkeypatch) -> None:
             }
         ],
     }
+
+
+def test_rankings_route_returns_documented_response(monkeypatch) -> None:
+    """销售排行接口接收枚举参数并返回统一分页格式。"""
+
+    received: dict[str, object] = {}
+
+    async def get_ranking(**kwargs):
+        received.update(kwargs)
+        return RankingsResponse(
+            items=[],
+            page=1,
+            page_size=10,
+            total=0,
+            total_pages=0,
+        )
+
+    monkeypatch.setattr("app.routers.reports.get_rankings_service", get_ranking)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_employee_id
+
+    with TestClient(application) as client:
+        response = client.get(
+            "/api/v1/reports/rankings",
+            params={
+                "department_id": 1,
+                "group_by": "category",
+                "sort_by": "amount",
+                "sort_order": "asc",
+                "page": 1,
+                "page_size": 10,
+            },
+        )
+
+    assert response.status_code == 200
+    assert received["department_id"] == 1
+    assert received["group_by"] == RankingGroupBy.CATEGORY
+    assert received["sort_by"] == RankingSortBy.AMOUNT
+    assert received["sort_order"] == RankingSortOrder.ASC
+    assert response.json() == {
+        "code": 200,
+        "message": "获取销售排行成功",
+        "data": {
+            "items": [],
+            "page": 1,
+            "page_size": 10,
+            "total": 0,
+            "total_pages": 0,
+        },
+    }
+
+
+def test_rankings_route_rejects_unsupported_group_by() -> None:
+    """不支持的汇总方式由请求模型直接拒绝。"""
+
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_employee_id
+
+    with TestClient(application) as client:
+        response = client.get(
+            "/api/v1/reports/rankings",
+            params={"group_by": "department"},
+        )
+
+    assert response.status_code == 422
 
 
 # endregion

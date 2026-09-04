@@ -6,12 +6,16 @@ from decimal import Decimal
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.category import Category
 from app.models.department import Department
+from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
+from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 
 ReportValues = tuple[Decimal, Decimal, Decimal, int, int]
 DepartmentReportValues = tuple[int, str, Decimal, Decimal, int]
+RankingValues = tuple[int, str, int, Decimal]
 
 
 # region 获取营业概览
@@ -156,9 +160,114 @@ async def get_departments_reports(
     return departments
 
 
+# region 获取销售排行
+async def get_rankings(
+    db: AsyncSession,
+    start_date: datetime | None,
+    end_date: datetime | None,
+    department_id: int | None,
+    group_by: RankingGroupBy,
+    sort_by: RankingSortBy,
+    sort_order: RankingSortOrder,
+    offset: int,
+    page_size: int,
+) -> tuple[list[RankingValues], int]:
+    """按商品或分类汇总销售数据，并返回当前页和分组总数。"""
+
+    conditions = []
+    if start_date is not None:
+        conditions.append(Sale.sold_at >= start_date)
+    if end_date is not None:
+        conditions.append(Sale.sold_at <= end_date)
+    if department_id is not None:
+        conditions.append(SaleItem.department_id == department_id)
+
+    # 两种排行都需要计算累计销售数量和累计销售金额。
+    total_quantity = func.sum(SaleItem.quantity).label("quantity")
+    total_amount = func.sum(SaleItem.subtotal).label("amount")
+
+    if group_by == RankingGroupBy.PRODUCT:
+        list_statement = (
+            select(
+                Product.id,
+                Product.name,
+                total_quantity,
+                total_amount,
+            )
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .join(Product, Product.id == SaleItem.product_id)
+            .where(*conditions)
+            .group_by(Product.id, Product.name)
+        )
+        count_statement = (
+            select(func.count(distinct(SaleItem.product_id)))
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(*conditions)
+        )
+        group_id = Product.id
+    else:
+        list_statement = (
+            select(
+                Category.id,
+                Category.name,
+                total_quantity,
+                total_amount,
+            )
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .join(Product, Product.id == SaleItem.product_id)
+            .join(Category, Category.id == Product.category_id)
+            .where(*conditions)
+            .group_by(Category.id, Category.name)
+        )
+        count_statement = (
+            select(func.count(distinct(Category.id)))
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .join(Product, Product.id == SaleItem.product_id)
+            .join(Category, Category.id == Product.category_id)
+            .where(*conditions)
+        )
+        group_id = Category.id
+
+    # 根据请求选择数量或金额作为排序列，再选择升序或降序。
+    sort_column = total_quantity if sort_by == RankingSortBy.QUANTITY else total_amount
+    if sort_order == RankingSortOrder.ASC:
+        order_expression = sort_column.asc()
+    else:
+        order_expression = sort_column.desc()
+
+    list_statement = (
+        list_statement.order_by(order_expression, group_id.asc()).offset(offset).limit(page_size)
+    )
+
+    total_result = await db.scalar(count_statement)
+    list_result = await db.execute(list_statement)
+    rows = list_result.all()
+
+    rankings: list[RankingValues] = []
+    for item_id, item_name, quantity, amount in rows:
+        ranking = (
+            int(item_id),
+            str(item_name),
+            int(quantity),
+            Decimal(amount),
+        )
+        rankings.append(ranking)
+
+    return rankings, int(total_result or 0)
+
+
+# endregion
+
+
 __all__ = [
     "DepartmentReportValues",
+    "RankingValues",
     "ReportValues",
     "get_departments_reports",
+    "get_rankings",
     "get_reports",
 ]

@@ -24,4 +24,32 @@ class SaleSource(StrEnum):
     DEMO_SEED = "demo_seed"  # 系统初始化生成的演示销售数据。
 
 
-__all__ = ["EmployeeRole", "ProductStatus", "SaleSource"]
+class RankingGroupBy(StrEnum):
+    """销售排行的汇总方式。"""
+
+    PRODUCT = "product"  # 将相同商品的销售明细合并。
+    CATEGORY = "category"  # 将同一商品分类的销售明细合并。
+
+
+class RankingSortBy(StrEnum):
+    """销售排行的排序指标。"""
+
+    QUANTITY = "quantity"  # 按累计销售数量排序。
+    AMOUNT = "amount"  # 按累计销售金额排序。
+
+
+class RankingSortOrder(StrEnum):
+    """销售排行的排序方向。"""
+
+    ASC = "asc"  # 从小到大排列。
+    DESC = "desc"  # 从大到小排列。
+
+
+__all__ = [
+    "EmployeeRole",
+    "ProductStatus",
+    "RankingGroupBy",
+    "RankingSortBy",
+    "RankingSortOrder",
+    "SaleSource",
+]

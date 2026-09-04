@@ -34,11 +34,22 @@ from app.schemas.products_responses import (
     ProductsItemResponse,
     ProductsListResponse,
 )
-from app.schemas.reports_requests import DepartmentRequest, ReportRequest
+from app.schemas.reports_requests import (
+    DepartmentRequest,
+    RankingGroupBy,
+    RankingSortBy,
+    RankingSortOrder,
+    RankingsRequest,
+    ReportRequest,
+)
 from app.schemas.reports_responses import (
     DepartmentResponse as ReportDepartmentResponse,
 )
-from app.schemas.reports_responses import ReportResponse
+from app.schemas.reports_responses import (
+    RankingItemResponse,
+    RankingsResponse,
+    ReportResponse,
+)
 from app.schemas.sales_requests import SalesListRequest
 from app.schemas.sales_responses import (
     SaleDetailItemResponse,
@@ -73,6 +84,12 @@ __all__ = [
     "ProductsListRequest",
     "ProductsListResponse",
     "ResponseModel",
+    "RankingGroupBy",
+    "RankingItemResponse",
+    "RankingSortBy",
+    "RankingSortOrder",
+    "RankingsRequest",
+    "RankingsResponse",
     "ReportRequest",
     "ReportDepartmentResponse",
     "ReportResponse",
