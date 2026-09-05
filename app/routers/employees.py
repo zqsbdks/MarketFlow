@@ -7,11 +7,13 @@ from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
 from app.schemas.employees_requests import (
+    EmployeeDetailUpdateRequest,
     EmployeesCreateRequest,
     EmployeesListRequest,
     EmployeesStatusUpdateRequest,
 )
 from app.schemas.employees_responses import (
+    EmployeeDetailResponse,
     EmployeesCreateResponse,
     EmployeesListResponse,
     EmployeesResetPasswordResponse,
@@ -19,8 +21,10 @@ from app.schemas.employees_responses import (
 )
 from app.services.employees import (
     create_employee_service,
+    get_employee_detail_service,
     get_list_employees_service,
     reset_employee_password_service,
+    update_employee_detail_service,
     update_employee_status_service,
 )
 
@@ -150,5 +154,68 @@ async def reset_employee_password(
 
 # endregion
 
+
+# region 获取员工详情接口
+@employees_router.get(
+    "/{employee_id}",
+    response_model=ResponseModel[EmployeeDetailResponse],
+    summary="获取员工详情",
+    description="员工可以查看本人详情，店长可以查看所有员工详情。",
+)
+async def get_employee_detail(
+    employee_id: int = Path(..., description="员工ID", ge=1),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[EmployeeDetailResponse]:
+    """接收目标员工 ID，并返回统一格式的员工详情。"""
+
+    # employee_id 来自 URL；current_employee_id 来自当前登录 Token。
+    # Service 负责权限检查，返回已组装好的 EmployeeDetailResponse 对象。
+    detail = await get_employee_detail_service(
+        employee_id=employee_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[EmployeeDetailResponse](
+        # data 中仅包含响应模型定义的公开字段，不包含密码哈希。
+        message="员工详情获取成功",
+        data=detail,
+    )
+
+
+# endregion
+
+
+# region 修改员工详情接口
+@employees_router.put(
+    "/{employee_id}",
+    response_model=ResponseModel[EmployeeDetailResponse],
+    summary="修改员工详情",
+    description="店长提交完整资料，修改指定员工详情。",
+)
+async def update_employee_detail(
+    request: EmployeeDetailUpdateRequest,
+    employee_id: int = Path(..., description="员工ID", ge=1),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[EmployeeDetailResponse]:
+    """从 JSON 请求体接收详情，返回保存后的员工资料。"""
+
+    # URL 指定被修改的员工；Token 指定操作人，两者不能混用。
+    update_detail = await update_employee_detail_service(
+        employee_id=employee_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[EmployeeDetailResponse](
+        message="员工详情修改成功",
+        data=update_detail,
+    )
+
+
+# endregion
 
 __all__ = ["employees_router"]

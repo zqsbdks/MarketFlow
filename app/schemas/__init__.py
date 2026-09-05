@@ -15,11 +15,13 @@ from app.schemas.categories_requests import CategoryListRequest
 from app.schemas.categories_responses import CategoriesItemResponse
 from app.schemas.departments_responses import DepartmentItemResponse
 from app.schemas.employees_requests import (
+    EmployeeDetailUpdateRequest,
     EmployeesCreateRequest,
     EmployeesListRequest,
     EmployeesStatusUpdateRequest,
 )
 from app.schemas.employees_responses import (
+    EmployeeDetailResponse,
     EmployeesCreateResponse,
     EmployeesItemResponse,
     EmployeesListResponse,
@@ -71,6 +73,8 @@ __all__ = [
     "DepartmentResponse",
     "DepartmentItemResponse",
     "DepartmentRequest",
+    "EmployeeDetailResponse",
+    "EmployeeDetailUpdateRequest",
     "EmployeesCreateRequest",
     "EmployeesCreateResponse",
     "EmployeesItemResponse",

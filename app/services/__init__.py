@@ -9,8 +9,10 @@ from app.services.categories import get_categories_list_service
 from app.services.departments import get_departments_list_service
 from app.services.employees import (
     create_employee_service,
+    get_employee_detail_service,
     get_list_employees_service,
     reset_employee_password_service,
+    update_employee_detail_service,
     update_employee_status_service,
 )
 from app.services.products import get_product_detail_service, get_products_list_service
@@ -29,6 +31,7 @@ __all__ = [
     "get_categories_list_service",
     "get_departments_list_service",
     "get_departments_service",
+    "get_employee_detail_service",
     "get_list_employees_service",
     "get_product_detail_service",
     "get_products_list_service",
@@ -37,5 +40,6 @@ __all__ = [
     "get_sales_detail_service",
     "get_sales_list_service",
     "reset_employee_password_service",
+    "update_employee_detail_service",
     "update_employee_status_service",
 ]

@@ -1,14 +1,16 @@
 """员工管理相关的数据库读写函数。"""
 
+from datetime import date
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.department import Department
 from app.models.employee import Employee
-from app.models.enums import EmployeeRole
+from app.models.employee_detail import EmployeeDetail
+from app.models.enums import EmployeeGender, EmployeeRole, EmploymentStatus
 
 
 # region 查询部门
@@ -65,6 +67,72 @@ async def get_list_employees(
 # endregion
 
 
+# region 获取员工详情
+async def get_employee_detail_by_id(
+    employee_id: int,
+    db: AsyncSession,
+) -> EmployeeDetail | None:
+    """返回一个 EmployeeDetail 对象，查不到详情时返回 None。
+
+    关联对象已提前加载，可通过 detail.employee 访问 Employee，
+    通过 detail.employee.department 访问 Department（无部门时为 None）。
+    """
+
+    statement = (
+        select(EmployeeDetail)
+        .options(
+            # 使用额外 SELECT 提前加载员工及部门关系，供 Service 读取。
+            selectinload(EmployeeDetail.employee).selectinload(Employee.department),
+        )
+        .where(EmployeeDetail.employee_id == employee_id)
+        # 修改后复用本查询时，刷新会话中已有对象及数据库生成的更新时间。
+        .execution_options(populate_existing=True)
+    )
+    result = await db.execute(statement)
+
+    # 从执行结果中取出唯一的详情 ORM 对象；没有记录时返回 None。
+    return result.scalar_one_or_none()
+
+
+# endregion
+
+
+# region 修改员工详情
+async def update_employee_detail(
+    employee_id: int,
+    gender: EmployeeGender,
+    birth_date: date,
+    hire_date: date,
+    phone: str,
+    address: str,
+    employment_status: EmploymentStatus,
+    separation_date: date | None,
+    separation_reason: str | None,
+    db: AsyncSession,
+) -> None:
+    """执行 UPDATE，不返回详情对象；查询结果与提交事务由 Service 负责。"""
+
+    statement = (
+        update(EmployeeDetail)
+        .where(EmployeeDetail.employee_id == employee_id)
+        .values(
+            gender=gender,
+            birth_date=birth_date,
+            hire_date=hire_date,
+            phone=phone,
+            address=address,
+            employment_status=employment_status,
+            separation_date=separation_date,
+            separation_reason=separation_reason,
+        )
+    )
+    # execute 执行 UPDATE，其返回值是执行结果，不是 EmployeeDetail 对象。
+    await db.execute(statement)
+
+
+# endregion
+
+
 # region 修改员工状态
 async def update_employee_status(
     employee: Employee,
@@ -101,6 +169,7 @@ async def create_employee(
         department_id=department_id,
         password_hash=password_hash,
         must_change_password=True,
+        detail=EmployeeDetail(hire_date=date.today()),
     )
     db.add(new_employee)
 
@@ -136,7 +205,9 @@ async def reset_employee_password(
 __all__ = [
     "create_employee",
     "get_department_by_id",
+    "get_employee_detail_by_id",
     "get_list_employees",
     "reset_employee_password",
+    "update_employee_detail",
     "update_employee_status",
 ]

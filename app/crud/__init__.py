@@ -14,8 +14,10 @@ from app.crud.departments import get_departments_list
 from app.crud.employees import (
     create_employee,
     get_department_by_id,
+    get_employee_detail_by_id,
     get_list_employees,
     reset_employee_password,
+    update_employee_detail,
     update_employee_status,
 )
 from app.crud.products import get_product_by_id, get_products_list
@@ -26,6 +28,7 @@ __all__ = [
     "create_employee",
     "get_employee_by_employee_no",
     "get_employee_by_id",
+    "get_employee_detail_by_id",
     "get_department_by_id",
     "get_departments_list",
     "get_departments_reports",
@@ -39,6 +42,7 @@ __all__ = [
     "get_sales_detail",
     "get_sales_list",
     "reset_employee_password",
+    "update_employee_detail",
     "update_employee_status",
     "update_employee_last_login",
 ]

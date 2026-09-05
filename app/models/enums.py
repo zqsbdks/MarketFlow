@@ -11,6 +11,23 @@ class EmployeeRole(StrEnum):
     CONTRACT_WORKER = "契约工"  # 绑定部门的契约雇员。
 
 
+class EmployeeGender(StrEnum):
+    """员工登记的性别。"""
+
+    MALE = "男"
+    FEMALE = "女"
+    UNSPECIFIED = "未填写"
+
+
+class EmploymentStatus(StrEnum):
+    """员工与门店之间的雇佣状态。"""
+
+    EMPLOYED = "在职"
+    ON_LEAVE = "休假"
+    RESIGNED = "离职"
+    DISMISSED = "解雇"
+
+
 class ProductStatus(StrEnum):
     """商品的人工销售状态；缺货状态由库存数量动态计算。"""
 
@@ -46,7 +63,9 @@ class RankingSortOrder(StrEnum):
 
 
 __all__ = [
+    "EmployeeGender",
     "EmployeeRole",
+    "EmploymentStatus",
     "ProductStatus",
     "RankingGroupBy",
     "RankingSortBy",

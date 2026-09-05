@@ -9,8 +9,11 @@ from app.models.base import Base
 from app.models.category import Category
 from app.models.department import Department
 from app.models.employee import Employee
+from app.models.employee_detail import EmployeeDetail
 from app.models.enums import (
+    EmployeeGender,
     EmployeeRole,
+    EmploymentStatus,
     ProductStatus,
     RankingGroupBy,
     RankingSortBy,
@@ -27,7 +30,10 @@ __all__ = [
     "Category",
     "Department",
     "Employee",
+    "EmployeeDetail",
+    "EmployeeGender",
     "EmployeeRole",
+    "EmploymentStatus",
     "Product",
     "ProductStatus",
     "RankingGroupBy",

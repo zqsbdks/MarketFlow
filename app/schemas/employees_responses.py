@@ -1,8 +1,10 @@
 """员工管理接口的响应模型。"""
 
+from datetime import date, datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import EmployeeRole
+from app.models.enums import EmployeeGender, EmployeeRole, EmploymentStatus
 
 
 # region 创建员工响应
@@ -106,7 +108,67 @@ class EmployeesResetPasswordResponse(BaseModel):
 # endregion
 
 
+# region 获取员工详情响应
+
+
+class EmployeeDetailResponse(BaseModel):
+    """员工详情响应。"""
+
+    id: int = Field(..., description="员工ID", ge=1)
+    employee_no: str = Field(
+        ...,
+        description="员工编号",
+        min_length=1,
+        max_length=20,
+    )
+    name: str = Field(
+        ...,
+        description="员工姓名",
+        min_length=1,
+        max_length=50,
+    )
+    role: EmployeeRole = Field(..., description="员工工种")
+
+    # 店长可以没有所属部门，因此需要允许为空。
+    department_id: int | None = Field(None, description="部门ID")
+    department_name: str | None = Field(None, description="部门名称")
+
+    is_active: bool = Field(..., description="账号是否启用")
+    last_login_at: datetime | None = Field(None, description="最后登录时间")
+
+    gender: EmployeeGender = Field(..., description="性别")
+    phone: str | None = Field(
+        None,
+        description="联系电话",
+        max_length=30,
+    )
+    birth_date: date | None = Field(None, description="出生日期")
+    hire_date: date = Field(..., description="入职日期")
+    address: str | None = Field(
+        None,
+        description="居住地址",
+        max_length=255,
+    )
+
+    employment_status: EmploymentStatus = Field(..., description="雇佣状态")
+    separation_date: date | None = Field(None, description="离职或解雇日期")
+    separation_reason: str | None = Field(
+        None,
+        description="离职或解雇原因",
+        max_length=255,
+    )
+
+    created_at: datetime = Field(..., description="详情创建时间")
+    updated_at: datetime = Field(..., description="详情更新时间")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# endregion
+
+
 __all__ = [
+    "EmployeeDetailResponse",
     "EmployeesCreateResponse",
     "EmployeesItemResponse",
     "EmployeesListResponse",

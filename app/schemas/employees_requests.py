@@ -1,8 +1,10 @@
 """员工管理接口的请求模型。"""
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import EmployeeRole
+from app.models.enums import EmployeeGender, EmployeeRole, EmploymentStatus
 
 
 # region 创建员工请求
@@ -44,7 +46,38 @@ class EmployeesStatusUpdateRequest(BaseModel):
 # endregion
 
 
+# region 修改员工详情请求
+class EmployeeDetailUpdateRequest(BaseModel):
+    """店长提交完整的员工详情编辑表单。"""
+
+    # 编辑详情时，除离职日期和原因外，其余六个字段必须提交且不能为 null。
+    gender: EmployeeGender = Field(..., description="性别：男、女、未填写")
+    # 日期只包含年月日，请求示例："2000-05-10"。
+    birth_date: date = Field(..., description="出生日期")
+    hire_date: date = Field(..., description="入职日期")
+    phone: str = Field(..., description="联系电话", min_length=1, max_length=30)
+    address: str = Field(..., description="居住地址", min_length=1, max_length=255)
+    employment_status: EmploymentStatus = Field(
+        ...,
+        description="雇佣状态：在职、休假、离职、解雇",
+    )
+    # 允许暂不填写；状态变更时的日期补全及先后关系由 Service 处理。
+    separation_date: date | None = Field(None, description="离职或解雇日期")
+    separation_reason: str | None = Field(
+        None,
+        description="离职或解雇原因",
+        max_length=255,
+    )
+
+    # 自动清除联系电话、地址和原因两端的空格。
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+# endregion
+
+
 __all__ = [
+    "EmployeeDetailUpdateRequest",
     "EmployeesCreateRequest",
     "EmployeesListRequest",
     "EmployeesStatusUpdateRequest",

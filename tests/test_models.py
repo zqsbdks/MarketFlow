@@ -10,7 +10,10 @@ from sqlalchemy.schema import CreateTable
 from app.models import (
     Base,
     Employee,
+    EmployeeDetail,
+    EmployeeGender,
     EmployeeRole,
+    EmploymentStatus,
     Product,
     ProductStatus,
     Sale,
@@ -29,6 +32,19 @@ EXPECTED_COLUMNS = {
         "is_active",
         "must_change_password",
         "last_login_at",
+        "created_at",
+        "updated_at",
+    },
+    "employee_detail": {
+        "employee_id",
+        "gender",
+        "birth_date",
+        "hire_date",
+        "phone",
+        "address",
+        "employment_status",
+        "separation_date",
+        "separation_reason",
         "created_at",
         "updated_at",
     },
@@ -74,6 +90,7 @@ EXPECTED_COLUMNS = {
 EXPECTED_TABLE_COMMENTS = {
     "department": "部门表",
     "employee": "员工表",
+    "employee_detail": "员工详情表",
     "category": "商品分类表",
     "product": "商品表",
     "sale": "销售单表",
@@ -81,8 +98,8 @@ EXPECTED_TABLE_COMMENTS = {
 }
 
 
-def test_first_version_has_only_six_physical_tables() -> None:
-    """最终设计删除 inventory，因此元数据只注册六张物理表。"""
+def test_employee_detail_is_the_seventh_business_table() -> None:
+    """员工详情作为第七张业务表，并继续排除独立库存表。"""
 
     assert set(Base.metadata.tables) == set(EXPECTED_COLUMNS)
     assert "inventory" not in Base.metadata.tables
@@ -162,11 +179,16 @@ def test_enum_values_match_confirmed_business_values() -> None:
     assert Employee.__table__.c.role.type.enums == [item.value for item in EmployeeRole]
     assert Product.__table__.c.status.type.enums == [item.value for item in ProductStatus]
     assert Sale.__table__.c.source.type.enums == [item.value for item in SaleSource]
+    assert EmployeeDetail.__table__.c.gender.type.enums == [item.value for item in EmployeeGender]
+    assert EmployeeDetail.__table__.c.employment_status.type.enums == [
+        item.value for item in EmploymentStatus
+    ]
 
     expected_constraint_names = {
         "employee": "employee_role",
         "product": "product_status",
         "sale": "sale_source",
+        "employee_detail": "employee_detail_employment_status",
     }
     for table_name, constraint_name in expected_constraint_names.items():
         check_names = {
@@ -189,7 +211,7 @@ def test_all_tables_explicitly_use_utf8mb4() -> None:
 def test_mutable_master_tables_update_timestamp_in_mysql() -> None:
     """主数据表由 MySQL 自动维护 updated_at，避免绕过 ORM 时留下旧时间。"""
 
-    for table_name in ("department", "employee", "category", "product"):
+    for table_name in ("department", "employee", "employee_detail", "category", "product"):
         ddl = str(CreateTable(Base.metadata.tables[table_name]).compile(dialect=mysql.dialect()))
         assert "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" in ddl
 
@@ -204,4 +226,4 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """员工角色中文化迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260902_0004"]
+    assert script.get_heads() == ["20260905_0005"]

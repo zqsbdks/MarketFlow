@@ -23,6 +23,7 @@ from app.models.enums import EmployeeRole
 
 if TYPE_CHECKING:
     from app.models.department import Department
+    from app.models.employee_detail import EmployeeDetail
 
 
 class Employee(TimestampMixin, Base):
@@ -92,6 +93,12 @@ class Employee(TimestampMixin, Base):
     )
 
     department: Mapped[Department | None] = relationship(back_populates="employees")
+    detail: Mapped[EmployeeDetail | None] = relationship(
+        back_populates="employee",
+        cascade="all, delete-orphan",
+        single_parent=True,
+        uselist=False,
+    )
 
 
 __all__ = ["Employee"]

@@ -1,5 +1,6 @@
 """创建员工 Service、CRUD 与 API 响应测试。"""
 
+from datetime import date
 from unittest.mock import AsyncMock
 
 import pytest
@@ -286,6 +287,8 @@ async def test_create_employee_crud_generates_employee_number() -> None:
     assert employee.employee_no == "E00012"
     assert employee.password_hash == password_hash
     assert employee.must_change_password is True
+    assert employee.detail is not None
+    assert employee.detail.hire_date == date.today()
     assert session.flush.await_count == 2
     session.commit.assert_not_awaited()
 

@@ -98,6 +98,9 @@
     "app/models/employee.py": {
         "description": "员工登录账号、角色与部门归属ORM模型"
     },
+    "app/models/employee_detail.py": {
+        "description": "员工个人资料与雇佣状态ORM模型"
+    },
     "app/models/category.py": {
         "description": "部门商品分类及同部门名称唯一约束ORM模型"
     },
@@ -265,6 +268,9 @@
     },
     "alembic/versions/20260902_0004_localize_employee_roles.py": {
         "description": "将员工角色数据与检查约束转换为中文的迁移"
+    },
+    "alembic/versions/20260905_0005_create_employee_detail.py": {
+        "description": "创建员工详情表并为现有员工补充默认详情"
     },
     "frontend": {
         "description": "Vue 3 门店经营管理前端"
