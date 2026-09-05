@@ -15,7 +15,7 @@ from app.models.employee import Employee
 from app.models.enums import EmployeeRole, ProductStatus
 from app.models.product import Product
 from app.schemas.products_responses import ProductsListResponse
-from app.services.products import get_products_list_service
+from app.services.products import get_product_detail_service, get_products_list_service
 
 
 def build_manager() -> Employee:
@@ -28,6 +28,21 @@ def build_manager() -> Employee:
         password_hash="test-password-hash",
         role=EmployeeRole.STORE_MANAGER,
         department_id=None,
+        is_active=True,
+        must_change_password=False,
+    )
+
+
+def build_regular_employee() -> Employee:
+    """构造已修改初始密码且状态正常的正式员工。"""
+
+    return Employee(
+        id=2,
+        employee_no="E00002",
+        name="测试员工",
+        password_hash="test-password-hash",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=1,
         is_active=True,
         must_change_password=False,
     )
@@ -96,6 +111,62 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
     assert result.total_pages == 1
     assert result.items[0].department_name == "精肉部"
     assert result.items[0].category_name == "牛肉"
+
+
+async def test_regular_employee_can_view_products_list(monkeypatch) -> None:
+    """已登录且状态正常的普通员工也可以查询商品列表。"""
+
+    employee = build_regular_employee()
+    product = build_product()
+
+    async def get_current(**_kwargs):
+        return employee
+
+    async def get_products(**_kwargs):
+        return [product], 1
+
+    monkeypatch.setattr("app.services.products.get_employee_by_id", get_current)
+    monkeypatch.setattr("app.services.products.get_products_list", get_products)
+
+    result = await get_products_list_service(
+        page=1,
+        page_size=10,
+        keyword=None,
+        department_id=None,
+        category_id=None,
+        status=None,
+        current_employee_id=employee.id,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.total == 1
+    assert result.items[0].id == product.id
+
+
+async def test_regular_employee_can_view_product_detail(monkeypatch) -> None:
+    """普通员工也可以打开商品详情。"""
+
+    employee = build_regular_employee()
+    product = build_product()
+
+    async def get_current(**_kwargs):
+        return employee
+
+    async def get_product(**_kwargs):
+        return product
+
+    monkeypatch.setattr("app.services.products.get_employee_by_id", get_current)
+    monkeypatch.setattr("app.services.products.get_product_by_id", get_product)
+
+    result = await get_product_detail_service(
+        product_id=product.id,
+        current_employee_id=employee.id,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.id == product.id
+    assert result.department.name == "精肉部"
+    assert result.category.name == "牛肉"
 
 
 # endregion

@@ -350,9 +350,6 @@
     "scripts/check_database.py": {
         "description": "检查MySQL连接和数据库基本可用性"
     },
-    "scripts/seed_demo_data.py": {
-        "description": "幂等生成部门、员工、分类、商品和最近七天销售演示数据"
-    },
     "scripts/setup.py": {
         "description": "跨平台初始化环境、依赖与项目配置"
     },

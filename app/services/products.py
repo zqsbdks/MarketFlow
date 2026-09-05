@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.products import get_product_by_id, get_products_list
-from app.models.enums import EmployeeRole, ProductStatus
+from app.models.enums import ProductStatus
 from app.schemas.products_responses import (
     CategoryResponse,
     DepartmentResponse,
@@ -27,7 +27,7 @@ async def get_products_list_service(
     current_employee_id: int,
     db: AsyncSession,
 ) -> ProductsListResponse:
-    """验证当前店长账号，并组装经过筛选和分页的商品列表。"""
+    """验证当前员工账号，并组装经过筛选和分页的商品列表。"""
 
     # Token 只能证明签发时员工存在；每次请求仍需检查账号的最新状态。
     current_employee = await get_employee_by_id(
@@ -51,12 +51,6 @@ async def get_products_list_service(
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
-        )
-
-    if current_employee.role != EmployeeRole.STORE_MANAGER:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="只有店长可以查看商品列表",
         )
 
     products, total = await get_products_list(
@@ -105,7 +99,7 @@ async def get_product_detail_service(
     db: AsyncSession,
     current_employee_id: int,
 ) -> ItemResponse:
-    """验证当前店长账号，并返回指定商品的详情。"""
+    """验证当前员工账号，并返回指定商品的详情。"""
 
     employee = await get_employee_by_id(
         employee_id=current_employee_id,
@@ -127,12 +121,6 @@ async def get_product_detail_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
-    if employee.role != EmployeeRole.STORE_MANAGER:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="只有店长可以查看商品详情",
-        )
-
     product = await get_product_by_id(
         product_id=product_id,
         db=db,

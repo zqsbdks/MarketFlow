@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     access_token_expire_minutes: int = Field(default=7 * 24 * 60, gt=0)
 
+    # 仅供手动执行初始店长创建脚本使用，不在应用启动时自动创建账号。
+    initial_manager_password: str | None = Field(default=None, min_length=6)
+
     # Redis 是可选服务；URL 为空时不会创建客户端或初始化缓存后端。
     redis_url: str | None = None
     redis_max_connections: int = Field(default=10, ge=1)

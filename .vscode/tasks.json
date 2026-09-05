@@ -37,6 +37,17 @@
             "problemMatcher": []
         },
         {
+            "label": "Database: 创建初始店长",
+            "detail": "数据库不存在店长账号时，使用 .env 中的密码创建初始店长",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "windows": { "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe" },
+            "args": ["-m", "scripts.bootstrap_manager"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated", "focus": true }
+        },
+        {
             "label": "Test: 运行普通测试",
             "type": "process",
             "command": "${workspaceFolder}/.venv/bin/python",
