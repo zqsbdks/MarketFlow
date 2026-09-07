@@ -41,6 +41,21 @@ class SaleSource(StrEnum):
     DEMO_SEED = "demo_seed"  # 系统初始化生成的演示销售数据。
 
 
+class PurchaseStatus(StrEnum):
+    """进货单从下单到入库的处理状态。"""
+
+    PENDING = "pending"  # 已经下单，但尚未达到预计到货时间。
+    ARRIVED = "arrived"  # 已经由系统自动签收并完成库存入库。
+
+
+class InventoryBatchStatus(StrEnum):
+    """库存批次的人工处理状态；是否过期根据到期日期动态判断。"""
+
+    AVAILABLE = "available"  # 批次仍有库存并且没有被人工报废。
+    SOLD_OUT = "sold_out"  # 批次的剩余数量已经变为0。
+    DISCARDED = "discarded"  # 批次因损坏等原因被人工报废。
+
+
 class RankingGroupBy(StrEnum):
     """销售排行的汇总方式。"""
 
@@ -83,7 +98,9 @@ __all__ = [
     "EmployeeGender",
     "EmployeeRole",
     "EmploymentStatus",
+    "InventoryBatchStatus",
     "ProductStatus",
+    "PurchaseStatus",
     "RankingGroupBy",
     "RankingSortBy",
     "RankingSortOrder",

@@ -24,6 +24,7 @@ from app.models.enums import EmployeeRole
 if TYPE_CHECKING:
     from app.models.department import Department
     from app.models.employee_detail import EmployeeDetail
+    from app.models.purchase import Purchase
 
 
 class Employee(TimestampMixin, Base):
@@ -98,6 +99,16 @@ class Employee(TimestampMixin, Base):
         cascade="all, delete-orphan",
         single_parent=True,
         uselist=False,
+    )
+    # 当前员工创建过的进货单；created_by和received_by都指向employee，因此需要指定外键。
+    created_purchases: Mapped[list[Purchase]] = relationship(
+        back_populates="created_by_employee",
+        foreign_keys="Purchase.created_by",
+    )
+    # 当前员工签收过的进货单；模拟系统会在到货时自动选择部门正式员工。
+    received_purchases: Mapped[list[Purchase]] = relationship(
+        back_populates="received_by_employee",
+        foreign_keys="Purchase.received_by",
     )
 
 

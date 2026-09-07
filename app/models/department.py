@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.employee import Employee
     from app.models.product import Product
+    from app.models.purchase import Purchase
     from app.models.sale_item import SaleItem
 
 
@@ -49,6 +50,8 @@ class Department(TimestampMixin, Base):
         overlaps="category,products",
     )
     sale_items: Mapped[list[SaleItem]] = relationship(back_populates="department")
+    # 一个部门可以创建多张进货单，每张进货单只能包含该部门的商品。
+    purchases: Mapped[list[Purchase]] = relationship(back_populates="department")
 
 
 __all__ = ["Department"]

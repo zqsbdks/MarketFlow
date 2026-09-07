@@ -14,8 +14,12 @@ from app.models import (
     EmployeeGender,
     EmployeeRole,
     EmploymentStatus,
+    InventoryBatch,
+    InventoryBatchStatus,
     Product,
     ProductStatus,
+    Purchase,
+    PurchaseStatus,
     Sale,
     SaleSource,
 )
@@ -53,11 +57,14 @@ EXPECTED_COLUMNS = {
         "id",
         "product_no",
         "name",
+        "supplier_product_id",
         "department_id",
         "category_id",
         "purchase_price",
         "sale_price",
         "stock_quantity",
+        "shelf_life_days",
+        "expiry_warning_days",
         "status",
         "created_at",
         "updated_at",
@@ -85,6 +92,71 @@ EXPECTED_COLUMNS = {
         "subtotal",
         "cost_subtotal",
     },
+    "supplier": {
+        "id",
+        "supplier_no",
+        "name",
+        "contact_name",
+        "phone",
+        "address",
+        "is_active",
+        "created_at",
+        "updated_at",
+    },
+    "purchase": {
+        "id",
+        "purchase_no",
+        "department_id",
+        "created_by",
+        "received_by",
+        "ordered_at",
+        "expected_arrival_at",
+        "arrived_at",
+        "total_amount",
+        "status",
+        "created_at",
+        "updated_at",
+    },
+    "purchase_item": {
+        "id",
+        "purchase_id",
+        "product_id",
+        "supplier_product_id",
+        "supplier_id",
+        "product_no_snapshot",
+        "product_name_snapshot",
+        "supplier_name_snapshot",
+        "quantity",
+        "unit_cost",
+        "subtotal",
+        "production_date",
+        "expiration_date",
+        "created_at",
+    },
+    "inventory_batch": {
+        "id",
+        "batch_no",
+        "product_id",
+        "purchase_item_id",
+        "production_date",
+        "expiration_date",
+        "initial_quantity",
+        "remaining_quantity",
+        "status",
+        "arrived_at",
+        "created_at",
+        "updated_at",
+    },
+    "supplier_product": {
+        "id",
+        "supplier_id",
+        "name",
+        "unit_cost",
+        "shelf_life_days",
+        "is_active",
+        "created_at",
+        "updated_at",
+    },
 }
 
 EXPECTED_TABLE_COMMENTS = {
@@ -95,11 +167,16 @@ EXPECTED_TABLE_COMMENTS = {
     "product": "商品表",
     "sale": "销售单表",
     "sale_item": "销售明细表",
+    "supplier": "供货商表",
+    "purchase": "进货单表",
+    "purchase_item": "进货明细表",
+    "inventory_batch": "库存批次表",
+    "supplier_product": "供应商商品目录表",
 }
 
 
-def test_employee_detail_is_the_seventh_business_table() -> None:
-    """员工详情作为第七张业务表，并继续排除独立库存表。"""
+def test_metadata_contains_confirmed_business_tables() -> None:
+    """元数据包含原有业务表以及新增的四张进货与批次表。"""
 
     assert set(Base.metadata.tables) == set(EXPECTED_COLUMNS)
     assert "inventory" not in Base.metadata.tables
@@ -165,6 +242,10 @@ def test_money_columns_use_exact_decimal_types() -> None:
         ("sale_item", "unit_cost"): (10, 2),
         ("sale_item", "subtotal"): (12, 2),
         ("sale_item", "cost_subtotal"): (12, 2),
+        ("purchase", "total_amount"): (12, 2),
+        ("purchase_item", "unit_cost"): (10, 2),
+        ("purchase_item", "subtotal"): (12, 2),
+        ("supplier_product", "unit_cost"): (10, 2),
     }
 
     for (table_name, column_name), (precision, scale) in expected_precision.items():
@@ -182,6 +263,10 @@ def test_enum_values_match_confirmed_business_values() -> None:
     assert EmployeeDetail.__table__.c.gender.type.enums == [item.value for item in EmployeeGender]
     assert EmployeeDetail.__table__.c.employment_status.type.enums == [
         item.value for item in EmploymentStatus
+    ]
+    assert Purchase.__table__.c.status.type.enums == [item.value for item in PurchaseStatus]
+    assert InventoryBatch.__table__.c.status.type.enums == [
+        item.value for item in InventoryBatchStatus
     ]
 
     expected_constraint_names = {
@@ -211,7 +296,17 @@ def test_all_tables_explicitly_use_utf8mb4() -> None:
 def test_mutable_master_tables_update_timestamp_in_mysql() -> None:
     """主数据表由 MySQL 自动维护 updated_at，避免绕过 ORM 时留下旧时间。"""
 
-    for table_name in ("department", "employee", "employee_detail", "category", "product"):
+    for table_name in (
+        "department",
+        "employee",
+        "employee_detail",
+        "category",
+        "product",
+        "supplier",
+        "purchase",
+        "inventory_batch",
+        "supplier_product",
+    ):
         ddl = str(CreateTable(Base.metadata.tables[table_name]).compile(dialect=mysql.dialect()))
         assert "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" in ddl
 
@@ -223,7 +318,7 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """员工角色中文化迁移是当前唯一的 Alembic 版本头。"""
+    """进货与批次迁移是当前唯一的 Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260905_0005"]
+    assert script.get_heads() == ["372ffba6f65b"]

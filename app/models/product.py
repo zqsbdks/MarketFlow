@@ -25,7 +25,10 @@ from app.models.enums import ProductStatus
 if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.department import Department
+    from app.models.inventory_batch import InventoryBatch
+    from app.models.purchase_item import PurchaseItem
     from app.models.sale_item import SaleItem
+    from app.models.supplier_product import SupplierProduct
 
 
 class Product(TimestampMixin, Base):
@@ -36,6 +39,19 @@ class Product(TimestampMixin, Base):
         CheckConstraint("purchase_price >= 0", name="ck_product_purchase_price_non_negative"),
         CheckConstraint("sale_price >= 0", name="ck_product_sale_price_non_negative"),
         CheckConstraint("stock_quantity >= 0", name="ck_product_stock_quantity_non_negative"),
+        CheckConstraint(
+            "shelf_life_days IS NULL OR shelf_life_days > 0",
+            name="ck_product_shelf_life_days_positive",
+        ),
+        CheckConstraint(
+            "expiry_warning_days IS NULL OR expiry_warning_days >= 0",
+            name="ck_product_expiry_warning_days_non_negative",
+        ),
+        CheckConstraint(
+            "shelf_life_days IS NULL OR expiry_warning_days IS NULL "
+            "OR expiry_warning_days < shelf_life_days",
+            name="ck_product_expiry_warning_before_shelf_life",
+        ),
         CheckConstraint("status IN ('on_sale', 'stopped')", name="product_status"),
         UniqueConstraint("product_no", name="uq_product_product_no"),
         ForeignKeyConstraint(
@@ -55,6 +71,19 @@ class Product(TimestampMixin, Base):
     )
     product_no: Mapped[str] = mapped_column(String(20), nullable=False, comment="商品编号")
     name: Mapped[str] = mapped_column(String(100), nullable=False, comment="商品名称")
+    # 一个正式商品唯一来源于一个供应商商品目录项。
+    supplier_product_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "supplier_product.id",
+            name="fk_product_supplier_product_id",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+        unique=True,
+        index=True,
+        comment="来源供应商商品目录ID",
+    )
     department_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("department.id", ondelete="RESTRICT"),
@@ -85,6 +114,18 @@ class Product(TimestampMixin, Base):
         server_default=text("0"),
         comment="当前库存数量",
     )
+    # shelf_life_days保存商品通常可保存的天数；没有保质期管理时允许为空。
+    shelf_life_days: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="默认保质期天数",
+    )
+    # expiry_warning_days表示到期前多少天开始显示为临期商品。
+    expiry_warning_days: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="临期提前提醒天数",
+    )
     status: Mapped[ProductStatus] = mapped_column(
         Enum(
             ProductStatus,
@@ -110,6 +151,12 @@ class Product(TimestampMixin, Base):
         overlaps="department,products",
     )
     sale_items: Mapped[list[SaleItem]] = relationship(back_populates="product")
+    # purchase_items保存该商品的所有历史进货明细。
+    purchase_items: Mapped[list[PurchaseItem]] = relationship(back_populates="product")
+    # inventory_batches保存该商品每次到货后生成的批次库存。
+    inventory_batches: Mapped[list[InventoryBatch]] = relationship(back_populates="product")
+    # supplier_product用于取得该商品的来源供应商、目录报价和默认保质期。
+    supplier_product: Mapped[SupplierProduct] = relationship(back_populates="product")
 
 
 __all__ = ["Product"]

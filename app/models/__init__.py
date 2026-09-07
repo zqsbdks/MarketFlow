@@ -14,16 +14,23 @@ from app.models.enums import (
     EmployeeGender,
     EmployeeRole,
     EmploymentStatus,
+    InventoryBatchStatus,
     ProductStatus,
+    PurchaseStatus,
     RankingGroupBy,
     RankingSortBy,
     RankingSortOrder,
     ReportMetric,
     SaleSource,
 )
+from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
+from app.models.purchase import Purchase
+from app.models.purchase_item import PurchaseItem
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.models.supplier import Supplier
+from app.models.supplier_product import SupplierProduct
 
 # 业务模型必须在此导入，确保 Alembic 能从 Base.metadata 发现全部表。
 __all__ = [
@@ -35,8 +42,13 @@ __all__ = [
     "EmployeeGender",
     "EmployeeRole",
     "EmploymentStatus",
+    "InventoryBatch",
+    "InventoryBatchStatus",
     "Product",
     "ProductStatus",
+    "Purchase",
+    "PurchaseItem",
+    "PurchaseStatus",
     "RankingGroupBy",
     "RankingSortBy",
     "RankingSortOrder",
@@ -44,4 +56,6 @@ __all__ = [
     "Sale",
     "SaleItem",
     "SaleSource",
+    "Supplier",
+    "SupplierProduct",
 ]

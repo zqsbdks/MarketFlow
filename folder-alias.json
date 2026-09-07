@@ -90,7 +90,7 @@
         "description": "ORM声明式Base与公共时间字段Mixin"
     },
     "app/models/enums.py": {
-        "description": "员工角色、商品状态与销售来源业务枚举"
+        "description": "员工、商品、销售、进货与库存批次业务枚举"
     },
     "app/models/department.py": {
         "description": "固定部门SQLAlchemy ORM模型"
@@ -105,7 +105,22 @@
         "description": "部门商品分类及同部门名称唯一约束ORM模型"
     },
     "app/models/product.py": {
-        "description": "商品价格、销售状态与当前库存ORM模型"
+        "description": "商品价格、销售状态、库存与保质期ORM模型"
+    },
+    "app/models/product_supplier.py": {
+        "description": "商品与供货商多对多关系、默认价格和首选状态ORM模型"
+    },
+    "app/models/supplier.py": {
+        "description": "供货商资料与合作状态ORM模型"
+    },
+    "app/models/purchase.py": {
+        "description": "部门进货单、到货状态与签收员工ORM模型"
+    },
+    "app/models/purchase_item.py": {
+        "description": "进货商品、供货商、价格和保质期明细ORM模型"
+    },
+    "app/models/inventory_batch.py": {
+        "description": "商品到货批次、剩余库存与到期日期ORM模型"
     },
     "app/models/sale.py": {
         "description": "销售单金额、成本与毛利润汇总ORM模型"
@@ -271,6 +286,12 @@
     },
     "alembic/versions/20260905_0005_create_employee_detail.py": {
         "description": "创建员工详情表并为现有员工补充默认详情"
+    },
+    "alembic/versions/20260907_0006_add_purchasing_inventory.py": {
+        "description": "创建供货商、进货单、进货明细和库存批次并扩展商品保质期"
+    },
+    "alembic/versions/20260907_0007_add_product_supplier.py": {
+        "description": "创建商品与供货商多对多关联表"
     },
     "frontend": {
         "description": "Vue 3 门店经营管理前端"
