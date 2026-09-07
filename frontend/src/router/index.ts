@@ -36,6 +36,12 @@ const router = createRouter({
           meta: { title: '部门经营' },
         },
         {
+          path: 'analytics',
+          name: 'analytics',
+          component: () => import('../views/AnalyticsView.vue'),
+          meta: { title: '经营分析' },
+        },
+        {
           path: 'products',
           name: 'products',
           component: () => import('../views/ProductsView.vue'),
@@ -52,6 +58,12 @@ const router = createRouter({
           name: 'employees',
           component: () => import('../views/EmployeesView.vue'),
           meta: { title: '员工管理', managerOnly: true },
+        },
+        {
+          path: 'employees/:id',
+          name: 'employee-detail',
+          component: () => import('../views/EmployeeDetailView.vue'),
+          meta: { title: '员工档案' },
         },
       ],
     },

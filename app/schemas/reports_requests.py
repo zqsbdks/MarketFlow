@@ -1,10 +1,11 @@
 """营业报表接口的请求模型。"""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
+from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder, ReportMetric
 
 
 # region 营业概览查询参数
@@ -89,6 +90,38 @@ class RankingsRequest(BaseModel):
 # endregion
 
 
+# region 营业分析查询参数
+class ReportAnalyticsRequest(BaseModel):
+    """统一营业分析的时间范围、部门筛选和趋势粒度。"""
+
+    # 需要明确本期范围，才能计算紧邻本期之前的上一等长周期。
+    # 时间先后和营业时段校验由 Service 处理；查询包含开始、不包含结束。
+    start_time: datetime = Field(
+        ...,
+        description="开始时间（包含），门店当地时间，每天09:00至21:00",
+    )
+    end_time: datetime = Field(
+        ...,
+        description="结束时间（不包含），须晚于开始时间，每天09:00至21:00",
+    )
+    department_id: int | None = Field(
+        None,
+        description="部门ID；不传统计全店，传入则统计该部门，占比分母仍为同期全店营业额",
+        ge=1,
+    )
+    interval: Literal["hour", "day", "month", "year"] = Field(
+        "day",
+        description="营业趋势分组：hour按小时、day按日、month按月、year按年",
+    )
+    metrics: list[ReportMetric] = Field(
+        ...,
+        min_length=1,
+        description="需要返回的指标，可重复传入metrics选择多项",
+    )
+
+
+# endregion
+
 __all__ = [
     "DepartmentRequest",
     "RankingGroupBy",
@@ -96,4 +129,6 @@ __all__ = [
     "RankingSortOrder",
     "RankingsRequest",
     "ReportRequest",
+    "ReportAnalyticsRequest",
+    "ReportMetric",
 ]

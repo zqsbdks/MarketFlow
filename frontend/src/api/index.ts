@@ -6,6 +6,8 @@ import type {
   Department,
   DepartmentReport,
   EmployeeIdentity,
+  EmployeeDetail,
+  EmployeeDetailUpdate,
   EmployeeListItem,
   EmployeeRole,
   LoginResult,
@@ -14,6 +16,8 @@ import type {
   ProductDetail,
   ProductListItem,
   RankingsResult,
+  ReportAnalytics,
+  ReportMetric,
   RankingGroupBy,
   RankingSortBy,
   SaleDetail,
@@ -66,6 +70,24 @@ export async function getRankings(params: {
   page_size?: number
 }) {
   const response = await http.get<ApiResponse<RankingsResult>>('/reports/rankings', { params })
+  return unwrap(response.data)
+}
+
+export async function getReportAnalytics(params: {
+  start_time: string
+  end_time: string
+  department_id?: number
+  interval: 'hour' | 'day' | 'month' | 'year'
+  metrics: ReportMetric[]
+}) {
+  // URLSearchParams 会把多个指标编码成 metrics=a&metrics=b，供 FastAPI 解析为列表。
+  const query = new URLSearchParams()
+  query.set('start_time', params.start_time)
+  query.set('end_time', params.end_time)
+  query.set('interval', params.interval)
+  if (params.department_id !== undefined) query.set('department_id', String(params.department_id))
+  for (const metric of params.metrics) query.append('metrics', metric)
+  const response = await http.get<ApiResponse<ReportAnalytics>>('/reports/analytics', { params: query })
   return unwrap(response.data)
 }
 
@@ -128,4 +150,12 @@ export async function resetEmployeePassword(employeeId: number) {
     `/employees/reset-password/${employeeId}`,
   )
   return unwrap(response.data)
+}
+
+export async function getEmployeeDetail(employeeId: number) {
+  return unwrap((await http.get<ApiResponse<EmployeeDetail>>(`/employees/${employeeId}`)).data)
+}
+
+export async function updateEmployeeDetail(employeeId: number, payload: EmployeeDetailUpdate) {
+  return unwrap((await http.put<ApiResponse<EmployeeDetail>>(`/employees/${employeeId}`, payload)).data)
 }

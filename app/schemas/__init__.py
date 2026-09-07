@@ -42,6 +42,8 @@ from app.schemas.reports_requests import (
     RankingSortBy,
     RankingSortOrder,
     RankingsRequest,
+    ReportAnalyticsRequest,
+    ReportMetric,
     ReportRequest,
 )
 from app.schemas.reports_responses import (
@@ -50,6 +52,7 @@ from app.schemas.reports_responses import (
 from app.schemas.reports_responses import (
     RankingItemResponse,
     RankingsResponse,
+    ReportAnalyticsResponse,
     ReportResponse,
 )
 from app.schemas.sales_requests import SalesListRequest
@@ -97,6 +100,9 @@ __all__ = [
     "ReportRequest",
     "ReportDepartmentResponse",
     "ReportResponse",
+    "ReportAnalyticsRequest",
+    "ReportMetric",
+    "ReportAnalyticsResponse",
     "SaleDetailItemResponse",
     "SaleDetailResponse",
     "SalesItemResponse",

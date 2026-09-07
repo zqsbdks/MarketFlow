@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   BarChart3,
+  ChartNoAxesCombined,
   Boxes,
   ChevronDown,
   LayoutDashboard,
@@ -25,10 +26,12 @@ const navItems = computed(() => {
   const items = [
     { to: '/dashboard', label: '店铺总览', icon: LayoutDashboard },
     { to: '/departments/1', label: '部门经营', icon: BarChart3 },
+    { to: '/analytics', label: '经营分析', icon: ChartNoAxesCombined },
     { to: '/products', label: '商品查询', icon: Boxes },
     { to: '/sales', label: '销售记录', icon: ReceiptText },
   ]
   if (auth.isManager) items.push({ to: '/employees', label: '员工管理', icon: Users })
+  if (auth.employee) items.push({ to: `/employees/${auth.employee.id}`, label: '我的档案', icon: Users })
   return items
 })
 

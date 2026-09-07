@@ -26,6 +26,40 @@ async def get_department_by_id(
 # endregion
 
 
+# region 创建员工
+async def create_employee(
+    name: str,
+    role: EmployeeRole,
+    department_id: int | None,
+    password_hash: str,
+    db: AsyncSession,
+) -> Employee:
+    """创建一个新的员工记录。"""
+
+    # employee_no 不允许为空，先使用事务内唯一的临时编号取得自增主键。
+    temporary_employee_no = f"TMP-{uuid4().hex[:16]}"
+    new_employee = Employee(
+        employee_no=temporary_employee_no,
+        name=name,
+        role=role,
+        department_id=department_id,
+        password_hash=password_hash,
+        must_change_password=True,
+        detail=EmployeeDetail(hire_date=date.today()),
+    )
+    db.add(new_employee)
+
+    # flush 后可取得自增 ID，再生成稳定且唯一的 E00001 格式员工编号。
+    await db.flush()
+    new_employee.employee_no = f"E{new_employee.id:05d}"
+    await db.flush()
+
+    return new_employee
+
+
+# endregion
+
+
 # region 查询员工列表
 async def get_list_employees(
     page: int,
@@ -62,6 +96,41 @@ async def get_list_employees(
     employees = list(list_result.scalars().all())
 
     return employees, total
+
+
+# endregion
+
+
+# region 修改员工状态
+async def update_employee_status(
+    employee: Employee,
+    is_active: bool,
+    db: AsyncSession,
+) -> Employee:
+    """修改员工启用状态，并把变更发送到当前事务。"""
+
+    employee.is_active = is_active
+    # CRUD 只执行 flush，最终提交或回滚仍由 Service 控制。
+    await db.flush()
+    return employee
+
+
+# endregion
+
+
+# region 重置员工密码
+async def reset_employee_password(
+    employee: Employee,
+    password_hash: str,
+    db: AsyncSession,
+) -> Employee:
+    """重置员工密码，并把变更发送到当前事务。"""
+
+    employee.password_hash = password_hash
+    employee.must_change_password = True
+    # CRUD 只执行 flush，最终提交或回滚由 Service 控制。
+    await db.flush()
+    return employee
 
 
 # endregion
@@ -128,75 +197,6 @@ async def update_employee_detail(
     )
     # execute 执行 UPDATE，其返回值是执行结果，不是 EmployeeDetail 对象。
     await db.execute(statement)
-
-
-# endregion
-
-
-# region 修改员工状态
-async def update_employee_status(
-    employee: Employee,
-    is_active: bool,
-    db: AsyncSession,
-) -> Employee:
-    """修改员工启用状态，并把变更发送到当前事务。"""
-
-    employee.is_active = is_active
-    # CRUD 只执行 flush，最终提交或回滚仍由 Service 控制。
-    await db.flush()
-    return employee
-
-
-# endregion
-
-
-# region 创建员工
-async def create_employee(
-    name: str,
-    role: EmployeeRole,
-    department_id: int | None,
-    password_hash: str,
-    db: AsyncSession,
-) -> Employee:
-    """创建一个新的员工记录。"""
-
-    # employee_no 不允许为空，先使用事务内唯一的临时编号取得自增主键。
-    temporary_employee_no = f"TMP-{uuid4().hex[:16]}"
-    new_employee = Employee(
-        employee_no=temporary_employee_no,
-        name=name,
-        role=role,
-        department_id=department_id,
-        password_hash=password_hash,
-        must_change_password=True,
-        detail=EmployeeDetail(hire_date=date.today()),
-    )
-    db.add(new_employee)
-
-    # flush 后可取得自增 ID，再生成稳定且唯一的 E00001 格式员工编号。
-    await db.flush()
-    new_employee.employee_no = f"E{new_employee.id:05d}"
-    await db.flush()
-
-    return new_employee
-
-
-# endregion
-
-
-# region 重置员工密码
-async def reset_employee_password(
-    employee: Employee,
-    password_hash: str,
-    db: AsyncSession,
-) -> Employee:
-    """重置员工密码，并把变更发送到当前事务。"""
-
-    employee.password_hash = password_hash
-    employee.must_change_password = True
-    # CRUD 只执行 flush，最终提交或回滚由 Service 控制。
-    await db.flush()
-    return employee
 
 
 # endregion

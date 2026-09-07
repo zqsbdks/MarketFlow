@@ -380,6 +380,9 @@
     "folder-alias.json": {
         "description": "项目目录和文件的中文用途别名"
     },
+    "frontend/src/views/EmployeeDetailView.vue": {
+        "description": "员工档案查看与店长编辑页面"
+    },
     "pyproject.toml": {
         "description": "pytest、Ruff和MyPy工具配置"
     },

@@ -1,8 +1,81 @@
 export type EmployeeRole = '店长' | '正式员工' | '契约工'
+export type EmployeeGender = '男' | '女' | '未填写'
+export type EmploymentStatus = '在职' | '休假' | '离职' | '解雇'
+
+export interface EmployeeDetail extends EmployeeListItem {
+  department_id: number | null
+  last_login_at: string | null
+  gender: EmployeeGender
+  birth_date: string | null
+  hire_date: string
+  phone: string | null
+  address: string | null
+  employment_status: EmploymentStatus
+  separation_date: string | null
+  separation_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EmployeeDetailUpdate {
+  gender: EmployeeGender
+  birth_date: string
+  hire_date: string
+  phone: string
+  address: string
+  employment_status: EmploymentStatus
+  separation_date: string | null
+  separation_reason: string | null
+}
 export type ProductStatus = 'on_sale' | 'stopped'
 export type RankingGroupBy = 'product' | 'category'
 export type RankingSortBy = 'quantity' | 'amount'
 export type SortOrder = 'asc' | 'desc'
+export type ReportMetric =
+  | 'revenue'
+  | 'sales_cost'
+  | 'gross_profit'
+  | 'sales_quantity'
+  | 'sale_count'
+  | 'average_sale_amount'
+  | 'average_sale_quantity'
+  | 'gross_profit_margin'
+  | 'revenue_growth_rate'
+  | 'gross_profit_growth_rate'
+  | 'department_revenue_share'
+  | 'sales_trend'
+
+export interface DepartmentRevenueShare {
+  department_id: number
+  department_name: string
+  revenue_share: string | null
+}
+
+export interface SalesTrendItem {
+  start_time: string
+  end_time: string
+  revenue: string
+  sales_cost: string
+  gross_profit: string
+  sales_quantity: number
+  sale_count: number
+  gross_profit_margin: string | null
+}
+
+export interface ReportAnalytics {
+  revenue?: string | null
+  sales_cost?: string | null
+  gross_profit?: string | null
+  sales_quantity?: number | null
+  sale_count?: number | null
+  average_sale_amount?: string | null
+  average_sale_quantity?: string | null
+  gross_profit_margin?: string | null
+  revenue_growth_rate?: string | null
+  gross_profit_growth_rate?: string | null
+  department_revenue_share?: DepartmentRevenueShare[]
+  sales_trend?: SalesTrendItem[]
+}
 
 export interface ApiResponse<T> {
   code: number

@@ -1,20 +1,29 @@
 """营业报表 API 路由。"""
 
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.reports_requests import DepartmentRequest, RankingsRequest, ReportRequest
+from app.schemas.reports_requests import (
+    DepartmentRequest,
+    RankingsRequest,
+    ReportAnalyticsRequest,
+    ReportRequest,
+)
 from app.schemas.reports_responses import (
     DepartmentResponse,
     RankingsResponse,
+    ReportAnalyticsResponse,
     ReportResponse,
 )
 from app.services.reports import (
     get_departments_service,
     get_rankings_service,
+    get_report_analytics_service,
     overview_service,
 )
 
@@ -93,6 +102,8 @@ async def get_sales_rankings(
 
 
 # region 获取部门销售对比接口
+
+
 @reports_router.get(
     "/departments",
     response_model=ResponseModel[list[DepartmentResponse]],
@@ -120,5 +131,49 @@ async def get_departments(
 
 
 # endregion
+
+
+@reports_router.get(
+    "/analytics",
+    response_model=ResponseModel[ReportAnalyticsResponse],
+    # 未勾选的响应字段没有被赋值，因此不会出现在最终JSON中。
+    response_model_exclude_unset=True,
+    summary="获取营业分析",
+    description="根据metrics参数，只计算并返回前端勾选的营业指标。",
+)
+async def get_report_analytics(
+    request: Annotated[ReportAnalyticsRequest, Query()],
+    employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[ReportAnalyticsResponse]:
+    """接收多个指标名称，并返回统一格式的按需营业分析。
+
+    Args:
+        request: 前端传入的查询条件，包含起止时间、部门ID、统计粒度和指标列表。
+        employee_id: 当前登录员工的ID，由访问令牌自动解析，不需要前端传入。
+        db: 当前请求使用的异步数据库会话，由FastAPI自动创建和关闭。
+
+    Returns:
+        ResponseModel[ReportAnalyticsResponse]: 统一响应外层，以及本次勾选的分析结果。
+    """
+
+    # Router只负责接收参数；权限验证、指标计算和响应组装都交给Service处理。
+    analytics = await get_report_analytics_service(
+        db=db,  # 当前请求的数据库会话。
+        employee_id=employee_id,  # 当前登录员工ID，用来验证查看报表的权限。
+        start_time=request.start_time,  # 用户选择的统计开始时间，包含该时刻。
+        end_time=request.end_time,  # 用户选择的统计结束时间，不包含该时刻。
+        department_id=request.department_id,  # 部门ID；None表示查询全店。
+        interval=request.interval,  # 趋势粒度：小时、日、月或年。
+        metrics=request.metrics,  # 用户勾选的指标；未勾选指标不会计算和返回。
+    )
+
+    return ResponseModel[ReportAnalyticsResponse](
+        # 本接口会排除未勾选指标；显式赋值可避免默认code也被一并排除。
+        code=200,
+        message="获取营业分析成功",
+        data=analytics,
+    )
+
 
 __all__ = ["reports_router"]

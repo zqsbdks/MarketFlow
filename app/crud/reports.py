@@ -1,7 +1,8 @@
 """营业报表的数据访问函数。"""
 
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,13 @@ from app.models.sale_item import SaleItem
 ReportValues = tuple[Decimal, Decimal, Decimal, int, int]
 DepartmentReportValues = tuple[int, str, Decimal, Decimal, int]
 RankingValues = tuple[int, str, int, Decimal]
+AnalyticsTrendValues = tuple[datetime, Decimal, Decimal, Decimal, int, int]
+AnalyticsDepartmentValues = tuple[int, str, Decimal]
+AnalyticsValues = tuple[
+    ReportValues | None,
+    list[AnalyticsDepartmentValues],
+    list[AnalyticsTrendValues],
+]
 
 
 # region 获取营业概览
@@ -268,6 +276,150 @@ async def get_rankings(
 # endregion
 
 
+# region 获取营业分析
+async def get_report_analytics(
+    db: AsyncSession,
+    start_time: datetime,
+    end_time: datetime,
+    department_id: int | None,
+    interval: Literal["hour", "day", "month", "year"],
+    include_summary: bool,
+    include_departments: bool,
+    include_trend: bool,
+) -> AnalyticsValues:
+    """按勾选项查询营业汇总、部门营业额和时间趋势的原始数据。
+
+    Args:
+        db: 当前请求使用的异步数据库会话。
+        start_time: 销售发生时间的查询下限，包含该时间。
+        end_time: 销售发生时间的查询上限，不包含该时间。
+        department_id: 部门ID；为None时不添加部门筛选条件。
+        interval: 趋势分组粒度，支持小时、日、月和年。
+        include_summary: 是否执行营业汇总查询。
+        include_departments: 是否执行各部门营业额查询。
+        include_trend: 是否执行按时间分组的趋势查询。
+
+    Returns:
+        AnalyticsValues: 依次返回汇总数据、部门数据列表和趋势数据列表。
+    """
+
+    # 三类查询使用相同的时间范围：包含开始时间，不包含结束时间。
+    base_conditions = [Sale.sold_at >= start_time, Sale.sold_at < end_time]
+    if department_id is not None:
+        base_conditions.append(SaleItem.department_id == department_id)
+
+    summary: ReportValues | None = None
+    if include_summary:
+        summary_statement = (
+            select(
+                func.coalesce(func.sum(SaleItem.subtotal), 0),  # 营业额：销售小计之和。
+                func.coalesce(func.sum(SaleItem.cost_subtotal), 0),  # 销售成本之和。
+                # 毛利润：每条明细的销售小计减去成本小计，再计算总和。
+                func.coalesce(func.sum(SaleItem.subtotal - SaleItem.cost_subtotal), 0),
+                func.coalesce(func.sum(SaleItem.quantity), 0),  # 销售商品总件数。
+                func.count(distinct(SaleItem.sale_id)),  # 去重后的销售单数量。
+            )
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(*base_conditions)
+        )
+        result = await db.execute(summary_statement)
+        revenue, sales_cost, gross_profit, sales_quantity, sale_count = result.one()
+        summary = (
+            Decimal(revenue),
+            Decimal(sales_cost),
+            Decimal(gross_profit),
+            int(sales_quantity),
+            int(sale_count),
+        )
+
+    departments: list[AnalyticsDepartmentValues] = []
+    if include_departments:
+        # 占比的分母是全店营业额，因此这里始终查询全部部门，再由 Service 筛选返回项。
+        department_summary = (
+            select(
+                SaleItem.department_id.label("department_id"),
+                func.sum(SaleItem.subtotal).label("revenue"),
+            )
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(Sale.sold_at >= start_time, Sale.sold_at < end_time)
+            .group_by(SaleItem.department_id)
+            .subquery()
+        )
+        department_statement = (
+            select(
+                Department.id,
+                Department.name,
+                func.coalesce(department_summary.c.revenue, 0),
+            )
+            .select_from(Department)
+            .outerjoin(
+                department_summary,
+                department_summary.c.department_id == Department.id,
+            )
+            .order_by(Department.id)
+        )
+        department_result = await db.execute(department_statement)
+        departments = [
+            (int(item_id), str(name), Decimal(revenue))
+            for item_id, name, revenue in department_result.all()
+        ]
+
+    trend: list[AnalyticsTrendValues] = []
+    if include_trend:
+        # MySQL 按实际日期分组；不能只按“小时数字”分组，否则不同日期会混在一起。
+        if interval == "hour":
+            bucket_expression = func.date_format(Sale.sold_at, "%Y-%m-%d %H:00:00")
+        elif interval == "day":
+            bucket_expression = func.date(Sale.sold_at)
+        elif interval == "month":
+            bucket_expression = func.date_format(Sale.sold_at, "%Y-%m-01 00:00:00")
+        else:
+            bucket_expression = func.date_format(Sale.sold_at, "%Y-01-01 00:00:00")
+
+        trend_statement = (
+            select(
+                bucket_expression.label("bucket"),
+                func.coalesce(func.sum(SaleItem.subtotal), 0),
+                func.coalesce(func.sum(SaleItem.cost_subtotal), 0),
+                func.coalesce(func.sum(SaleItem.subtotal - SaleItem.cost_subtotal), 0),
+                func.coalesce(func.sum(SaleItem.quantity), 0),
+                func.count(distinct(SaleItem.sale_id)),
+            )
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(*base_conditions)
+            # 每天只统计09:00至21:00的营业数据。
+            .where(func.time(Sale.sold_at) >= time(9, 0))
+            .where(func.time(Sale.sold_at) <= time(21, 0))
+            .group_by(bucket_expression)
+            .order_by(bucket_expression)
+        )
+        trend_result = await db.execute(trend_statement)
+        for bucket, revenue, sales_cost, gross_profit, quantity, sale_count in trend_result.all():
+            if isinstance(bucket, datetime):
+                bucket_time = bucket
+            elif isinstance(bucket, date):
+                bucket_time = datetime.combine(bucket, time.min)
+            else:
+                bucket_time = datetime.fromisoformat(str(bucket))
+            trend.append(
+                (
+                    bucket_time,
+                    Decimal(revenue),
+                    Decimal(sales_cost),
+                    Decimal(gross_profit),
+                    int(quantity),
+                    int(sale_count),
+                )
+            )
+
+    return summary, departments, trend
+
+
+# endregion
+
 __all__ = [
     "DepartmentReportValues",
     "RankingValues",
@@ -275,4 +427,5 @@ __all__ = [
     "get_departments_reports",
     "get_rankings",
     "get_reports",
+    "get_report_analytics",
 ]

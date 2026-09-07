@@ -62,6 +62,23 @@ class RankingSortOrder(StrEnum):
     DESC = "desc"  # 从大到小排列。
 
 
+class ReportMetric(StrEnum):
+    """营业分析接口支持按需返回的指标。"""
+
+    REVENUE = "revenue"  # 营业额。
+    SALES_COST = "sales_cost"  # 销售成本。
+    GROSS_PROFIT = "gross_profit"  # 毛利润。
+    SALES_QUANTITY = "sales_quantity"  # 销售商品数量。
+    SALE_COUNT = "sale_count"  # 销售单数量。
+    AVERAGE_SALE_AMOUNT = "average_sale_amount"  # 平均每单金额。
+    AVERAGE_SALE_QUANTITY = "average_sale_quantity"  # 平均每单件数。
+    GROSS_PROFIT_MARGIN = "gross_profit_margin"  # 毛利率。
+    REVENUE_GROWTH_RATE = "revenue_growth_rate"  # 营业额增长率。
+    GROSS_PROFIT_GROWTH_RATE = "gross_profit_growth_rate"  # 毛利润增长率。
+    DEPARTMENT_REVENUE_SHARE = "department_revenue_share"  # 部门销售额占比。
+    SALES_TREND = "sales_trend"  # 按小时、日、月或年的营业数据。
+
+
 __all__ = [
     "EmployeeGender",
     "EmployeeRole",
@@ -70,5 +87,6 @@ __all__ = [
     "RankingGroupBy",
     "RankingSortBy",
     "RankingSortOrder",
+    "ReportMetric",
     "SaleSource",
 ]

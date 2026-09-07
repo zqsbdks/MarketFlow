@@ -13,15 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
-from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
+from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder, ReportMetric
 from app.schemas.reports_responses import (
     DepartmentResponse,
     RankingsResponse,
+    ReportAnalyticsResponse,
     ReportResponse,
 )
 from app.services.reports import (
     get_departments_service,
     get_rankings_service,
+    get_report_analytics_service,
     overview_service,
 )
 
@@ -196,6 +198,47 @@ async def test_rankings_service_builds_paginated_ranking(monkeypatch) -> None:
     assert result.total_pages == 2
 
 
+async def test_analytics_service_only_sets_requested_metrics(monkeypatch) -> None:
+    """营业分析只查询并设置前端勾选的指标。"""
+
+    async def get_employee(**_kwargs):
+        return build_employee()
+
+    analytics_query = AsyncMock(
+        return_value=(
+            (Decimal("120.00"), Decimal("70.00"), Decimal("50.00"), 9, 3),
+            [],
+            [],
+        )
+    )
+    monkeypatch.setattr("app.services.reports.get_employee_by_id", get_employee)
+    monkeypatch.setattr("app.services.reports.get_report_analytics", analytics_query)
+
+    result = await get_report_analytics_service(
+        db=AsyncMock(spec=AsyncSession),
+        employee_id=2,
+        start_time=datetime(2026, 9, 1, 9, 0),
+        end_time=datetime(2026, 9, 1, 21, 0),
+        department_id=None,
+        interval="day",
+        metrics=[
+            ReportMetric.REVENUE,
+            ReportMetric.SALE_COUNT,
+            ReportMetric.AVERAGE_SALE_AMOUNT,
+        ],
+    )
+
+    assert result.model_dump(exclude_unset=True) == {
+        "revenue": Decimal("120.00"),
+        "sale_count": 3,
+        "average_sale_amount": Decimal("40.00"),
+    }
+    assert analytics_query.await_count == 1
+    assert analytics_query.await_args.kwargs["include_summary"] is True
+    assert analytics_query.await_args.kwargs["include_departments"] is False
+    assert analytics_query.await_args.kwargs["include_trend"] is False
+
+
 # endregion
 
 
@@ -349,6 +392,49 @@ def test_rankings_route_rejects_unsupported_group_by() -> None:
         )
 
     assert response.status_code == 422
+
+
+def test_analytics_route_omits_unselected_metrics(monkeypatch) -> None:
+    """未勾选字段不出现在JSON中，已勾选但无法计算的字段保留null。"""
+
+    received: dict[str, object] = {}
+
+    async def get_analytics(**kwargs):
+        received.update(kwargs)
+        return ReportAnalyticsResponse(
+            average_sale_amount=Decimal("40.00"),
+            revenue_growth_rate=None,
+        )
+
+    monkeypatch.setattr("app.routers.reports.get_report_analytics_service", get_analytics)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    application.dependency_overrides[get_current_employee_id] = override_employee_id
+
+    with TestClient(application) as client:
+        response = client.get(
+            "/api/v1/reports/analytics",
+            params=[
+                ("start_time", "2026-09-01T09:00:00"),
+                ("end_time", "2026-09-01T21:00:00"),
+                ("metrics", "average_sale_amount"),
+                ("metrics", "revenue_growth_rate"),
+            ],
+        )
+
+    assert response.status_code == 200
+    assert received["metrics"] == [
+        ReportMetric.AVERAGE_SALE_AMOUNT,
+        ReportMetric.REVENUE_GROWTH_RATE,
+    ]
+    assert response.json() == {
+        "code": 200,
+        "message": "获取营业分析成功",
+        "data": {
+            "average_sale_amount": "40.00",
+            "revenue_growth_rate": None,
+        },
+    }
 
 
 # endregion

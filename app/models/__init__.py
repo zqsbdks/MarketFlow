@@ -18,6 +18,7 @@ from app.models.enums import (
     RankingGroupBy,
     RankingSortBy,
     RankingSortOrder,
+    ReportMetric,
     SaleSource,
 )
 from app.models.product import Product
@@ -39,6 +40,7 @@ __all__ = [
     "RankingGroupBy",
     "RankingSortBy",
     "RankingSortOrder",
+    "ReportMetric",
     "Sale",
     "SaleItem",
     "SaleSource",
