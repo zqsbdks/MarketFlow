@@ -28,6 +28,7 @@ from app.crud.reports import (
     get_reports,
 )
 from app.crud.sales import get_sales_detail, get_sales_list
+from app.crud.suppliers import get_all_suppliers
 
 __all__ = [
     "create_employee",
@@ -47,6 +48,7 @@ __all__ = [
     "get_report_analytics",
     "get_sales_detail",
     "get_sales_list",
+    "get_all_suppliers",
     "reset_employee_password",
     "update_employee_detail",
     "update_employee_status",

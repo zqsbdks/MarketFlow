@@ -13,6 +13,7 @@ from app.routers.employees import employees_router
 from app.routers.products import products_router
 from app.routers.reports import reports_router
 from app.routers.sales import sales_router
+from app.routers.suppliers import suppliers_router
 
 # 该对象最终在 app.main 中统一添加 /api/v1 前缀。
 api_router = APIRouter()
@@ -24,6 +25,7 @@ api_router.include_router(employees_router)
 api_router.include_router(products_router)
 api_router.include_router(sales_router)
 api_router.include_router(reports_router)
+api_router.include_router(suppliers_router)
 
 __all__ = [
     "api_router",
@@ -34,4 +36,5 @@ __all__ = [
     "products_router",
     "reports_router",
     "sales_router",
+    "suppliers_router",
 ]
