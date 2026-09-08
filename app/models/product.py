@@ -40,17 +40,8 @@ class Product(TimestampMixin, Base):
         CheckConstraint("sale_price >= 0", name="ck_product_sale_price_non_negative"),
         CheckConstraint("stock_quantity >= 0", name="ck_product_stock_quantity_non_negative"),
         CheckConstraint(
-            "shelf_life_days IS NULL OR shelf_life_days > 0",
-            name="ck_product_shelf_life_days_positive",
-        ),
-        CheckConstraint(
             "expiry_warning_days IS NULL OR expiry_warning_days >= 0",
             name="ck_product_expiry_warning_days_non_negative",
-        ),
-        CheckConstraint(
-            "shelf_life_days IS NULL OR expiry_warning_days IS NULL "
-            "OR expiry_warning_days < shelf_life_days",
-            name="ck_product_expiry_warning_before_shelf_life",
         ),
         CheckConstraint("status IN ('on_sale', 'stopped')", name="product_status"),
         UniqueConstraint("product_no", name="uq_product_product_no"),
@@ -113,12 +104,6 @@ class Product(TimestampMixin, Base):
         default=0,
         server_default=text("0"),
         comment="当前库存数量",
-    )
-    # shelf_life_days保存商品通常可保存的天数；没有保质期管理时允许为空。
-    shelf_life_days: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        comment="默认保质期天数",
     )
     # expiry_warning_days表示到期前多少天开始显示为临期商品。
     expiry_warning_days: Mapped[int | None] = mapped_column(
