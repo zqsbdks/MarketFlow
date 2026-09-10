@@ -2,18 +2,21 @@
 
 from fastapi import HTTPException
 from fastapi import status as http_status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.suppliers import (
+    create_supplier,
     get_all_suppliers,
+    get_next_supplier_no,
     get_supplier_by_id,
     get_supplier_by_name,
     put_supplier_status,
     update_supplier,
 )
 from app.models.enums import EmployeeRole
-from app.schemas.suppliers_requests import SuppliersUpdateRequest
+from app.schemas.suppliers_requests import SuppliersCreateRequest, SuppliersUpdateRequest
 from app.schemas.suppliers_responses import SupplierItemResponse, SupplierListResponse
 
 
@@ -257,7 +260,76 @@ async def update_supplier_service(
 
 # endregion
 
+
+# region 创建供应商
+async def create_supplier_service(
+    request: SuppliersCreateRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> SupplierItemResponse:
+    """验证店长权限，自动生成供应商编号并创建供应商。"""
+
+    # current_employee_id来自登录令牌，用它查询本次操作的员工。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # 已停用账号即使令牌尚未过期，也不允许创建供应商。
+    if not current_employee.is_active:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="账号已停用")
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # 创建供应商属于管理操作，只允许店长执行。
+    if current_employee.role != EmployeeRole.STORE_MANAGER:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长可以创建供应商",
+        )
+
+    # 名称具有唯一约束；创建前先检查，以便返回清楚的业务错误。
+    supplier_with_same_name = await get_supplier_by_name(name=request.name, db=db)
+    if supplier_with_same_name is not None:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="供应商名称已存在",
+        )
+
+    # 前端不提交supplier_no，由后端根据现有最大编号生成下一个编号。
+    supplier_no = await get_next_supplier_no(db=db)
+
+    try:
+        created_supplier = await create_supplier(
+            supplier_no=supplier_no,
+            name=request.name,
+            contact_name=request.contact_name,
+            phone=request.phone,
+            address=request.address,
+            db=db,
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        # 并发创建仍可能撞上唯一约束；发生时撤销当前事务并返回409。
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="供应商编号或名称已存在，请重试",
+        ) from exc
+
+    # CRUD已经refresh过对象，这里可以直接转换成统一的响应模型。
+    return SupplierItemResponse.model_validate(created_supplier)
+
+
+# endregion
+
 __all__ = [
+    "create_supplier_service",
     "get_supplier_detail_service",
     "get_suppliers_list_service",
     "update_supplier_service",

@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole
 from app.models.supplier import Supplier
-from app.services.suppliers import get_supplier_detail_service, update_supplier_status_service
+from app.schemas.suppliers_requests import SuppliersCreateRequest
+from app.services.suppliers import (
+    create_supplier_service,
+    get_supplier_detail_service,
+    update_supplier_status_service,
+)
 
 
 def build_employee(role: EmployeeRole = EmployeeRole.STORE_MANAGER) -> Employee:
@@ -102,3 +107,48 @@ async def test_manager_can_update_supplier_status(monkeypatch) -> None:
     )
     db.commit.assert_awaited_once()
     assert result.is_active is False
+
+
+async def test_manager_can_create_supplier_with_generated_number(monkeypatch) -> None:
+    """创建供应商时由后端生成编号，并提交新增记录。"""
+
+    manager = build_employee()
+    created_supplier = build_supplier()
+    db = AsyncMock(spec=AsyncSession)
+    create_record = AsyncMock(return_value=created_supplier)
+
+    monkeypatch.setattr(
+        "app.services.suppliers.get_employee_by_id",
+        AsyncMock(return_value=manager),
+    )
+    monkeypatch.setattr(
+        "app.services.suppliers.get_supplier_by_name",
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        "app.services.suppliers.get_next_supplier_no",
+        AsyncMock(return_value="SUP00001"),
+    )
+    monkeypatch.setattr("app.services.suppliers.create_supplier", create_record)
+
+    result = await create_supplier_service(
+        request=SuppliersCreateRequest(
+            name="测试供应商",
+            contact_name="张三",
+            phone="13800138000",
+            address="测试地址",
+        ),
+        current_employee_id=manager.id,
+        db=db,
+    )
+
+    create_record.assert_awaited_once_with(
+        supplier_no="SUP00001",
+        name="测试供应商",
+        contact_name="张三",
+        phone="13800138000",
+        address="测试地址",
+        db=db,
+    )
+    db.commit.assert_awaited_once()
+    assert result.supplier_no == "SUP00001"

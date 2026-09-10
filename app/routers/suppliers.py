@@ -7,12 +7,14 @@ from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
 from app.schemas.suppliers_requests import (
+    SuppliersCreateRequest,
     SuppliersListRequest,
     SuppliersStatusUpdateRequest,
     SuppliersUpdateRequest,
 )
 from app.schemas.suppliers_responses import SupplierItemResponse, SupplierListResponse
 from app.services.suppliers import (
+    create_supplier_service,
     get_supplier_detail_service,
     get_suppliers_list_service,
     update_supplier_service,
@@ -145,4 +147,34 @@ async def update_supplier_details(
 
 # endregion
 
+# region 创建供应商接口
+
+
+@suppliers_router.post(
+    "/",
+    response_model=ResponseModel[SupplierItemResponse],
+    summary="创建供应商",
+    description="店长创建供应商。",
+)
+async def create_supplier(
+    request: SuppliersCreateRequest,
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[SupplierItemResponse]:
+    """接收供应商信息，并使用统一响应格式返回创建后的供应商信息。"""
+
+    # request是前端提交的创建内容；Service负责权限、数据和重复值校验。
+    created_supplier = await create_supplier_service(
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[SupplierItemResponse](
+        message="创建供应商成功", 
+        data=created_supplier,
+    )
+
+
+# endregion
 __all__ = ["suppliers_router"]

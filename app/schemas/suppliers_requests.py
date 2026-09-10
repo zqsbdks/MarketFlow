@@ -43,4 +43,29 @@ class SuppliersUpdateRequest(BaseModel):
 # endregion
 
 
-__all__ = ["SuppliersListRequest", "SuppliersStatusUpdateRequest", "SuppliersUpdateRequest"]
+# region 创建供应商请求
+class SuppliersCreateRequest(BaseModel):
+    """店长创建供应商时提交的基本资料。"""
+
+    # 供应商名称是创建记录所必需的数据；...表示前端必须传入。
+    name: str = Field(..., description="供应商名称", min_length=1, max_length=100)
+
+    # 以下资料在数据库中允许为空，因此创建时可以不传，之后也可以通过修改接口补充。
+    contact_name: str | None = Field(None, description="联系人姓名", min_length=1, max_length=50)
+    phone: str | None = Field(None, description="联系电话", min_length=1, max_length=30)
+    address: str | None = Field(None, description="供应商地址", min_length=1, max_length=255)
+
+    # supplier_no不由前端提交，创建供应商时由后端自动生成，例如SUP00001。
+    # is_active也不由前端提交，创建后使用数据库默认值True。
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+# endregion
+
+
+__all__ = [
+    "SuppliersCreateRequest",
+    "SuppliersListRequest",
+    "SuppliersStatusUpdateRequest",
+    "SuppliersUpdateRequest",
+]
