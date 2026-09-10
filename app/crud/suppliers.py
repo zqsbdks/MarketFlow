@@ -69,4 +69,46 @@ async def put_supplier_status(
 
 # endregion
 
-__all__ = ["get_all_suppliers", "get_supplier_by_id", "put_supplier_status"]
+
+# region 根据名称获取其他供应商
+async def get_supplier_by_name(
+    name: str,
+    excluded_supplier_id: int,
+    db: AsyncSession,
+) -> Supplier | None:
+    """按名称查询其他供应商，用于判断修改后的名称是否重复。"""
+
+    statement = select(Supplier).where(
+        Supplier.name == name,
+        # 排除当前正在修改的供应商，否则保留原名称也会被误判为重复。
+        Supplier.id != excluded_supplier_id,
+    )
+    result = await db.execute(statement)
+    return result.scalar_one_or_none()
+
+
+# endregion
+
+
+# region 修改供应商详情
+async def update_supplier(
+    supplier_id: int,
+    update_data: dict[str, object],
+    db: AsyncSession,
+) -> None:
+    """更新指定供应商实际提交的字段；事务提交由Service负责。"""
+
+    # **update_data会把字典展开成SQL UPDATE语句中的字段和值。
+    statement = update(Supplier).where(Supplier.id == supplier_id).values(**update_data)
+    await db.execute(statement)
+
+
+# endregion
+
+__all__ = [
+    "get_all_suppliers",
+    "get_supplier_by_id",
+    "get_supplier_by_name",
+    "put_supplier_status",
+    "update_supplier",
+]

@@ -6,11 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.suppliers_requests import SuppliersListRequest, SuppliersStatusUpdateRequest
+from app.schemas.suppliers_requests import (
+    SuppliersListRequest,
+    SuppliersStatusUpdateRequest,
+    SuppliersUpdateRequest,
+)
 from app.schemas.suppliers_responses import SupplierItemResponse, SupplierListResponse
 from app.services.suppliers import (
     get_supplier_detail_service,
     get_suppliers_list_service,
+    update_supplier_service,
     update_supplier_status_service,
 )
 
@@ -102,6 +107,39 @@ async def update_supplier_status(
     return ResponseModel[SupplierItemResponse](
         message="修改供应商启用状态成功",
         data=supplier,
+    )
+
+
+# endregion
+
+# region 修改供应商详情接口
+
+
+@suppliers_router.put(
+    "/{supplier_id}",
+    response_model=ResponseModel[SupplierItemResponse],
+    summary="修改供应商详情",
+    description="店长修改供应商详情。",
+)
+async def update_supplier_details(
+    request: SuppliersUpdateRequest,
+    supplier_id: int = Path(..., description="供应商ID", ge=1),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[SupplierItemResponse]:
+    """接收供应商ID和修改后的供应商信息，并使用统一响应格式返回修改后的供应商信息。"""
+
+    # request是前端提交的修改内容；Service负责权限、数据和重复值校验。
+    updated_supplier = await update_supplier_service(
+        supplier_id=supplier_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    return ResponseModel[SupplierItemResponse](
+        message="修改供应商详情成功",
+        data=updated_supplier,
     )
 
 
