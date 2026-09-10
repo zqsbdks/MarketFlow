@@ -171,7 +171,7 @@ async def create_supplier(
     )
 
     return ResponseModel[SupplierItemResponse](
-        message="创建供应商成功", 
+        message="创建供应商成功",
         data=created_supplier,
     )
 
