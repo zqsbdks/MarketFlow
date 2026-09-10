@@ -23,7 +23,11 @@ from app.services.reports import (
     overview_service,
 )
 from app.services.sales import get_sales_detail_service, get_sales_list_service
-from app.services.suppliers import get_suppliers_list_service
+from app.services.suppliers import (
+    get_supplier_detail_service,
+    get_suppliers_list_service,
+    update_supplier_status_service,
+)
 
 __all__ = [
     "auth_login_service",
@@ -43,6 +47,8 @@ __all__ = [
     "get_sales_detail_service",
     "get_sales_list_service",
     "get_suppliers_list_service",
+    "get_supplier_detail_service",
+    "update_supplier_status_service",
     "reset_employee_password_service",
     "update_employee_detail_service",
     "update_employee_status_service",

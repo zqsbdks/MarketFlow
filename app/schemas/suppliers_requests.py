@@ -14,4 +14,15 @@ class SuppliersListRequest(BaseModel):
 
 # endregion
 
-__all__ = ["SuppliersListRequest"]
+
+# region 修改供应商状态请求
+class SuppliersStatusUpdateRequest(BaseModel):
+    """店长启用或停用供应商时提交的状态。"""
+
+    # 使用...表示前端必须明确传入true或false，避免遗漏后默认为启用。
+    is_active: bool = Field(..., description="是否继续合作")
+
+
+# endregion
+
+__all__ = ["SuppliersListRequest", "SuppliersStatusUpdateRequest"]

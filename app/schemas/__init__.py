@@ -62,7 +62,7 @@ from app.schemas.sales_responses import (
     SalesItemResponse,
     SalesListResponse,
 )
-from app.schemas.suppliers_requests import SuppliersListRequest
+from app.schemas.suppliers_requests import SuppliersListRequest, SuppliersStatusUpdateRequest
 from app.schemas.suppliers_responses import SupplierItemResponse, SupplierListResponse
 
 __all__ = [
@@ -113,4 +113,5 @@ __all__ = [
     "SupplierItemResponse",
     "SupplierListResponse",
     "SuppliersListRequest",
+    "SuppliersStatusUpdateRequest",
 ]
