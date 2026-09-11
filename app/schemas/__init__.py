@@ -62,6 +62,16 @@ from app.schemas.sales_responses import (
     SalesItemResponse,
     SalesListResponse,
 )
+from app.schemas.supplier_products_requests import (
+    SupplierProductCreateRequest,
+    SupplierProductsListRequest,
+    SupplierProductStatusUpdateRequest,
+    SupplierProductUpdateRequest,
+)
+from app.schemas.supplier_products_responses import (
+    SupplierProductItemResponse,
+    SupplierProductListResponse,
+)
 from app.schemas.suppliers_requests import (
     SuppliersCreateRequest,
     SuppliersListRequest,
@@ -117,6 +127,12 @@ __all__ = [
     "SalesListResponse",
     "SupplierItemResponse",
     "SupplierListResponse",
+    "SupplierProductCreateRequest",
+    "SupplierProductItemResponse",
+    "SupplierProductListResponse",
+    "SupplierProductsListRequest",
+    "SupplierProductStatusUpdateRequest",
+    "SupplierProductUpdateRequest",
     "SuppliersCreateRequest",
     "SuppliersListRequest",
     "SuppliersStatusUpdateRequest",
