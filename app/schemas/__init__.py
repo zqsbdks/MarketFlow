@@ -37,7 +37,12 @@ from app.schemas.products_responses import (
     ProductsListResponse,
 )
 from app.schemas.purchases_requests import PurchasesListRequest
-from app.schemas.purchases_responses import PurchaseListItemResponse, PurchaseListResponse
+from app.schemas.purchases_responses import (
+    PurchaseDetailResponse,
+    PurchaseItemResponse,
+    PurchaseListItemResponse,
+    PurchaseListResponse,
+)
 from app.schemas.reports_requests import (
     DepartmentRequest,
     RankingGroupBy,
@@ -110,6 +115,8 @@ __all__ = [
     "ProductsListRequest",
     "ProductsListResponse",
     "PurchasesListRequest",
+    "PurchaseDetailResponse",
+    "PurchaseItemResponse",
     "PurchaseListItemResponse",
     "PurchaseListResponse",
     "ResponseModel",

@@ -10,7 +10,8 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole, PurchaseStatus
 from app.models.purchase import Purchase
-from app.services.purchases import get_purchases_list_service
+from app.models.purchase_item import PurchaseItem
+from app.services.purchases import get_purchase_detail_service, get_purchases_list_service
 
 
 def build_employee() -> Employee:
@@ -80,3 +81,45 @@ async def test_employee_can_get_purchase_list_with_item_totals(monkeypatch) -> N
     assert result.items[0].item_count == 2
     assert result.items[0].total_quantity == 30
     assert result.items[0].received_by_name is None
+
+
+async def test_employee_can_get_purchase_detail_with_items(monkeypatch) -> None:
+    """详情响应会返回进货单中的全部商品明细。"""
+
+    employee = build_employee()
+    purchase = build_purchase()
+    purchase.items = [
+        PurchaseItem(
+            id=1,
+            purchase_id=1,
+            product_id=None,
+            supplier_product_id=1,
+            supplier_id=1,
+            product_no_snapshot=None,
+            product_name_snapshot="猪五花肉",
+            supplier_name_snapshot="测试供应商",
+            quantity=20,
+            unit_cost=Decimal("25.80"),
+            subtotal=Decimal("516.00"),
+            production_date=None,
+            expiration_date=None,
+        )
+    ]
+    monkeypatch.setattr(
+        "app.services.purchases.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.purchases.get_purchase_by_id",
+        AsyncMock(return_value=purchase),
+    )
+
+    result = await get_purchase_detail_service(
+        purchase_id=purchase.id,
+        current_employee_id=employee.id,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.item_count == 1
+    assert result.total_quantity == 20
+    assert result.items[0].product_name == "猪五花肉"

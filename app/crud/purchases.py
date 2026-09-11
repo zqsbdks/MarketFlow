@@ -89,4 +89,28 @@ async def get_all_purchases(
 # endregion
 
 
-__all__ = ["get_all_purchases"]
+# region 获取进货单详情
+async def get_purchase_by_id(
+    purchase_id: int,
+    db: AsyncSession,
+) -> Purchase | None:
+    """根据ID查询进货单，并加载部门、员工和全部进货明细。"""
+
+    statement = (
+        select(Purchase)
+        .options(
+            selectinload(Purchase.department),
+            selectinload(Purchase.created_by_employee),
+            selectinload(Purchase.received_by_employee),
+            selectinload(Purchase.items),
+        )
+        .where(Purchase.id == purchase_id)
+    )
+    result = await db.execute(statement)
+    return result.scalar_one_or_none()
+
+
+# endregion
+
+
+__all__ = ["get_all_purchases", "get_purchase_by_id"]

@@ -1,6 +1,6 @@
 """进货管理接口的响应模型。"""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,6 +44,33 @@ class PurchaseListItemResponse(BaseModel):
 # endregion
 
 
+# region 进货单详情
+class PurchaseItemResponse(BaseModel):
+    """进货单详情中的一条商品明细。"""
+
+    id: int = Field(..., description="进货明细ID", ge=1)
+    supplier_product_id: int = Field(..., description="供应商商品目录ID", ge=1)
+    product_id: int | None = Field(None, description="签收后生成或匹配的正式商品ID", ge=1)
+    supplier_id: int = Field(..., description="供应商ID", ge=1)
+    product_no: str | None = Field(None, description="下单时商品编号快照", max_length=20)
+    product_name: str = Field(..., description="下单时商品名称", min_length=1, max_length=100)
+    supplier_name: str = Field(..., description="下单时供应商名称", min_length=1, max_length=100)
+    quantity: int = Field(..., description="进货数量", ge=1)
+    unit_cost: Decimal = Field(..., description="本次进货单价", ge=0, decimal_places=2)
+    subtotal: Decimal = Field(..., description="进货金额小计", ge=0, decimal_places=2)
+    production_date: date | None = Field(None, description="生产日期")
+    expiration_date: date | None = Field(None, description="到期日期")
+
+
+class PurchaseDetailResponse(PurchaseListItemResponse):
+    """进货单汇总信息及其全部商品明细。"""
+
+    items: list[PurchaseItemResponse] = Field(..., description="进货商品明细")
+
+
+# endregion
+
+
 # region 进货单列表响应
 class PurchaseListResponse(BaseModel):
     """进货单列表及分页信息。"""
@@ -58,6 +85,9 @@ class PurchaseListResponse(BaseModel):
 # endregion
 
 
-# 获取进货单详情时，再补充PurchaseItemResponse和PurchaseDetailResponse。
-
-__all__ = ["PurchaseListItemResponse", "PurchaseListResponse"]
+__all__ = [
+    "PurchaseDetailResponse",
+    "PurchaseItemResponse",
+    "PurchaseListItemResponse",
+    "PurchaseListResponse",
+]
