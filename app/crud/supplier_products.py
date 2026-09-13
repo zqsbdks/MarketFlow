@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.models.supplier_product import SupplierProduct
 
 
+# region 供应商商品目录数据库操作
 async def get_all_supplier_products(
     offset: int,
     page_size: int,
@@ -136,3 +137,4 @@ __all__ = [
     "update_supplier_product",
     "update_supplier_product_status",
 ]
+# endregion

@@ -5,6 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# region 供应商商品目录请求模型
 class SupplierProductsListRequest(BaseModel):
     """供应商商品列表的分页及可选筛选条件。"""
 
@@ -49,3 +50,4 @@ __all__ = [
     "SupplierProductStatusUpdateRequest",
     "SupplierProductUpdateRequest",
 ]
+# endregion

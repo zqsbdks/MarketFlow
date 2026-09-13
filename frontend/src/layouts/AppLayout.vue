@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   ReceiptText,
+  Truck,
   Store,
   Users,
   X,
@@ -29,6 +30,7 @@ const navItems = computed(() => {
     { to: '/analytics', label: '经营分析', icon: ChartNoAxesCombined },
     { to: '/products', label: '商品查询', icon: Boxes },
     { to: '/sales', label: '销售记录', icon: ReceiptText },
+    { to: '/procurement', label: '进货管理', icon: Truck },
   ]
   if (auth.isManager) items.push({ to: '/employees', label: '员工管理', icon: Users })
   if (auth.employee) items.push({ to: `/employees/${auth.employee.id}`, label: '我的档案', icon: Users })

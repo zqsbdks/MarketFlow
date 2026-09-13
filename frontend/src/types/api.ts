@@ -205,3 +205,67 @@ export interface CreatedEmployee {
   temporary_password: string
   must_change_password: boolean
 }
+
+export interface Supplier {
+  id: number
+  supplier_no: string
+  name: string
+  contact_name: string | null
+  phone: string | null
+  address: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SupplierProduct {
+  id: number
+  supplier_id: number
+  supplier_name: string
+  category_id: number | null
+  category_name: string | null
+  name: string
+  unit_cost: string
+  shelf_life_days: number | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type PurchaseStatus = 'pending' | 'arrived'
+
+export interface PurchaseItem {
+  id: number
+  supplier_product_id: number
+  product_id: number | null
+  supplier_id: number
+  product_no: string | null
+  product_name: string
+  supplier_name: string
+  quantity: number
+  unit_cost: string
+  subtotal: string
+  production_date: string | null
+  expiration_date: string | null
+}
+
+export interface Purchase {
+  id: number
+  purchase_no: string
+  department_id: number
+  department_name: string
+  created_by: number
+  created_by_name: string
+  received_by: number | null
+  received_by_name: string | null
+  ordered_at: string
+  expected_arrival_at: string
+  arrived_at: string | null
+  total_amount: string
+  status: PurchaseStatus
+  item_count: number
+  total_quantity: number
+  created_at: string
+  updated_at: string
+  items?: PurchaseItem[]
+}

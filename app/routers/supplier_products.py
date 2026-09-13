@@ -95,7 +95,7 @@ async def get_supplier_product_detail(
     "",
     response_model=ResponseModel[SupplierProductItemResponse],
     summary="创建供应商商品",
-    description="店长向指定供应商的商品目录中添加商品。",
+    description="店长可为任意部门添加商品，正式员工只能为自己所属部门添加。",
 )
 async def create_supplier_product(
     request: SupplierProductCreateRequest,
@@ -123,7 +123,7 @@ async def create_supplier_product(
     "/{supplier_product_id}/status",
     response_model=ResponseModel[SupplierProductItemResponse],
     summary="修改供应商商品状态",
-    description="店长启用或停用指定的供应商商品。",
+    description="店长可操作全部部门，正式员工只能操作自己所属部门的商品。",
 )
 async def update_supplier_product_status(
     request: SupplierProductStatusUpdateRequest,
@@ -153,7 +153,7 @@ async def update_supplier_product_status(
     "/{supplier_product_id}",
     response_model=ResponseModel[SupplierProductItemResponse],
     summary="修改供应商商品详情",
-    description="店长修改指定供应商商品的名称、进货价或默认保质期。",
+    description="修改商品分类、名称、进货价或默认保质期；正式员工仅限自己部门。",
 )
 async def update_supplier_product_details(
     request: SupplierProductUpdateRequest,

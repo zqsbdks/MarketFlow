@@ -23,6 +23,9 @@ import type {
   SaleDetail,
   SaleListItem,
   SortOrder,
+  Supplier,
+  SupplierProduct,
+  Purchase,
 } from '../types/api'
 
 export async function login(employeeNo: string, password: string) {
@@ -158,4 +161,52 @@ export async function getEmployeeDetail(employeeId: number) {
 
 export async function updateEmployeeDetail(employeeId: number, payload: EmployeeDetailUpdate) {
   return unwrap((await http.put<ApiResponse<EmployeeDetail>>(`/employees/${employeeId}`, payload)).data)
+}
+
+export async function getSuppliers(params: Record<string, unknown> = {}) {
+  return unwrap((await http.get<ApiResponse<PageResult<Supplier>>>('/suppliers/list', { params })).data)
+}
+
+export async function createSupplier(payload: Record<string, unknown>) {
+  return unwrap((await http.post<ApiResponse<Supplier>>('/suppliers/', payload)).data)
+}
+
+export async function updateSupplier(id: number, payload: Record<string, unknown>) {
+  return unwrap((await http.put<ApiResponse<Supplier>>(`/suppliers/${id}`, payload)).data)
+}
+
+export async function updateSupplierStatus(id: number, isActive: boolean) {
+  return unwrap((await http.put<ApiResponse<Supplier>>(`/suppliers/${id}/status`, { is_active: isActive })).data)
+}
+
+export async function getSupplierProducts(params: Record<string, unknown> = {}) {
+  return unwrap((await http.get<ApiResponse<PageResult<SupplierProduct>>>('/supplier-products/list', { params })).data)
+}
+
+export async function createSupplierProduct(payload: Record<string, unknown>) {
+  return unwrap((await http.post<ApiResponse<SupplierProduct>>('/supplier-products', payload)).data)
+}
+
+export async function updateSupplierProduct(id: number, payload: Record<string, unknown>) {
+  return unwrap((await http.put<ApiResponse<SupplierProduct>>(`/supplier-products/${id}`, payload)).data)
+}
+
+export async function updateSupplierProductStatus(id: number, isActive: boolean) {
+  return unwrap((await http.put<ApiResponse<SupplierProduct>>(`/supplier-products/${id}/status`, { is_active: isActive })).data)
+}
+
+export async function getPurchases(params: Record<string, unknown> = {}) {
+  return unwrap((await http.get<ApiResponse<PageResult<Purchase>>>('/purchases/list', { params })).data)
+}
+
+export async function getPurchase(id: number) {
+  return unwrap((await http.get<ApiResponse<Purchase>>(`/purchases/${id}`)).data)
+}
+
+export async function createPurchase(payload: Record<string, unknown>) {
+  return unwrap((await http.post<ApiResponse<Purchase>>('/purchases/', payload)).data)
+}
+
+export async function autoReceivePurchases() {
+  return unwrap((await http.put<ApiResponse<Purchase[]>>('/purchases/auto-receive')).data)
 }

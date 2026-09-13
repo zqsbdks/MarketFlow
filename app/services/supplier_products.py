@@ -28,6 +28,7 @@ from app.schemas.supplier_products_responses import (
 )
 
 
+# region 供应商商品目录业务逻辑
 def _build_supplier_product_response(
     supplier_product: SupplierProduct,
 ) -> SupplierProductItemResponse:
@@ -403,3 +404,4 @@ __all__ = [
     "update_supplier_product_service",
     "update_supplier_product_status_service",
 ]
+# endregion

@@ -54,6 +54,12 @@ const router = createRouter({
           meta: { title: '销售记录' },
         },
         {
+          path: 'procurement',
+          name: 'procurement',
+          component: () => import('../views/ProcurementView.vue'),
+          meta: { title: '进货管理' },
+        },
+        {
           path: 'employees',
           name: 'employees',
           component: () => import('../views/EmployeesView.vue'),
