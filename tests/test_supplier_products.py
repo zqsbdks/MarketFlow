@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.category import Category
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole
 from app.models.supplier import Supplier
@@ -141,6 +142,10 @@ async def test_manager_can_create_supplier_product(monkeypatch) -> None:
         "app.services.supplier_products.get_supplier_product_by_name",
         AsyncMock(return_value=None),
     )
+    monkeypatch.setattr(
+        "app.services.supplier_products.get_category_by_id",
+        AsyncMock(return_value=Category(id=1, department_id=1, name="测试分类", is_active=True)),
+    )
     monkeypatch.setattr("app.services.supplier_products.create_supplier_product", create_record)
     monkeypatch.setattr(
         "app.services.supplier_products.get_supplier_product_by_id",
@@ -150,6 +155,7 @@ async def test_manager_can_create_supplier_product(monkeypatch) -> None:
     result = await create_supplier_product_service(
         request=SupplierProductCreateRequest(
             supplier_id=1,
+            category_id=1,
             name="猪五花肉",
             unit_cost=Decimal("25.80"),
             shelf_life_days=7,

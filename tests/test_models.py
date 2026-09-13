@@ -149,6 +149,7 @@ EXPECTED_COLUMNS = {
     "supplier_product": {
         "id",
         "supplier_id",
+        "category_id",
         "name",
         "unit_cost",
         "shelf_life_days",
@@ -320,4 +321,4 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """进货与批次迁移是当前唯一的 Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["3878bf50f212"]
+    assert script.get_heads() == ["20260913_0007"]

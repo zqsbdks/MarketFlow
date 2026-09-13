@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.models.enums import PurchaseStatus
+from app.models.employee import Employee
+from app.models.enums import EmployeeRole, InventoryBatchStatus, ProductStatus, PurchaseStatus
+from app.models.inventory_batch import InventoryBatch
+from app.models.product import Product
 from app.models.purchase import Purchase
 from app.models.purchase_item import PurchaseItem
 from app.models.supplier_product import SupplierProduct
@@ -234,4 +237,119 @@ async def create_purchase(
 # endregion
 
 
-__all__ = ["create_purchase", "get_all_purchases", "get_purchase_by_id"]
+# region 自动签收到货
+async def auto_receive_due_purchases(
+    arrived_at: datetime,
+    db: AsyncSession,
+) -> list[Purchase]:
+    """签收所有达到预计到货时间的待到货进货单，并同步商品与批次库存。"""
+
+    statement = (
+        select(Purchase)
+        .options(
+            selectinload(Purchase.items)
+            .selectinload(PurchaseItem.supplier_product)
+            .selectinload(SupplierProduct.product),
+            selectinload(Purchase.items)
+            .selectinload(PurchaseItem.supplier_product)
+            .selectinload(SupplierProduct.category),
+        )
+        .where(
+            Purchase.status == PurchaseStatus.PENDING,
+            Purchase.expected_arrival_at <= arrived_at,
+        )
+        .order_by(Purchase.id.asc())
+        .with_for_update()
+    )
+    due_purchases = list((await db.scalars(statement)).all())
+
+    product_number = int(
+        await db.scalar(
+            select(func.coalesce(func.max(cast(func.substr(Product.product_no, 2), Integer)), 0))
+        )
+        or 0
+    )
+    batch_number = int(
+        await db.scalar(
+            select(
+                func.coalesce(func.max(cast(func.substr(InventoryBatch.batch_no, 12), Integer)), 0)
+            ).where(InventoryBatch.batch_no.like(f"BAT{arrived_at:%Y%m%d}%"))
+        )
+        or 0
+    )
+
+    for purchase in due_purchases:
+        # 模拟自动签收：选择该部门 ID 最小的一名启用正式员工作为签收人。
+        receiver = await db.scalar(
+            select(Employee)
+            .where(
+                Employee.department_id == purchase.department_id,
+                Employee.role == EmployeeRole.REGULAR_EMPLOYEE,
+                Employee.is_active.is_(True),
+            )
+            .order_by(Employee.id.asc())
+            .limit(1)
+        )
+        if receiver is None:
+            raise ValueError(f"部门ID {purchase.department_id} 没有可用的正式员工")
+
+        for purchase_item in purchase.items:
+            catalog_product = purchase_item.supplier_product
+            product = catalog_product.product
+            if product is None:
+                if catalog_product.category_id is None or catalog_product.category is None:
+                    raise ValueError(f"供应商商品目录ID {catalog_product.id} 尚未设置商品分类")
+                if catalog_product.category.department_id != purchase.department_id:
+                    raise ValueError(f"供应商商品目录ID {catalog_product.id} 的分类不属于进货部门")
+                product_number += 1
+                product = Product(
+                    product_no=f"P{product_number:05d}",
+                    name=catalog_product.name,
+                    supplier_product_id=catalog_product.id,
+                    department_id=purchase.department_id,
+                    category_id=catalog_product.category_id,
+                    purchase_price=purchase_item.unit_cost,
+                    sale_price=purchase_item.unit_cost * Decimal("2"),
+                    stock_quantity=0,
+                    expiry_warning_days=1,
+                    status=ProductStatus.ON_SALE,
+                )
+                db.add(product)
+                await db.flush()
+
+            product.purchase_price = purchase_item.unit_cost
+            product.stock_quantity += purchase_item.quantity
+            purchase_item.product_id = product.id
+
+            batch_number += 1
+            db.add(
+                InventoryBatch(
+                    batch_no=f"BAT{arrived_at:%Y%m%d}{batch_number:04d}",
+                    product_id=product.id,
+                    purchase_item_id=purchase_item.id,
+                    production_date=purchase_item.production_date,
+                    expiration_date=purchase_item.expiration_date,
+                    initial_quantity=purchase_item.quantity,
+                    remaining_quantity=purchase_item.quantity,
+                    status=InventoryBatchStatus.AVAILABLE,
+                    arrived_at=arrived_at,
+                )
+            )
+
+        purchase.received_by = receiver.id
+        purchase.arrived_at = arrived_at
+        purchase.status = PurchaseStatus.ARRIVED
+
+    await db.flush()
+    return due_purchases
+
+
+# endregion
+
+
+__all__ = [
+    "auto_receive_due_purchases",
+    "create_purchase",
+    "get_all_purchases",
+    "get_purchase_by_id",
+]

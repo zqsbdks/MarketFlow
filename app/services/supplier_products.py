@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
+from app.crud.categories import get_category_by_id
 from app.crud.supplier_products import (
     create_supplier_product,
     get_all_supplier_products,
@@ -36,6 +37,8 @@ def _build_supplier_product_response(
         id=supplier_product.id,
         supplier_id=supplier_product.supplier_id,
         supplier_name=supplier_product.supplier.name,
+        category_id=supplier_product.category_id,
+        category_name=(supplier_product.category.name if supplier_product.category else None),
         name=supplier_product.name,
         unit_cost=supplier_product.unit_cost,
         shelf_life_days=supplier_product.shelf_life_days,
@@ -149,10 +152,13 @@ async def create_supplier_product_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
-    if current_employee.role != EmployeeRole.STORE_MANAGER:
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="只有店长可以创建供应商商品",
+            detail="只有店长或正式员工可以创建供应商商品",
         )
 
     supplier = await get_supplier_by_id(supplier_id=request.supplier_id, db=db)
@@ -160,6 +166,20 @@ async def create_supplier_product_service(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商不存在")
     if not supplier.is_active:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="供应商已停用")
+
+    category = await get_category_by_id(category_id=request.category_id, db=db)
+    if category is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="商品分类不存在")
+    if not category.is_active:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="商品分类已停用")
+    if (
+        current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
+        and current_employee.department_id != category.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能为自己所属部门创建供应商商品",
+        )
 
     same_name_product = await get_supplier_product_by_name(
         supplier_id=request.supplier_id,
@@ -175,6 +195,7 @@ async def create_supplier_product_service(
     try:
         created_product = await create_supplier_product(
             supplier_id=request.supplier_id,
+            category_id=request.category_id,
             name=request.name,
             unit_cost=request.unit_cost,
             shelf_life_days=request.shelf_life_days,
@@ -220,10 +241,13 @@ async def update_supplier_product_status_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
-    if current_employee.role != EmployeeRole.STORE_MANAGER:
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="只有店长可以修改供应商商品状态",
+            detail="只有店长或正式员工可以修改供应商商品状态",
         )
 
     supplier_product = await get_supplier_product_by_id(
@@ -232,6 +256,14 @@ async def update_supplier_product_status_service(
     )
     if supplier_product is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商商品不存在")
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE and (
+        supplier_product.category is None
+        or supplier_product.category.department_id != current_employee.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能修改自己所属部门的供应商商品",
+        )
     # 供应商停用时，不能单独重新启用它目录下的商品。
     if is_active and not supplier_product.supplier.is_active:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="供应商已停用")
@@ -273,10 +305,13 @@ async def update_supplier_product_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
-    if current_employee.role != EmployeeRole.STORE_MANAGER:
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="只有店长可以修改供应商商品详情",
+            detail="只有店长或正式员工可以修改供应商商品详情",
         )
 
     existing_product = await get_supplier_product_by_id(
@@ -285,6 +320,14 @@ async def update_supplier_product_service(
     )
     if existing_product is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商商品不存在")
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE and (
+        existing_product.category is None
+        or existing_product.category.department_id != current_employee.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能修改自己所属部门的供应商商品",
+        )
 
     update_data = request.model_dump(exclude_unset=True)
     if not update_data:
@@ -296,6 +339,25 @@ async def update_supplier_product_service(
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="商品名称不能为空")
     if update_data.get("unit_cost", existing_product.unit_cost) is None:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="进货单价不能为空")
+
+    new_category_id = update_data.get("category_id")
+    if isinstance(new_category_id, int):
+        new_category = await get_category_by_id(category_id=new_category_id, db=db)
+        if new_category is None:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="商品分类不存在")
+        if not new_category.is_active:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="商品分类已停用",
+            )
+        if (
+            current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
+            and new_category.department_id != current_employee.department_id
+        ):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工不能把商品修改到其他部门的分类",
+            )
 
     new_name = update_data.get("name")
     if isinstance(new_name, str):

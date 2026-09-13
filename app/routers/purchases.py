@@ -12,6 +12,7 @@ from app.schemas.purchases_responses import (
     PurchaseListResponse,
 )
 from app.services.purchases import (
+    auto_receive_purchases_service,
     create_purchase_service,
     get_purchase_detail_service,
     get_purchases_list_service,
@@ -58,6 +59,32 @@ async def list_purchases(
     )
     return ResponseModel[PurchaseListResponse](
         message="获取进货单列表成功",
+        data=purchases,
+    )
+
+
+# endregion
+
+
+# region 自动签收进货单
+@purchases_router.put(
+    "/auto-receive",
+    response_model=ResponseModel[list[PurchaseDetailResponse]],
+    summary="自动签收到期进货单",
+    description="签收所有已达到预计到货时间的待到货进货单，并同步商品和批次库存。",
+)
+async def auto_receive_purchases(
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[list[PurchaseDetailResponse]]:
+    """模拟每天12点执行的自动签收任务；当前由店长调用接口触发。"""
+
+    purchases = await auto_receive_purchases_service(
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[list[PurchaseDetailResponse]](
+        message=f"自动签收完成，共签收{len(purchases)}张进货单",
         data=purchases,
     )
 

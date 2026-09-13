@@ -30,7 +30,7 @@ async def get_all_supplier_products(
     # 提前加载supplier关系，Service读取供应商名称时不会再次查询数据库。
     list_statement = (
         select(SupplierProduct)
-        .options(selectinload(SupplierProduct.supplier))
+        .options(selectinload(SupplierProduct.supplier), selectinload(SupplierProduct.category))
         .where(*conditions)
         .order_by(SupplierProduct.id.asc())
         .offset(offset)
@@ -50,7 +50,7 @@ async def get_supplier_product_by_id(
 
     statement = (
         select(SupplierProduct)
-        .options(selectinload(SupplierProduct.supplier))
+        .options(selectinload(SupplierProduct.supplier), selectinload(SupplierProduct.category))
         .where(SupplierProduct.id == supplier_product_id)
         .execution_options(populate_existing=True)
     )
@@ -78,6 +78,7 @@ async def get_supplier_product_by_name(
 
 async def create_supplier_product(
     supplier_id: int,
+    category_id: int,
     name: str,
     unit_cost: Decimal,
     shelf_life_days: int | None,
@@ -87,6 +88,7 @@ async def create_supplier_product(
 
     supplier_product = SupplierProduct(
         supplier_id=supplier_id,
+        category_id=category_id,
         name=name,
         unit_cost=unit_cost,
         shelf_life_days=shelf_life_days,

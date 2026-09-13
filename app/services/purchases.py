@@ -1,6 +1,6 @@
 """进货管理的业务逻辑。"""
 
-from datetime import date
+from datetime import date, datetime, time
 
 from fastapi import HTTPException
 from fastapi import status as http_status
@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.employees import get_department_by_id
+from app.crud.purchases import auto_receive_due_purchases, get_all_purchases, get_purchase_by_id
 from app.crud.purchases import create_purchase as create_purchase_crud
-from app.crud.purchases import get_all_purchases, get_purchase_by_id
 from app.models.enums import EmployeeRole, PurchaseStatus
 from app.schemas.purchases_requests import CreatePurchaseRequest
 from app.schemas.purchases_responses import (
@@ -206,6 +206,17 @@ async def create_purchase_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
+
+    # 模拟系统规定每天中午统一处理进货，因此 12:00 起不再接收当天的新进货单。
+    # datetime.now().time() 只取当前时间中的“时、分、秒”，方便与 12:00 比较。
+    purchase_cutoff_time = time(hour=12)
+    current_time = datetime.now().time()
+    if current_time >= purchase_cutoff_time:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="每天12:00后不能创建进货单，请于次日12:00前提交",
+        )
+
     # 只有店长和正式员工可以创建进货单，契约工不能创建。
     if current_employee.role not in (
         EmployeeRole.STORE_MANAGER,
@@ -222,6 +233,14 @@ async def create_purchase_service(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="部门不存在")
     if not department.is_active:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="部门已停用")
+    if (
+        current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
+        and current_employee.department_id != purchase.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能为自己所属部门创建进货单",
+        )
 
     # 同一张进货单不能重复添加同一个供应商商品目录项目。
     supplier_product_ids = [item.supplier_product_id for item in purchase.items]
@@ -279,7 +298,70 @@ async def create_purchase_service(
 # endregion
 
 
+# region 自动签收进货单
+async def auto_receive_purchases_service(
+    current_employee_id: int,
+    db: AsyncSession,
+) -> list[PurchaseDetailResponse]:
+    """由店长触发模拟任务，签收全部已达到预计时间的进货单。"""
+
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="账号已停用")
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role != EmployeeRole.STORE_MANAGER:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长可以执行自动签收",
+        )
+
+    now = datetime.now()
+    try:
+        received = await auto_receive_due_purchases(arrived_at=now, db=db)
+        responses: list[PurchaseDetailResponse] = []
+        for purchase in received:
+            refreshed = await get_purchase_by_id(purchase_id=purchase.id, db=db)
+            if refreshed is None:
+                raise RuntimeError("已签收的进货单无法重新读取")
+            # 复用详情服务现有的响应组装，确保详情与创建接口返回格式一致。
+            responses.append(
+                await get_purchase_detail_service(
+                    purchase_id=refreshed.id,
+                    current_employee_id=current_employee_id,
+                    db=db,
+                )
+            )
+        await db.commit()
+        return responses
+    except ValueError as error:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="自动签收时发生数据冲突",
+        ) from error
+
+
+# endregion
+
+
 __all__ = [
+    "auto_receive_purchases_service",
     "create_purchase_service",
     "get_purchase_detail_service",
     "get_purchases_list_service",

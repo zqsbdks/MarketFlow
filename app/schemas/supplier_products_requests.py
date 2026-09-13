@@ -20,6 +20,7 @@ class SupplierProductCreateRequest(BaseModel):
     """店长向供应商商品目录中添加商品时提交的数据。"""
 
     supplier_id: int = Field(..., description="供应商ID", ge=1)
+    category_id: int = Field(..., description="商品分类ID", ge=1)
     name: str = Field(..., description="供应商商品名称", min_length=1, max_length=100)
     unit_cost: Decimal = Field(..., description="当前默认进货单价", ge=0, decimal_places=2)
     shelf_life_days: int | None = Field(None, description="默认保质期天数", ge=1)
@@ -35,6 +36,7 @@ class SupplierProductStatusUpdateRequest(BaseModel):
 class SupplierProductUpdateRequest(BaseModel):
     """店长修改供应商商品资料时提交的可选字段。"""
 
+    category_id: int | None = Field(None, description="商品分类ID", ge=1)
     name: str | None = Field(None, description="供应商商品名称", min_length=1, max_length=100)
     unit_cost: Decimal | None = Field(None, description="当前默认进货单价", ge=0, decimal_places=2)
     shelf_life_days: int | None = Field(None, description="默认保质期天数", ge=1)

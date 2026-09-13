@@ -13,6 +13,8 @@ class SupplierProductItemResponse(BaseModel):
     id: int = Field(..., description="供应商商品目录ID", ge=1)
     supplier_id: int = Field(..., description="供应商ID", ge=1)
     supplier_name: str = Field(..., description="供应商名称", min_length=1, max_length=100)
+    category_id: int | None = Field(None, description="商品分类ID", ge=1)
+    category_name: str | None = Field(None, description="商品分类名称", max_length=50)
     name: str = Field(..., description="供应商商品名称", min_length=1, max_length=100)
     unit_cost: Decimal = Field(..., description="当前默认进货单价", ge=0, decimal_places=2)
     shelf_life_days: int | None = Field(None, description="默认保质期天数", ge=1)

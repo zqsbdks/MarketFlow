@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.category import Category
     from app.models.product import Product
     from app.models.purchase_item import PurchaseItem
     from app.models.supplier import Supplier
@@ -50,6 +51,13 @@ class SupplierProduct(TimestampMixin, Base):
         index=True,
         comment="供应商ID",
     )
+    category_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("category.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+        comment="商品分类ID",
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False, comment="供应商商品名称")
     unit_cost: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False, comment="当前默认进货单价"
@@ -66,6 +74,7 @@ class SupplierProduct(TimestampMixin, Base):
     )
 
     supplier: Mapped[Supplier] = relationship(back_populates="catalog_products")
+    category: Mapped[Category | None] = relationship()
     product: Mapped[Product | None] = relationship(back_populates="supplier_product", uselist=False)
     purchase_items: Mapped[list[PurchaseItem]] = relationship(back_populates="supplier_product")
 
