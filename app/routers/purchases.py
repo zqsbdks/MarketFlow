@@ -6,9 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.purchases_requests import PurchasesListRequest
-from app.schemas.purchases_responses import PurchaseDetailResponse, PurchaseListResponse
-from app.services.purchases import get_purchase_detail_service, get_purchases_list_service
+from app.schemas.purchases_requests import CreatePurchaseRequest, PurchasesListRequest
+from app.schemas.purchases_responses import (
+    PurchaseDetailResponse,
+    PurchaseListResponse,
+)
+from app.services.purchases import (
+    create_purchase_service,
+    get_purchase_detail_service,
+    get_purchases_list_service,
+)
 
 # 最终接口地址统一以 /api/v1/purchases 开头。
 purchases_router = APIRouter(
@@ -24,6 +31,7 @@ purchases_router = APIRouter(
 # 4. PUT /{purchase_id}/receive：签收到货
 
 
+# region 获取进货单列表
 @purchases_router.get(
     "/list",
     response_model=ResponseModel[PurchaseListResponse],
@@ -54,6 +62,10 @@ async def list_purchases(
     )
 
 
+# endregion
+
+
+# region 获取进货单详情
 @purchases_router.get(
     "/{purchase_id}",
     response_model=ResponseModel[PurchaseDetailResponse],
@@ -76,6 +88,34 @@ async def get_purchase_detail(
         message="获取进货单详情成功",
         data=purchase,
     )
+
+
+# endregion
+
+
+# region 创建进货单
+@purchases_router.post(
+    "/",
+    response_model=ResponseModel[PurchaseDetailResponse],
+    summary="创建进货单",
+    description="创建进货单。",
+)
+async def create_purchase(
+    request: CreatePurchaseRequest,
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[PurchaseDetailResponse]:
+    """接收进货单汇总及商品明细，并返回进货单汇总及商品明细。"""
+
+    purchase = await create_purchase_service(
+        purchase=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[PurchaseDetailResponse](message="创建进货单成功", data=purchase)
+
+
+# endregion
 
 
 __all__ = ["purchases_router"]

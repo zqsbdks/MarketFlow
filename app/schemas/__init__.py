@@ -36,7 +36,11 @@ from app.schemas.products_responses import (
     ProductsItemResponse,
     ProductsListResponse,
 )
-from app.schemas.purchases_requests import PurchasesListRequest
+from app.schemas.purchases_requests import (
+    CreatePurchaseItemRequest,
+    CreatePurchaseRequest,
+    PurchasesListRequest,
+)
 from app.schemas.purchases_responses import (
     PurchaseDetailResponse,
     PurchaseItemResponse,
@@ -115,6 +119,8 @@ __all__ = [
     "ProductsListRequest",
     "ProductsListResponse",
     "PurchasesListRequest",
+    "CreatePurchaseItemRequest",
+    "CreatePurchaseRequest",
     "PurchaseDetailResponse",
     "PurchaseItemResponse",
     "PurchaseListItemResponse",
