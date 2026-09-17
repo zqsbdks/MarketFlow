@@ -1,19 +1,32 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { Boxes, Search, SlidersHorizontal } from '@lucide/vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { Boxes, Pencil, Search, SlidersHorizontal } from '@lucide/vue'
 
-import { getCategories, getDepartments, getProduct, getProducts } from '../api'
+import {
+  getCategories,
+  getDepartments,
+  getProduct,
+  getProducts,
+  updateProduct,
+  updateProductStatus,
+} from '../api'
 import { getErrorMessage } from '../api/http'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
+import { useAuthStore } from '../stores/auth'
 import type { Category, Department, ProductDetail, ProductListItem, ProductStatus } from '../types/api'
 import { formatMoney } from '../utils'
 
 const products = ref<ProductListItem[]>([])
+const auth = useAuthStore()
 const departments = ref<Department[]>([])
 const categories = ref<Category[]>([])
 const detail = ref<ProductDetail | null>(null)
 const detailOpen = ref(false)
+const editOpen = ref(false)
+const saving = ref(false)
+const notice = ref('')
+const editForm = reactive({ name: '', category_id: 0, sale_price: '', expiry_warning_days: 1, reason: '' })
 const loading = ref(false)
 const error = ref('')
 const keyword = ref('')
@@ -25,6 +38,14 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const totalPages = ref(0)
+const canEditDetail = computed(() =>
+  Boolean(
+    detail.value &&
+      (auth.isManager ||
+        (auth.employee?.role === '正式员工' &&
+          auth.employee.department?.id === detail.value.department.id)),
+  ),
+)
 
 async function loadProducts() {
   loading.value = true
@@ -55,6 +76,52 @@ async function openDetail(productId: number) {
     detailOpen.value = true
   } catch (reason) {
     error.value = getErrorMessage(reason)
+  }
+}
+
+async function openEditor() {
+  if (!detail.value) return
+  editForm.name = detail.value.name
+  editForm.category_id = detail.value.category.id
+  editForm.sale_price = detail.value.sale_price
+  editForm.expiry_warning_days = detail.value.expiry_warning_days ?? 1
+  editForm.reason = ''
+  categories.value = await getCategories(detail.value.department.id)
+  editOpen.value = true
+}
+
+async function submitEdit() {
+  if (!detail.value) return
+  saving.value = true
+  error.value = ''
+  try {
+    detail.value = await updateProduct(detail.value.id, {
+      name: editForm.name,
+      category_id: editForm.category_id,
+      sale_price: editForm.sale_price,
+      expiry_warning_days: editForm.expiry_warning_days,
+      reason: editForm.reason || undefined,
+    })
+    editOpen.value = false
+    notice.value = '商品资料修改成功。'
+    await loadProducts()
+  } catch (reason) {
+    error.value = getErrorMessage(reason)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function toggleDetailStatus() {
+  if (!detail.value) return
+  const nextStatus: ProductStatus = detail.value.status === 'on_sale' ? 'stopped' : 'on_sale'
+  const reason = window.prompt(`请输入${nextStatus === 'on_sale' ? '上架' : '停售'}理由（可不填）`) || undefined
+  try {
+    detail.value = await updateProductStatus(detail.value.id, nextStatus, reason)
+    notice.value = `商品已${nextStatus === 'on_sale' ? '上架' : '停售'}。`
+    await loadProducts()
+  } catch (cause) {
+    error.value = getErrorMessage(cause)
   }
 }
 
@@ -97,6 +164,7 @@ onMounted(async () => {
     </section>
 
     <p v-if="error" class="alert error">{{ error }}</p>
+    <p v-if="notice" class="alert success">{{ notice }}</p>
     <section class="panel table-panel">
       <div class="table-wrap">
         <table>
@@ -121,8 +189,24 @@ onMounted(async () => {
     <ModalPanel title="商品详情" :open="detailOpen" @close="detailOpen = false">
       <div v-if="detail" class="detail-sheet">
         <div class="detail-hero"><span>{{ detail.name.slice(0, 1) }}</span><div><p>{{ detail.product_no }}</p><h3>{{ detail.name }}</h3></div></div>
-        <dl><div><dt>所属部门</dt><dd>{{ detail.department.name }}</dd></div><div><dt>商品分类</dt><dd>{{ detail.category.name }}</dd></div><div><dt>进货价格</dt><dd>{{ formatMoney(detail.purchase_price) }}</dd></div><div><dt>销售价格</dt><dd>{{ formatMoney(detail.sale_price) }}</dd></div><div><dt>当前库存</dt><dd>{{ detail.stock_quantity }} 件</dd></div><div><dt>销售状态</dt><dd>{{ detail.status === 'on_sale' ? '在售' : '停售' }}</dd></div></dl>
+        <dl><div><dt>所属部门</dt><dd>{{ detail.department.name }}</dd></div><div><dt>商品分类</dt><dd>{{ detail.category.name }}</dd></div><div><dt>进货价格</dt><dd>{{ formatMoney(detail.purchase_price) }}</dd></div><div><dt>销售价格</dt><dd>{{ formatMoney(detail.sale_price) }}</dd></div><div><dt>当前库存</dt><dd>{{ detail.stock_quantity }} 件</dd></div><div><dt>临期提醒</dt><dd>提前 {{ detail.expiry_warning_days ?? 0 }} 天</dd></div><div><dt>销售状态</dt><dd>{{ detail.status === 'on_sale' ? '在售' : '停售' }}</dd></div></dl>
+        <div v-if="canEditDetail" class="detail-actions"><button class="primary-button" @click="openEditor"><Pencil :size="16" />修改资料</button><button class="secondary-button" @click="toggleDetailStatus">{{ detail.status === 'on_sale' ? '设为停售' : '重新上架' }}</button></div>
       </div>
+    </ModalPanel>
+
+    <ModalPanel title="修改商品资料" :open="editOpen" @close="editOpen = false">
+      <form class="stack-form" @submit.prevent="submitEdit">
+        <label><span>商品名称</span><input v-model="editForm.name" maxlength="100" required /></label>
+        <label><span>商品分类</span><select v-model.number="editForm.category_id" required><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+        <label><span>销售价格</span><input v-model="editForm.sale_price" type="number" min="0" step="0.01" required /></label>
+        <label><span>临期提前提醒天数</span><input v-model.number="editForm.expiry_warning_days" type="number" min="0" required /></label>
+        <label><span>修改理由（可选）</span><textarea v-model="editForm.reason" maxlength="255" /></label>
+        <button class="primary-button full" :disabled="saving">保存修改</button>
+      </form>
     </ModalPanel>
   </div>
 </template>
+
+<style scoped>
+.detail-actions{display:flex;gap:10px;margin-top:20px}textarea{min-height:80px;resize:vertical;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+</style>

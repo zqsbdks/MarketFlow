@@ -154,7 +154,37 @@ export interface ProductDetail {
   purchase_price: string
   sale_price: string
   stock_quantity: number
+  expiry_warning_days?: number | null
   status: ProductStatus
+}
+
+export type InventoryBatchStatus = 'available' | 'near_expiry' | 'sold_out'
+
+export interface InventoryBatchListItem {
+  id: number
+  batch_no: string
+  product_no: string
+  product_name: string
+  department_name: string
+  initial_quantity: number
+  remaining_quantity: number
+  production_date: string | null
+  expiration_date: string | null
+  status: InventoryBatchStatus
+  arrived_at: string
+}
+
+export interface InventoryBatchDetail extends InventoryBatchListItem {
+  product_id: number
+  department_id: number
+  category_id: number
+  category_name: string
+  supplier_name: string
+  purchase_no: string
+  purchase_item_id: number
+  unit_cost: string
+  created_at: string
+  updated_at: string
 }
 
 export interface SaleListItem {
@@ -177,6 +207,11 @@ export interface SaleDetail {
   sold_at: string
   total_amount: string
   items: SaleDetailItem[]
+}
+
+export interface CreateSaleItem {
+  product_id: number
+  quantity: number
 }
 
 export interface EmployeeListItem {

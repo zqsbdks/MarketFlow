@@ -60,6 +60,12 @@ const router = createRouter({
           meta: { title: '进货管理' },
         },
         {
+          path: 'inventory-batches',
+          name: 'inventory-batches',
+          component: () => import('../views/InventoryBatchesView.vue'),
+          meta: { title: '库存批次' },
+        },
+        {
           path: 'employees',
           name: 'employees',
           component: () => import('../views/EmployeesView.vue'),

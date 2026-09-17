@@ -2,6 +2,7 @@ import { http, unwrap } from './http'
 import type {
   ApiResponse,
   Category,
+  CreateSaleItem,
   CreatedEmployee,
   Department,
   DepartmentReport,
@@ -11,6 +12,8 @@ import type {
   EmployeeListItem,
   EmployeeRole,
   LoginResult,
+  InventoryBatchDetail,
+  InventoryBatchListItem,
   OverviewReport,
   PageResult,
   ProductDetail,
@@ -118,6 +121,50 @@ export async function getProduct(productId: number) {
   return unwrap(response.data)
 }
 
+export async function updateProduct(productId: number, payload: Record<string, unknown>) {
+  const response = await http.put<ApiResponse<ProductDetail>>(`/products/${productId}`, payload)
+  return unwrap(response.data)
+}
+
+export async function updateProductStatus(
+  productId: number,
+  status: 'on_sale' | 'stopped',
+  reason?: string,
+) {
+  const response = await http.put<ApiResponse<ProductDetail>>(`/products/${productId}/status`, {
+    status,
+    reason: reason || undefined,
+  })
+  return unwrap(response.data)
+}
+
+export async function getInventoryBatches(params: Record<string, unknown> = {}) {
+  const response = await http.get<ApiResponse<PageResult<InventoryBatchListItem>>>(
+    '/inventory-batches/list',
+    { params },
+  )
+  return unwrap(response.data)
+}
+
+export async function getInventoryBatch(batchId: number) {
+  const response = await http.get<ApiResponse<InventoryBatchDetail>>(
+    `/inventory-batches/${batchId}`,
+  )
+  return unwrap(response.data)
+}
+
+export async function updateInventoryBatchQuantity(
+  batchId: number,
+  remainingQuantity: number,
+  reason?: string,
+) {
+  const response = await http.put<ApiResponse<InventoryBatchDetail>>(
+    `/inventory-batches/${batchId}/quantity`,
+    { remaining_quantity: remainingQuantity, reason: reason || undefined },
+  )
+  return unwrap(response.data)
+}
+
 export async function getSales(params: Record<string, unknown>) {
   const response = await http.get<ApiResponse<PageResult<SaleListItem>>>('/sales/list', { params })
   return unwrap(response.data)
@@ -125,6 +172,11 @@ export async function getSales(params: Record<string, unknown>) {
 
 export async function getSale(saleNo: string) {
   const response = await http.get<ApiResponse<SaleDetail>>(`/sales/${saleNo}`)
+  return unwrap(response.data)
+}
+
+export async function createSale(items: CreateSaleItem[]) {
+  const response = await http.post<ApiResponse<SaleDetail>>('/sales', { items })
   return unwrap(response.data)
 }
 
@@ -144,13 +196,17 @@ export async function createEmployee(payload: {
   return unwrap(response.data)
 }
 
-export async function updateEmployeeStatus(employeeId: number, isActive: boolean) {
-  await http.put(`/employees/status/${employeeId}`, { is_active: isActive })
+export async function updateEmployeeStatus(employeeId: number, isActive: boolean, reason?: string) {
+  await http.put(`/employees/status/${employeeId}`, {
+    is_active: isActive,
+    reason: reason || undefined,
+  })
 }
 
-export async function resetEmployeePassword(employeeId: number) {
+export async function resetEmployeePassword(employeeId: number, reason?: string) {
   const response = await http.put<ApiResponse<CreatedEmployee>>(
     `/employees/reset-password/${employeeId}`,
+    { reason: reason || undefined },
   )
   return unwrap(response.data)
 }
@@ -167,6 +223,10 @@ export async function getSuppliers(params: Record<string, unknown> = {}) {
   return unwrap((await http.get<ApiResponse<PageResult<Supplier>>>('/suppliers/list', { params })).data)
 }
 
+export async function getSupplier(id: number) {
+  return unwrap((await http.get<ApiResponse<Supplier>>(`/suppliers/${id}`)).data)
+}
+
 export async function createSupplier(payload: Record<string, unknown>) {
   return unwrap((await http.post<ApiResponse<Supplier>>('/suppliers/', payload)).data)
 }
@@ -175,12 +235,25 @@ export async function updateSupplier(id: number, payload: Record<string, unknown
   return unwrap((await http.put<ApiResponse<Supplier>>(`/suppliers/${id}`, payload)).data)
 }
 
-export async function updateSupplierStatus(id: number, isActive: boolean) {
-  return unwrap((await http.put<ApiResponse<Supplier>>(`/suppliers/${id}/status`, { is_active: isActive })).data)
+export async function updateSupplierStatus(id: number, isActive: boolean, reason?: string) {
+  return unwrap(
+    (
+      await http.put<ApiResponse<Supplier>>(`/suppliers/${id}/status`, {
+        is_active: isActive,
+        reason: reason || undefined,
+      })
+    ).data,
+  )
 }
 
 export async function getSupplierProducts(params: Record<string, unknown> = {}) {
   return unwrap((await http.get<ApiResponse<PageResult<SupplierProduct>>>('/supplier-products/list', { params })).data)
+}
+
+export async function getSupplierProduct(id: number) {
+  return unwrap(
+    (await http.get<ApiResponse<SupplierProduct>>(`/supplier-products/${id}`)).data,
+  )
 }
 
 export async function createSupplierProduct(payload: Record<string, unknown>) {
@@ -191,8 +264,15 @@ export async function updateSupplierProduct(id: number, payload: Record<string, 
   return unwrap((await http.put<ApiResponse<SupplierProduct>>(`/supplier-products/${id}`, payload)).data)
 }
 
-export async function updateSupplierProductStatus(id: number, isActive: boolean) {
-  return unwrap((await http.put<ApiResponse<SupplierProduct>>(`/supplier-products/${id}/status`, { is_active: isActive })).data)
+export async function updateSupplierProductStatus(id: number, isActive: boolean, reason?: string) {
+  return unwrap(
+    (
+      await http.put<ApiResponse<SupplierProduct>>(`/supplier-products/${id}/status`, {
+        is_active: isActive,
+        reason: reason || undefined,
+      })
+    ).data,
+  )
 }
 
 export async function getPurchases(params: Record<string, unknown> = {}) {

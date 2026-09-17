@@ -73,8 +73,9 @@ async function submitCreate() {
 
 async function toggleStatus(item: EmployeeListItem) {
   if (!window.confirm(`确定要${item.is_active ? '停用' : '启用'} ${item.name} 的账号吗？`)) return
+  const reason = window.prompt('修改理由（可不填写）') || undefined
   try {
-    await updateEmployeeStatus(item.id, !item.is_active)
+    await updateEmployeeStatus(item.id, !item.is_active, reason)
     await loadEmployees()
   } catch (reason) {
     error.value = getErrorMessage(reason)
@@ -83,8 +84,9 @@ async function toggleStatus(item: EmployeeListItem) {
 
 async function resetPassword(item: EmployeeListItem) {
   if (!window.confirm(`确定重置 ${item.name} 的密码吗？`)) return
+  const reason = window.prompt('重置理由（可不填写）') || undefined
   try {
-    credential.value = await resetEmployeePassword(item.id)
+    credential.value = await resetEmployeePassword(item.id, reason)
     credentialOpen.value = true
   } catch (reason) {
     error.value = getErrorMessage(reason)
