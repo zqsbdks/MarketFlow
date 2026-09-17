@@ -18,8 +18,11 @@ class InsufficientStockError(Exception):
     """商品未过期批次库存不足。"""
 
     def __init__(self, product_name: str, requested: int, available: int) -> None:
+        # product_name：库存不足的商品名称，用于生成前端可读的错误信息。
         self.product_name = product_name
+        # requested：顾客本次准备购买的数量。
         self.requested = requested
+        # available：所有未过期可售批次的剩余数量合计。
         self.available = available
         super().__init__(product_name)
 
@@ -74,25 +77,33 @@ async def get_sales_list(
 
 # region 创建销售单并扣减批次库存
 async def create_sale(
+    # requested_quantities：商品ID和购买总数量，例如 {1: 8, 3: 2}。
     requested_quantities: dict[int, int],
+    # sold_at：本次结账时间，同时用于生成销售单号。
     sold_at: datetime,
+    # db：当前请求共用的数据库会话；本函数只 flush，不负责 commit。
     db: AsyncSession,
 ) -> Sale:
     """按先到期先销售原则扣减批次库存，并创建销售单和批次级明细。"""
 
+    # 三个变量分别累计整张小票的销售额、成本和数据库销售明细。
     total_amount = Decimal("0.00")
     total_cost = Decimal("0.00")
     sale_items: list[SaleItem] = []
 
+    # requested_quantities 已在 Service 中合并，因此每个商品只处理一次。
     for product_id, requested_quantity in requested_quantities.items():
-        # 锁定商品，避免两个收银请求同时读取并扣减同一份库存。
+        # 第一步：读取并锁定商品行，避免两个收银请求同时扣减同一商品库存。
         product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update())
         if product is None:
+            # LookupError 会由 Service 转成 404 响应。
             raise LookupError(product_id)
         if product.status != ProductStatus.ON_SALE:
+            # 商品存在但已停售时不能继续创建销售明细。
             raise PermissionError(product.name)
 
-        # 未过期且仍有库存的批次可销售；无到期日期的批次排在最后。
+        # 第二步：查询这个商品所有有库存且未过期的批次。
+        # expiration_date >= 今天表示当天到期仍可销售；没有日期的历史批次排在最后。
         batch_statement = (
             select(InventoryBatch)
             .options(selectinload(InventoryBatch.purchase_item))
@@ -105,14 +116,20 @@ async def create_sale(
                 ),
             )
             .order_by(
+                # False 排在 True 前面，因此有明确到期日期的批次优先。
                 InventoryBatch.expiration_date.is_(None),
+                # 在有日期的批次中，越早到期越先扣减，即“先到期先出库”。
                 InventoryBatch.expiration_date.asc(),
+                # 到期日期相同则优先使用更早到货的批次，最后用主键保证顺序稳定。
                 InventoryBatch.arrived_at.asc(),
                 InventoryBatch.id.asc(),
             )
+            # 锁定实际准备扣减的批次，防止并发销售导致同一库存被扣两次。
             .with_for_update()
         )
         batches = list((await db.scalars(batch_statement)).all())
+
+        # 第三步：批次库存才是真正可售库存；商品表的汇总库存不作为扣减依据。
         available_quantity = sum(batch.remaining_quantity for batch in batches)
         if available_quantity < requested_quantity:
             raise InsufficientStockError(
@@ -121,15 +138,18 @@ async def create_sale(
                 available=available_quantity,
             )
 
+        # 第四步：从最早到期批次开始扣，直到满足本次商品购买数量。
         quantity_left = requested_quantity
         for batch in batches:
             if quantity_left == 0:
                 break
+            # 当前批次数量不足时全部扣完，剩余需求继续从下一个批次扣。
             deducted_quantity = min(batch.remaining_quantity, quantity_left)
             batch.remaining_quantity -= deducted_quantity
             if batch.remaining_quantity == 0:
                 batch.status = InventoryBatchStatus.SOLD_OUT
 
+            # 每个批次的进货成本可能不同，所以跨批次时分别生成 SaleItem。
             unit_cost = batch.purchase_item.unit_cost
             subtotal = product.sale_price * deducted_quantity
             cost_subtotal = unit_cost * deducted_quantity
@@ -151,7 +171,8 @@ async def create_sale(
             total_cost += cost_subtotal
             quantity_left -= deducted_quantity
 
-        # 商品总库存以所有批次剩余数量之和为准，避免继续保留历史差异。
+        # 第五步：先把批次扣减写入当前事务，再重新求和同步商品总库存。
+        # 这样不仅完成本次扣减，也能消除商品表之前可能存在的汇总差异。
         await db.flush()
         product.stock_quantity = int(
             await db.scalar(
@@ -162,11 +183,13 @@ async def create_sale(
             or 0
         )
 
+    # 第六步：生成当天递增销售单号，例如 S202609170001。
     sale_no_prefix = f"S{sold_at:%Y%m%d}"
     latest_sale_no = await db.scalar(
         select(func.max(Sale.sale_no)).where(Sale.sale_no.like(f"{sale_no_prefix}%"))
     )
     next_number = int(latest_sale_no[-4:]) + 1 if latest_sale_no else 1
+    # 第七步：创建销售主表；items relationship 会自动给明细填写 sale_id。
     sale = Sale(
         sale_no=f"{sale_no_prefix}{next_number:04d}",
         sold_at=sold_at,
@@ -177,6 +200,7 @@ async def create_sale(
         items=sale_items,
     )
     db.add(sale)
+    # flush 取得数据库生成的 sale.id，但最终提交仍由 Service 统一负责。
     await db.flush()
     return sale
 

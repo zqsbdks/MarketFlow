@@ -126,7 +126,7 @@
         "description": "销售单金额、成本与毛利润汇总ORM模型"
     },
     "app/models/sale_item.py": {
-        "description": "销售商品、价格和成本快照明细ORM模型"
+        "description": "销售商品、扣减批次、价格和成本快照明细ORM模型"
     },
     "app/routers": {
         "description": "API业务路由目录"
@@ -150,7 +150,7 @@
         "description": "商品列表、详情、资料与销售状态修改API路由"
     },
     "app/routers/sales.py": {
-        "description": "销售记录API路由"
+        "description": "收银销售创建、销售列表与小票详情API路由"
     },
     "app/routers/reports.py": {
         "description": "营业概览、部门对比和销售排行API路由"
@@ -177,7 +177,7 @@
         "description": "商品查询、资料及状态修改权限校验业务逻辑"
     },
     "app/services/sales.py": {
-        "description": "销售记录业务逻辑"
+        "description": "收银权限校验、销售事务处理与小票合并业务逻辑"
     },
     "app/services/reports.py": {
         "description": "营业报表权限验证与响应组装业务逻辑"
@@ -198,7 +198,7 @@
         "description": "商品筛选、详情查询与资料更新数据访问函数"
     },
     "app/crud/sales.py": {
-        "description": "销售记录数据访问函数"
+        "description": "销售查询、批次扣减、商品库存同步与销售写入函数"
     },
     "app/crud/reports.py": {
         "description": "营业数据汇总、分组与排行查询函数"
@@ -234,7 +234,7 @@
         "description": "商品列表、详情、资料与状态修改响应模型"
     },
     "app/schemas/sales_requests.py": {
-        "description": "销售记录查询参数模型"
+        "description": "销售查询及收银台商品数量请求模型"
     },
     "app/schemas/sales_responses.py": {
         "description": "销售记录响应模型"
@@ -426,7 +426,7 @@
         "description": "自动生成且不提交的完整依赖快照"
     },
     "app/core/purchase_scheduler.py": {
-        "description": "每日12点自动签收进货单与刷新批次状态调度器"
+        "description": "自动签收、凌晨临期刷新及半小时库存检查调度器"
     },
     "app/crud/purchases.py": {
         "description": "进货单、明细、商品与库存批次数据访问函数"

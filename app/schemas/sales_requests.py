@@ -36,13 +36,16 @@ class SalesListRequest(BaseModel):
 class CreateSaleItemRequest(BaseModel):
     """收银台扫描的一种商品及购买数量。"""
 
+    # product_id 对应扫码后解析出的正式商品主键。
     product_id: int = Field(..., description="商品ID", ge=1)
+    # quantity 是顾客购买该商品的件数，至少为1。
     quantity: int = Field(..., description="购买数量", ge=1)
 
 
 class CreateSaleRequest(BaseModel):
     """收银台完成结账时提交的商品列表。"""
 
+    # 一张销售单至少需要一个商品；同一商品重复出现时由 Service 自动合并数量。
     items: list[CreateSaleItemRequest] = Field(..., description="销售商品", min_length=1)
 
 

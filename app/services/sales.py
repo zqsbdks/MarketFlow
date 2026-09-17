@@ -1,6 +1,7 @@
 """销售记录业务逻辑。"""
 
 from datetime import datetime, time
+from decimal import Decimal
 
 from fastapi import HTTPException
 from fastapi import status as http_status
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.sales import InsufficientStockError, create_sale, get_sales_detail, get_sales_list
+from app.models.sale import Sale
 from app.schemas.sales_requests import CreateSaleRequest
 from app.schemas.sales_responses import (
     SaleDetailItemResponse,
@@ -20,14 +22,16 @@ BUSINESS_OPENING_TIME = time(9, 0)
 BUSINESS_CLOSING_TIME = time(21, 0)
 
 
-def _build_sale_detail_response(sale) -> SaleDetailResponse:
+def _build_sale_detail_response(sale: Sale) -> SaleDetailResponse:
     """把同一商品因跨批次产生的多条数据库明细合并成小票中的一行。"""
 
-    grouped_items: dict[tuple[int, str, object], SaleDetailItemResponse] = {}
+    # key 同时包含商品ID、成交名称和成交单价，避免不同价格的明细被错误合并。
+    grouped_items: dict[tuple[int, str, Decimal], SaleDetailItemResponse] = {}
     for item in sale.items:
         key = (item.product_id, item.product_name_snapshot, item.unit_price)
         existing = grouped_items.get(key)
         if existing is None:
+            # 第一次遇到该商品时，新建一行前端小票明细。
             grouped_items[key] = SaleDetailItemResponse(
                 product_name=item.product_name_snapshot,
                 quantity=item.quantity,
@@ -35,6 +39,7 @@ def _build_sale_detail_response(sale) -> SaleDetailResponse:
                 subtotal=item.subtotal,
             )
         else:
+            # 同商品的其他批次只累加数量和销售小计，不向小票增加重复行。
             existing.quantity += item.quantity
             existing.subtotal += item.subtotal
 
@@ -146,12 +151,16 @@ async def get_sales_list_service(
 
 # region 创建销售单
 async def create_sale_service(
+    # request：收银台扫码后提交的商品ID和数量列表。
     request: CreateSaleRequest,
+    # current_employee_id：从登录令牌中解析出的当前收银员工ID。
     current_employee_id: int,
+    # db：当前 HTTP 请求使用的异步数据库会话。
     db: AsyncSession,
 ) -> SaleDetailResponse:
     """验证收银员工，在营业时间内创建销售并扣减未过期批次库存。"""
 
+    # 第一步：验证操作员工存在、账号启用并且已经修改初始密码。
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
     if employee is None:
         raise HTTPException(
@@ -167,6 +176,7 @@ async def create_sale_service(
             detail="请先修改初始密码",
         )
 
+    # 第二步：销售时间由服务器生成，前端不能伪造历史销售时间。
     sold_at = datetime.now()
     if not BUSINESS_OPENING_TIME <= sold_at.time() <= BUSINESS_CLOSING_TIME:
         raise HTTPException(
@@ -174,13 +184,14 @@ async def create_sale_service(
             detail="只能在营业时间09:00至21:00创建销售单",
         )
 
-    # 同一商品被扫码多次时先合并数量，避免重复读取和扣减同一组批次。
+    # 第三步：同一商品被扫码多次时先合并数量，避免重复锁定和扣减同一组批次。
     requested_quantities: dict[int, int] = {}
     for item in request.items:
         requested_quantities[item.product_id] = (
             requested_quantities.get(item.product_id, 0) + item.quantity
         )
 
+    # 第四步：扣库存、创建销售单和明细；成功后在 Service 层统一提交事务。
     try:
         sale = await create_sale(
             requested_quantities=requested_quantities,
@@ -209,7 +220,12 @@ async def create_sale_service(
                 f"需要{exc.requested}件，当前只有{exc.available}件"
             ),
         ) from exc
+    except Exception:
+        # 未预料的数据库或程序异常同样必须回滚，不能留下部分扣减的数据。
+        await db.rollback()
+        raise
 
+    # 第五步：重新查询已经提交的销售单，并按商品合并跨批次明细后返回小票。
     refreshed_sale = await get_sales_detail(sale_no=sale.sale_no, db=db)
     if refreshed_sale is None:
         raise RuntimeError("销售单创建后无法重新查询")
