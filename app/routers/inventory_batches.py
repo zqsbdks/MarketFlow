@@ -44,6 +44,11 @@ async def get_inventory_batches_list(
         page=request.page,
         page_size=request.page_size,
         status=request.status,
+        supplier_id=request.supplier_id,
+        product_id=request.product_id,
+        department_id=request.department_id,
+        expiration_start=request.expiration_start,
+        expiration_end=request.expiration_end,
         current_employee_id=current_employee_id,
         db=db,
     )

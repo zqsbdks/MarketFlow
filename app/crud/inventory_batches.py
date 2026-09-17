@@ -1,8 +1,11 @@
 """库存批次的数据访问函数。"""
 
+from datetime import date
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.enums import InventoryBatchStatus
 from app.models.inventory_batch import InventoryBatch
@@ -18,19 +21,39 @@ async def get_inventory_batches_list(
     page_size: int,
     # status：可选批次状态；None 表示不按照状态筛选。
     status: InventoryBatchStatus | None,
+    # supplier_id：可选供应商 ID，通过来源进货明细筛选。
+    supplier_id: int | None,
+    # product_id：可选正式商品 ID。
+    product_id: int | None,
+    # department_id：可选所属部门 ID，通过正式商品筛选。
+    department_id: int | None,
+    # expiration_start 和 expiration_end：可选到期日期范围，包含边界日期。
+    expiration_start: date | None,
+    expiration_end: date | None,
     # db：当前请求使用的异步数据库会话。
     db: AsyncSession,
 ) -> tuple[list[InventoryBatch], int]:
     """按状态分页查询全部库存批次，并返回当前页数据及总记录数。"""
 
-    # 第一步：分别创建总数查询和列表查询，两条语句必须使用相同筛选条件。
-    count_statement = select(func.count(InventoryBatch.id))
-    list_statement = select(InventoryBatch)
-
-    # 第二步：只有前端传入 status 时才添加 WHERE 条件；不传则查询全部状态。
+    # 第一步：只添加前端实际传入的筛选条件；空列表表示查询全部批次。
+    # 现在存在多个可选条件，使用列表可以确保总数查询和列表查询完全一致。
+    conditions: list[ColumnElement[bool]] = []
     if status is not None:
-        count_statement = count_statement.where(InventoryBatch.status == status)
-        list_statement = list_statement.where(InventoryBatch.status == status)
+        conditions.append(InventoryBatch.status == status)
+    if supplier_id is not None:
+        conditions.append(InventoryBatch.purchase_item.has(PurchaseItem.supplier_id == supplier_id))
+    if product_id is not None:
+        conditions.append(InventoryBatch.product_id == product_id)
+    if department_id is not None:
+        conditions.append(InventoryBatch.product.has(Product.department_id == department_id))
+    if expiration_start is not None:
+        conditions.append(InventoryBatch.expiration_date >= expiration_start)
+    if expiration_end is not None:
+        conditions.append(InventoryBatch.expiration_date <= expiration_end)
+
+    # 第二步：数量查询和列表查询使用同一组 WHERE 条件。
+    count_statement = select(func.count(InventoryBatch.id)).where(*conditions)
+    list_statement = select(InventoryBatch).where(*conditions)
 
     # 第三步：执行数量查询。数据库没有符合条件的记录时按 0 处理。
     total = int(await db.scalar(count_statement) or 0)

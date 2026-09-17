@@ -1,5 +1,7 @@
 """库存批次接口的请求模型。"""
 
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 from app.models.enums import InventoryBatchStatus
@@ -15,6 +17,11 @@ class InventoryBatchListRequest(BaseModel):
         None,
         description="批次状态；不传时查询全部部门的所有状态批次",
     )
+    supplier_id: int | None = Field(None, description="供应商ID", ge=1)
+    product_id: int | None = Field(None, description="商品ID", ge=1)
+    department_id: int | None = Field(None, description="所属部门ID", ge=1)
+    expiration_start: date | None = Field(None, description="最早到期日期")
+    expiration_end: date | None = Field(None, description="最晚到期日期")
 
 
 # endregion

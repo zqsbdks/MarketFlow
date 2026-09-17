@@ -1,5 +1,7 @@
 """库存批次业务逻辑。"""
 
+from datetime import date
+
 from fastapi import HTTPException
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +24,12 @@ async def get_inventory_batches_list_service(
     page_size: int,
     # status：可选批次状态筛选条件。
     status: InventoryBatchStatus | None,
+    # 以下参数分别按照供应商、商品、部门和到期日期范围筛选。
+    supplier_id: int | None,
+    product_id: int | None,
+    department_id: int | None,
+    expiration_start: date | None,
+    expiration_end: date | None,
     # current_employee_id：当前登录员工 ID，用于检查账号有效性。
     current_employee_id: int,
     # db：当前请求使用的异步数据库会话。
@@ -55,12 +63,28 @@ async def get_inventory_batches_list_service(
             detail="请先修改初始密码",
         )
 
+    # 开始日期晚于结束日期时无法形成有效范围，直接返回清晰的参数错误。
+    if (
+        expiration_start is not None
+        and expiration_end is not None
+        and expiration_start > expiration_end
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="最早到期日期不能晚于最晚到期日期",
+        )
+
     # 第二步：获取当前页批次以及符合筛选条件的总记录数。
     # 所有有效员工都查询全部部门，不按照角色或所属部门过滤。
     batches, total = await get_inventory_batches_list(
         page=page,
         page_size=page_size,
         status=status,
+        supplier_id=supplier_id,
+        product_id=product_id,
+        department_id=department_id,
+        expiration_start=expiration_start,
+        expiration_end=expiration_end,
         db=db,
     )
 

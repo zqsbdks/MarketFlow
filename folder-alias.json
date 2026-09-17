@@ -606,7 +606,7 @@
         "description": "库存批次分页列表与完整详情数据访问函数"
     },
     "app/schemas/inventory_batches_requests.py": {
-        "description": "库存批次分页与状态筛选请求模型"
+        "description": "库存批次分页、来源、部门与到期日期筛选请求模型"
     },
     "app/schemas/inventory_batches_responses.py": {
         "description": "库存批次列表项、分页列表与完整详情响应模型"
