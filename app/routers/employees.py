@@ -1,6 +1,6 @@
 """员工管理 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -8,6 +8,7 @@ from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
 from app.schemas.employees_requests import (
     EmployeeDetailUpdateRequest,
+    EmployeePasswordResetRequest,
     EmployeesCreateRequest,
     EmployeesListRequest,
     EmployeesStatusUpdateRequest,
@@ -113,6 +114,7 @@ async def update_employee_status(
     updated_employee = await update_employee_status_service(
         employee_id=employee_id,
         is_active=request.is_active,
+        reason=request.reason,
         current_employee_id=current_employee_id,
         db=db,
     )
@@ -134,6 +136,7 @@ async def update_employee_status(
     description="店长将指定员工密码重置为临时密码。",
 )
 async def reset_employee_password(
+    request: EmployeePasswordResetRequest | None = Body(None),
     employee_id: int = Path(..., description="员工ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
@@ -143,6 +146,7 @@ async def reset_employee_password(
     employee = await reset_employee_password_service(
         employee_id=employee_id,
         current_employee_id=current_employee_id,
+        reason=request.reason if request is not None else None,
         db=db,
     )
 

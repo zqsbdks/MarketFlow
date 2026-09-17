@@ -146,6 +146,18 @@ EXPECTED_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "operation_audit_log": {
+        "id",
+        "employee_id",
+        "module",
+        "action",
+        "target_type",
+        "target_id",
+        "before_data",
+        "after_data",
+        "reason",
+        "created_at",
+    },
     "supplier_product": {
         "id",
         "supplier_id",
@@ -171,6 +183,7 @@ EXPECTED_TABLE_COMMENTS = {
     "purchase": "进货单表",
     "purchase_item": "进货明细表",
     "inventory_batch": "库存批次表",
+    "operation_audit_log": "操作审计记录表",
     "supplier_product": "供应商商品目录表",
 }
 
@@ -321,4 +334,4 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """批次状态自动化迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260917_0008"]
+    assert script.get_heads() == ["20260917_0010"]

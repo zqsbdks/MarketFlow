@@ -91,7 +91,7 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
         return manager
 
     async def get_products(**_kwargs):
-        return [product], 1
+        return [(product, 10)], 1
 
     monkeypatch.setattr("app.services.products.get_employee_by_id", get_current)
     monkeypatch.setattr("app.services.products.get_products_list", get_products)
@@ -103,6 +103,7 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
         department_id=None,
         category_id=None,
         status=None,
+        stock_consistent=None,
         current_employee_id=manager.id,
         db=AsyncMock(spec=AsyncSession),
     )
@@ -111,6 +112,9 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
     assert result.total_pages == 1
     assert result.items[0].department_name == "精肉部"
     assert result.items[0].category_name == "牛肉"
+    assert result.items[0].batch_stock_quantity == 10
+    assert result.items[0].stock_difference == 0
+    assert result.items[0].is_stock_consistent is True
 
 
 async def test_regular_employee_can_view_products_list(monkeypatch) -> None:
@@ -123,7 +127,7 @@ async def test_regular_employee_can_view_products_list(monkeypatch) -> None:
         return employee
 
     async def get_products(**_kwargs):
-        return [product], 1
+        return [(product, 8)], 1
 
     monkeypatch.setattr("app.services.products.get_employee_by_id", get_current)
     monkeypatch.setattr("app.services.products.get_products_list", get_products)
@@ -135,12 +139,14 @@ async def test_regular_employee_can_view_products_list(monkeypatch) -> None:
         department_id=None,
         category_id=None,
         status=None,
+        stock_consistent=None,
         current_employee_id=employee.id,
         db=AsyncMock(spec=AsyncSession),
     )
 
     assert result.total == 1
     assert result.items[0].id == product.id
+    assert result.items[0].stock_difference == 2
 
 
 async def test_regular_employee_can_view_product_detail(monkeypatch) -> None:

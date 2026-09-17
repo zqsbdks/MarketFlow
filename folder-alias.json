@@ -613,5 +613,17 @@
     },
     "alembic/versions/20260917_0008_update_inventory_batch_status.py": {
         "description": "库存批次报废状态替换为临期状态的数据库迁移"
+    },
+    "alembic/versions/20260917_0009_create_inventory_adjustment.py": {
+        "description": "创建库存调整记录表的数据库迁移"
+    },
+    "app/models/operation_audit_log.py": {
+        "description": "统一保存各模块修改前后数据与理由的审计ORM模型"
+    },
+    "app/crud/operation_audit_logs.py": {
+        "description": "统一创建操作审计记录的数据访问函数"
+    },
+    "alembic/versions/20260917_0010_create_operation_audit_log.py": {
+        "description": "以统一操作审计记录表替换库存专用调整表迁移"
     }
 }

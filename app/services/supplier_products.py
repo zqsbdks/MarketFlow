@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.categories import get_category_by_id
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.supplier_products import (
     create_supplier_product,
     get_all_supplier_products,
@@ -225,6 +226,7 @@ async def update_supplier_product_status_service(
     is_active: bool,
     current_employee_id: int,
     db: AsyncSession,
+    reason: str | None = None,
 ) -> SupplierProductItemResponse:
     """验证店长权限，并修改供应商商品的供应状态。"""
 
@@ -269,9 +271,21 @@ async def update_supplier_product_status_service(
     if is_active and not supplier_product.supplier.is_active:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="供应商已停用")
 
+    previous_status = supplier_product.is_active
     await update_supplier_product_status(
         supplier_product_id=supplier_product_id,
         is_active=is_active,
+        db=db,
+    )
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="supplier_product",
+        action="update_status",
+        target_type="supplier_product",
+        target_id=supplier_product_id,
+        before_data={"is_active": previous_status},
+        after_data={"is_active": is_active},
+        reason=reason,
         db=db,
     )
     await db.commit()
@@ -330,7 +344,7 @@ async def update_supplier_product_service(
             detail="正式员工只能修改自己所属部门的供应商商品",
         )
 
-    update_data = request.model_dump(exclude_unset=True)
+    update_data = request.model_dump(exclude_unset=True, exclude={"reason"})
     if not update_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -375,9 +389,21 @@ async def update_supplier_product_service(
             )
 
     try:
+        previous_data = {field: getattr(existing_product, field) for field in update_data}
         await update_supplier_product(
             supplier_product_id=supplier_product_id,
             update_data=update_data,
+            db=db,
+        )
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="supplier_product",
+            action="update_details",
+            target_type="supplier_product",
+            target_id=supplier_product_id,
+            before_data=previous_data,
+            after_data=update_data,
+            reason=request.reason,
             db=db,
         )
         await db.commit()

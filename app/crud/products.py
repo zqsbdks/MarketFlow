@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.enums import ProductStatus
+from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
 
 
@@ -17,8 +18,9 @@ async def get_products_list(
     department_id: int | None,
     category_id: int | None,
     status: ProductStatus | None,
+    stock_consistent: bool | None,
     db: AsyncSession,
-) -> tuple[list[Product], int]:
+) -> tuple[list[tuple[Product, int]], int]:
     """按条件分页查询商品，并返回当前页商品和符合条件的总数。"""
 
     # 只添加调用方实际传入的条件；空条件列表表示查询全部商品。
@@ -32,26 +34,58 @@ async def get_products_list(
     if status is not None:
         conditions.append(Product.status == status)
 
+    # 先按商品分组汇总所有批次的剩余数量，再作为子查询关联商品表。
+    # 已售罄批次的 remaining_quantity 是 0，因此无需按批次状态排除。
+    batch_stock_summary = (
+        select(
+            InventoryBatch.product_id.label("product_id"),
+            func.coalesce(func.sum(InventoryBatch.remaining_quantity), 0).label(
+                "batch_stock_quantity"
+            ),
+        )
+        .group_by(InventoryBatch.product_id)
+        .subquery()
+    )
+    # 没有任何批次的商品经过外连接后得到 NULL，这里把它转换成库存 0。
+    batch_stock_quantity = func.coalesce(batch_stock_summary.c.batch_stock_quantity, 0)
+
+    # stock_consistent 未传时不筛选；传 true/false 时分别查询一致或不一致商品。
+    if stock_consistent is True:
+        conditions.append(Product.stock_quantity == batch_stock_quantity)
+    elif stock_consistent is False:
+        conditions.append(Product.stock_quantity != batch_stock_quantity)
+
     # 列表查询和数量查询使用完全相同的筛选条件，保证分页数据准确。
-    count_statement = select(func.count(Product.id)).where(*conditions)
+    count_statement = (
+        select(func.count(Product.id))
+        .outerjoin(
+            batch_stock_summary,
+            batch_stock_summary.c.product_id == Product.id,
+        )
+        .where(*conditions)
+    )
     count_result = await db.scalar(count_statement)
     total = count_result if count_result is not None else 0
 
     offset = (page - 1) * page_size
     list_statement = (
-        select(Product)
+        select(Product, batch_stock_quantity)
         # Service 需要部门名和分类名，因此在异步会话中提前加载两个关系。
         .options(
             selectinload(Product.department),
             selectinload(Product.category),
+        )
+        .outerjoin(
+            batch_stock_summary,
+            batch_stock_summary.c.product_id == Product.id,
         )
         .where(*conditions)
         .order_by(Product.id.asc())
         .offset(offset)
         .limit(page_size)
     )
-    list_result = await db.scalars(list_statement)
-    products = list(list_result.all())
+    list_result = await db.execute(list_statement)
+    products = [(product, int(batch_quantity)) for product, batch_quantity in list_result.all()]
 
     return products, total
 

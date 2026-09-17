@@ -444,6 +444,7 @@ def test_update_employee_status_uses_json_body(monkeypatch) -> None:
     update_service.assert_awaited_once_with(
         employee_id=2,
         is_active=False,
+        reason=None,
         current_employee_id=1,
         db=None,
     )
@@ -602,6 +603,7 @@ def test_reset_employee_password_returns_temporary_password(monkeypatch) -> None
     reset_service.assert_awaited_once_with(
         employee_id=2,
         current_employee_id=1,
+        reason=None,
         db=None,
     )
 

@@ -21,6 +21,7 @@ class AuthPasswordChangeRequest(BaseModel):
     old_password: str = Field(..., description="旧密码", min_length=3, max_length=128)
     new_password: str = Field(..., description="新密码", min_length=3, max_length=128)
     confirm_password: str = Field(..., description="确认新密码", min_length=3, max_length=128)
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
 
 # endregion

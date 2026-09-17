@@ -102,6 +102,7 @@ async def update_supplier_status(
     supplier = await update_supplier_status_service(
         supplier_id=supplier_id,
         is_active=status.is_active,  # 请求体中明确提交的新合作状态。
+        reason=status.reason,
         current_employee_id=current_employee_id,
         db=db,
     )

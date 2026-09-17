@@ -21,6 +21,7 @@ class SuppliersStatusUpdateRequest(BaseModel):
 
     # 使用...表示前端必须明确传入true或false，避免遗漏后默认为启用。
     is_active: bool = Field(..., description="是否继续合作")
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
 
 # endregion
@@ -35,6 +36,7 @@ class SuppliersUpdateRequest(BaseModel):
     contact_name: str | None = Field(None, description="联系人姓名", min_length=1, max_length=50)
     phone: str | None = Field(None, description="联系电话", min_length=1, max_length=30)
     address: str | None = Field(None, description="供应商地址", min_length=1, max_length=255)
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
     # 自动去掉字符串首尾的空格，例如把"  某供应商  "处理为"某供应商"。
     model_config = ConfigDict(str_strip_whitespace=True)

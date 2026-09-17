@@ -139,6 +139,9 @@ export interface ProductListItem {
   purchase_price: string
   sale_price: string
   stock_quantity: number
+  batch_stock_quantity: number
+  stock_difference: number
+  is_stock_consistent: boolean
   status: ProductStatus
 }
 

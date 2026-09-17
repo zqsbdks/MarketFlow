@@ -32,6 +32,7 @@ class SupplierProductStatusUpdateRequest(BaseModel):
     """店长启用或停用供应商商品时提交的状态。"""
 
     is_active: bool = Field(..., description="是否仍在供应")
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
 
 class SupplierProductUpdateRequest(BaseModel):
@@ -41,6 +42,7 @@ class SupplierProductUpdateRequest(BaseModel):
     name: str | None = Field(None, description="供应商商品名称", min_length=1, max_length=100)
     unit_cost: Decimal | None = Field(None, description="当前默认进货单价", ge=0, decimal_places=2)
     shelf_life_days: int | None = Field(None, description="默认保质期天数", ge=1)
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
     model_config = ConfigDict(str_strip_whitespace=True)
 
 

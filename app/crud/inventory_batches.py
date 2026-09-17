@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.enums import InventoryBatchStatus
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
@@ -150,8 +151,60 @@ async def get_inventory_batch_by_id(
 # endregion
 
 
+# region 修改库存批次数量
+async def update_inventory_batch_quantity(
+    batch: InventoryBatch,
+    remaining_quantity: int,
+    employee_id: int,
+    reason: str | None,
+    db: AsyncSession,
+) -> InventoryBatch:
+    """修改批次剩余数量，记录调整历史并重新汇总商品总库存。"""
+
+    before_quantity = batch.remaining_quantity
+    batch.remaining_quantity = remaining_quantity
+
+    # 修改后立即同步批次状态，不必等待半小时定时任务。
+    if remaining_quantity == 0:
+        batch.status = InventoryBatchStatus.SOLD_OUT
+    elif (
+        batch.expiration_date is not None
+        and batch.product.expiry_warning_days is not None
+        and batch.expiration_date
+        <= date.today() + timedelta(days=batch.product.expiry_warning_days)
+    ):
+        batch.status = InventoryBatchStatus.NEAR_EXPIRY
+    else:
+        batch.status = InventoryBatchStatus.AVAILABLE
+
+    # 先把新批次数量发送到数据库，使后面的 SUM 查询能读取本次修改。
+    await db.flush()
+    batch_stock_statement = select(
+        func.coalesce(func.sum(InventoryBatch.remaining_quantity), 0)
+    ).where(InventoryBatch.product_id == batch.product_id)
+    batch.product.stock_quantity = int(await db.scalar(batch_stock_statement) or 0)
+
+    # 保存人工调整历史。原因可以为空，但前后数量、差异和操作人始终保留。
+    await create_operation_audit_log(
+        employee_id=employee_id,
+        module="inventory",
+        action="update_quantity",
+        target_type="inventory_batch",
+        target_id=batch.id,
+        before_data={"remaining_quantity": before_quantity},
+        after_data={"remaining_quantity": remaining_quantity},
+        reason=reason,
+        db=db,
+    )
+    return batch
+
+
+# endregion
+
+
 __all__ = [
     "get_inventory_batch_by_id",
     "get_inventory_batches_list",
     "refresh_inventory_batch_statuses",
+    "update_inventory_batch_quantity",
 ]

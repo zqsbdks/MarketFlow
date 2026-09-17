@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.categories import get_category_by_id
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.products import get_product_by_id, get_products_list, update_product
 from app.models.enums import EmployeeRole, ProductStatus
 from app.schemas.products_requests import ProductStatusUpdateRequest, UpdateProductRequest
@@ -24,6 +25,7 @@ async def get_products_list_service(
     department_id: int | None,
     category_id: int | None,
     status: ProductStatus | None,
+    stock_consistent: bool | None,
     current_employee_id: int,
     db: AsyncSession,
 ) -> ProductsListResponse:
@@ -60,6 +62,7 @@ async def get_products_list_service(
         department_id=department_id,
         category_id=category_id,
         status=status,
+        stock_consistent=stock_consistent,
         db=db,
     )
 
@@ -74,9 +77,12 @@ async def get_products_list_service(
             purchase_price=product.purchase_price,
             sale_price=product.sale_price,
             stock_quantity=product.stock_quantity,
+            batch_stock_quantity=batch_stock_quantity,
+            stock_difference=product.stock_quantity - batch_stock_quantity,
+            is_stock_consistent=product.stock_quantity == batch_stock_quantity,
             status=product.status,
         )
-        for product in products
+        for product, batch_stock_quantity in products
     ]
 
     total_pages = (total + page_size - 1) // page_size
@@ -210,9 +216,22 @@ async def update_product_status_service(
         )
 
     # 第五步：复用商品更新 CRUD，只把新的 status 写入数据库。
+    previous_status = product.status
     updated_product = await update_product(
         product_id=product_id,
         update_data={"status": request.status},
+        db=db,
+    )
+
+    await create_operation_audit_log(
+        employee_id=employee.id,
+        module="product",
+        action="update_status",
+        target_type="product",
+        target_id=product.id,
+        before_data={"status": previous_status},
+        after_data={"status": request.status},
+        reason=request.reason,
         db=db,
     )
 
@@ -297,7 +316,7 @@ async def update_product_service(
 
     # 第五步：把 Pydantic 请求模型转换成字典。
     # exclude_unset=True 表示只保留前端实际传入的字段，未传字段不会覆盖数据库原值。
-    update_data = request.model_dump(exclude_unset=True)
+    update_data = request.model_dump(exclude_unset=True, exclude={"reason"})
     if not update_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -344,9 +363,22 @@ async def update_product_service(
             )
 
     # 第八步：调用 CRUD 执行 UPDATE，并重新查询更新后的商品。
+    previous_data = {field: getattr(product, field) for field in update_data}
     updated_product = await update_product(
         product_id=product_id,
         update_data=update_data,
+        db=db,
+    )
+
+    await create_operation_audit_log(
+        employee_id=employee.id,
+        module="product",
+        action="update_details",
+        target_type="product",
+        target_id=product.id,
+        before_data=previous_data,
+        after_data=update_data,
+        reason=request.reason,
         db=db,
     )
 

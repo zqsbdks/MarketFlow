@@ -39,6 +39,7 @@ async def test_update_detail_permissions_and_commit(monkeypatch, manager):
     )
     write = AsyncMock()
     monkeypatch.setattr(service, "update_employee_detail", write)
+    monkeypatch.setattr(service, "create_operation_audit_log", AsyncMock())
     refreshed = object()
     monkeypatch.setattr(service, "get_employee_detail_service", AsyncMock(return_value=refreshed))
     db = AsyncMock()

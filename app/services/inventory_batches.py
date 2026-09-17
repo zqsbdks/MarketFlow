@@ -7,8 +7,13 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
-from app.crud.inventory_batches import get_inventory_batch_by_id, get_inventory_batches_list
-from app.models.enums import InventoryBatchStatus
+from app.crud.inventory_batches import (
+    get_inventory_batch_by_id,
+    get_inventory_batches_list,
+    update_inventory_batch_quantity,
+)
+from app.models.enums import EmployeeRole, InventoryBatchStatus
+from app.schemas.inventory_batches_requests import InventoryBatchQuantityUpdateRequest
 from app.schemas.inventory_batches_responses import (
     InventoryBatchDetailResponse,
     InventoryBatchItemResponse,
@@ -121,6 +126,92 @@ async def get_inventory_batches_list_service(
 # endregion
 
 
+# region 修改库存批次数量
+async def update_inventory_batch_quantity_service(
+    batch_id: int,
+    request: InventoryBatchQuantityUpdateRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> InventoryBatchDetailResponse:
+    """校验账号及部门权限，修改批次库存并同步商品总库存。"""
+
+    # 第一步：执行与其他受保护接口相同的基础账号验证。
+    current_employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # 第二步：只有店长和正式员工能够人工调整库存。
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以修改库存批次数量",
+        )
+
+    # 第三步：查询批次及其商品、部门和进货来源信息。
+    batch = await get_inventory_batch_by_id(batch_id=batch_id, db=db)
+    if batch is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="库存批次不存在",
+        )
+
+    # 店长可以修改所有部门；正式员工只能修改自己所属部门的批次。
+    if (
+        current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
+        and current_employee.department_id != batch.product.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能修改自己所属部门的库存批次",
+        )
+
+    # 剩余数量不能超过该批次到货时记录的初始数量。
+    if request.remaining_quantity > batch.initial_quantity:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="批次剩余数量不能超过到货初始数量",
+        )
+
+    await update_inventory_batch_quantity(
+        batch=batch,
+        remaining_quantity=request.remaining_quantity,
+        employee_id=current_employee.id,
+        reason=request.reason,
+        db=db,
+    )
+    await db.commit()
+
+    # 提交后重新读取最新值，再复用详情 Service 组装统一响应。
+    return await get_inventory_batch_detail_service(
+        batch_id=batch_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+
+# endregion
+
+
 # region 获取库存批次详情
 async def get_inventory_batch_detail_service(
     # batch_id：准备查看的库存批次 ID。
@@ -197,4 +288,5 @@ async def get_inventory_batch_detail_service(
 __all__ = [
     "get_inventory_batch_detail_service",
     "get_inventory_batches_list_service",
+    "update_inventory_batch_quantity_service",
 ]

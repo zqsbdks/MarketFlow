@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import InventoryBatchStatus
 
@@ -27,4 +27,22 @@ class InventoryBatchListRequest(BaseModel):
 # endregion
 
 
-__all__ = ["InventoryBatchListRequest"]
+# region 修改库存批次数量请求模型
+class InventoryBatchQuantityUpdateRequest(BaseModel):
+    """人工盘点后修改某个批次剩余库存时提交的数据。"""
+
+    remaining_quantity: int = Field(..., ge=0, description="修改后的批次剩余数量")
+    reason: str | None = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="修改原因，可不填写",
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+# endregion
+
+
+__all__ = ["InventoryBatchListRequest", "InventoryBatchQuantityUpdateRequest"]

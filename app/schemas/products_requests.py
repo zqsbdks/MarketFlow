@@ -22,6 +22,10 @@ class ProductsListRequest(BaseModel):
     department_id: int | None = Field(None, description="所属部门ID", ge=1)
     category_id: int | None = Field(None, description="所属分类ID", ge=1)
     status: ProductStatus | None = Field(None, description="商品销售状态")
+    stock_consistent: bool | None = Field(
+        None,
+        description="库存一致性；true只查询一致商品，false只查询不一致商品",
+    )
 
 
 # endregion
@@ -36,6 +40,7 @@ class ProductStatusUpdateRequest(BaseModel):
         ...,
         description="商品销售状态：on_sale为上架，stopped为停售",
     )
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
 
 # endregion
@@ -73,6 +78,7 @@ class UpdateProductRequest(BaseModel):
         description="临期提前提醒天数；例如填写1，表示到期前1天开始提醒",
         ge=0,
     )
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
     # 自动去除字符串首尾空格，避免把“ 牛肉 ”保存为带空格的商品名称。
     model_config = ConfigDict(str_strip_whitespace=True)

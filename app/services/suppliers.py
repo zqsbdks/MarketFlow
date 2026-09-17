@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.suppliers import (
     create_supplier,
     get_all_suppliers,
@@ -119,6 +120,7 @@ async def update_supplier_status_service(
     is_active: bool,
     current_employee_id: int,
     db: AsyncSession,
+    reason: str | None = None,
 ) -> SupplierItemResponse:
     """验证店长权限，修改供应商合作状态并返回数据库中的最新资料。"""
 
@@ -153,7 +155,19 @@ async def update_supplier_status_service(
         )
 
     # CRUD只执行UPDATE，事务由Service统一提交。
+    previous_status = supplier.is_active
     await put_supplier_status(supplier_id=supplier_id, is_active=is_active, db=db)
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="supplier",
+        action="update_status",
+        target_type="supplier",
+        target_id=supplier_id,
+        before_data={"is_active": previous_status},
+        after_data={"is_active": is_active},
+        reason=reason,
+        db=db,
+    )
     await db.commit()
 
     # 重新查询可以取得最新is_active和数据库自动更新的updated_at。
@@ -213,7 +227,7 @@ async def update_supplier_service(
         )
 
     # 把请求模型转为字典，并排除前端没有提交的字段，实现局部更新。
-    update_data = request.model_dump(exclude_unset=True)
+    update_data = request.model_dump(exclude_unset=True, exclude={"reason"})
     if not update_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -243,7 +257,19 @@ async def update_supplier_service(
             )
 
     # CRUD只执行UPDATE；Service统一负责提交当前事务。
+    previous_data = {field: getattr(existing_supplier, field) for field in update_data}
     await update_supplier(supplier_id=supplier_id, update_data=update_data, db=db)
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="supplier",
+        action="update_details",
+        target_type="supplier",
+        target_id=supplier_id,
+        before_data=previous_data,
+        after_data=update_data,
+        reason=request.reason,
+        db=db,
+    )
     await db.commit()
 
     # 提交后重新查询，取得数据库最新的字段以及自动更新的updated_at。

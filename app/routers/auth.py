@@ -89,6 +89,7 @@ async def change_password(
         old_password=password.old_password,
         new_password=password.new_password,
         confirm_password=password.confirm_password,
+        reason=password.reason,
         db=db,
     )
 

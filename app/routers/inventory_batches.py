@@ -1,12 +1,15 @@
 """库存批次 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.inventory_batches_requests import InventoryBatchListRequest
+from app.schemas.inventory_batches_requests import (
+    InventoryBatchListRequest,
+    InventoryBatchQuantityUpdateRequest,
+)
 from app.schemas.inventory_batches_responses import (
     InventoryBatchDetailResponse,
     InventoryBatchListResponse,
@@ -14,6 +17,7 @@ from app.schemas.inventory_batches_responses import (
 from app.services.inventory_batches import (
     get_inventory_batch_detail_service,
     get_inventory_batches_list_service,
+    update_inventory_batch_quantity_service,
 )
 
 # 最终接口地址统一以 /api/v1/inventory-batches 开头。
@@ -56,6 +60,36 @@ async def get_inventory_batches_list(
     return ResponseModel[InventoryBatchListResponse](
         message="库存批次列表获取成功",
         data=batches,
+    )
+
+
+# endregion
+
+
+# region 修改库存批次数量
+@inventory_batches_router.put(
+    "/{batch_id}/quantity",
+    response_model=ResponseModel[InventoryBatchDetailResponse],
+    summary="修改库存批次数量",
+    description="店长可修改全部批次，正式员工只能修改本部门批次，并同步商品总库存。",
+)
+async def update_inventory_batch_quantity(
+    batch_id: int = Path(..., description="库存批次ID", ge=1),
+    request: InventoryBatchQuantityUpdateRequest = Body(...),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[InventoryBatchDetailResponse]:
+    """接收新的批次剩余数量和可选理由，返回修改后的批次详情。"""
+
+    batch = await update_inventory_batch_quantity_service(
+        batch_id=batch_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[InventoryBatchDetailResponse](
+        message="库存批次数量修改成功",
+        data=batch,
     )
 
 

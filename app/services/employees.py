@@ -16,6 +16,7 @@ from app.crud.employees import (
     update_employee_detail,
     update_employee_status,
 )
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.enums import EmployeeRole, EmploymentStatus
 from app.schemas.employees_requests import EmployeeDetailUpdateRequest
 from app.schemas.employees_responses import (
@@ -197,6 +198,7 @@ async def update_employee_status_service(
     is_active: bool,
     current_employee_id: int,
     db: AsyncSession,
+    reason: str | None = None,
 ) -> EmployeesStatusUpdateResponse:
     """验证店长权限，并更新指定员工的状态。"""
 
@@ -242,9 +244,21 @@ async def update_employee_status_service(
             detail="员工不存在",
         )
 
+    previous_status = employee.is_active
     await update_employee_status(
         employee=employee,
         is_active=is_active,
+        db=db,
+    )
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="employee",
+        action="update_status",
+        target_type="employee",
+        target_id=employee_id,
+        before_data={"is_active": previous_status},
+        after_data={"is_active": is_active},
+        reason=reason,
         db=db,
     )
     await db.commit()
@@ -263,6 +277,7 @@ async def reset_employee_password_service(
     employee_id: int,
     current_employee_id: int,
     db: AsyncSession,
+    reason: str | None = None,
 ) -> EmployeesResetPasswordResponse:
     """验证店长权限，并重置指定员工的密码。"""
 
@@ -312,6 +327,17 @@ async def reset_employee_password_service(
     await reset_employee_password(
         employee=employee,
         password_hash=temporary_password_hash,
+        db=db,
+    )
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="employee",
+        action="reset_password",
+        target_type="employee",
+        target_id=employee_id,
+        before_data=None,
+        after_data={"must_change_password": True},
+        reason=reason,
         db=db,
     )
     await db.commit()
@@ -505,6 +531,10 @@ async def update_employee_detail_service(
             detail="离职或解雇日期不能早于入职日期",
         )
 
+    # 审计只保存业务资料，不把请求中的通用修改理由当成员工详情字段。
+    changed_fields = request.model_dump(exclude={"reason"})
+    previous_data = {field: getattr(employee_detail, field, None) for field in changed_fields}
+
     # CRUD 只执行更新；复用详情查询获得最新字段，提交由本 Service 负责。
     await update_employee_detail(
         employee_id=employee_id,
@@ -516,6 +546,17 @@ async def update_employee_detail_service(
         employment_status=request.employment_status,
         separation_date=separation_date,
         separation_reason=separation_reason,
+        db=db,
+    )
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="employee",
+        action="update_details",
+        target_type="employee_detail",
+        target_id=employee_id,
+        before_data=previous_data,
+        after_data=changed_fields,
+        reason=request.reason,
         db=db,
     )
     # 复用获取详情的 Service：它会查询最新资料并组装响应，无需重复拼字段。

@@ -19,7 +19,20 @@ class ProductsItemResponse(BaseModel):
     category_name: str = Field(..., description="所属分类名称")
     purchase_price: Decimal = Field(..., description="进货价", ge=0)
     sale_price: Decimal = Field(..., description="销售价", ge=0)
-    stock_quantity: int = Field(..., description="库存数量", ge=0)
+    stock_quantity: int = Field(..., description="商品表保存的总库存数量", ge=0)
+    batch_stock_quantity: int = Field(
+        ...,
+        description="该商品所有库存批次的剩余数量合计",
+        ge=0,
+    )
+    stock_difference: int = Field(
+        ...,
+        description="库存差异，计算方式为商品总库存减去批次库存合计",
+    )
+    is_stock_consistent: bool = Field(
+        ...,
+        description="商品总库存是否等于所有批次剩余数量合计",
+    )
     status: ProductStatus = Field(..., description="商品销售状态")
 
     model_config = ConfigDict(from_attributes=True)

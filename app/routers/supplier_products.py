@@ -136,6 +136,7 @@ async def update_supplier_product_status(
     supplier_product = await update_supplier_product_status_service(
         supplier_product_id=supplier_product_id,
         is_active=request.is_active,
+        reason=request.reason,
         current_employee_id=current_employee_id,
         db=db,
     )

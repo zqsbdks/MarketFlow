@@ -24,6 +24,7 @@ from app.models.enums import (
     SaleSource,
 )
 from app.models.inventory_batch import InventoryBatch
+from app.models.operation_audit_log import OperationAuditLog
 from app.models.product import Product
 from app.models.purchase import Purchase
 from app.models.purchase_item import PurchaseItem
@@ -44,6 +45,7 @@ __all__ = [
     "EmploymentStatus",
     "InventoryBatch",
     "InventoryBatchStatus",
+    "OperationAuditLog",
     "Product",
     "ProductStatus",
     "Purchase",

@@ -41,6 +41,13 @@ class EmployeesStatusUpdateRequest(BaseModel):
     """店长启用或停用员工时提交的状态。"""
 
     is_active: bool = Field(..., description="是否启用")
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
+
+
+class EmployeePasswordResetRequest(BaseModel):
+    """店长重置员工密码时提交的可选修改理由。"""
+
+    reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
 
 
 # endregion
@@ -68,6 +75,7 @@ class EmployeeDetailUpdateRequest(BaseModel):
         description="离职或解雇原因",
         max_length=255,
     )
+    reason: str | None = Field(None, description="本次资料修改理由，可不填写", max_length=255)
 
     # 自动清除联系电话、地址和原因两端的空格。
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -78,6 +86,7 @@ class EmployeeDetailUpdateRequest(BaseModel):
 
 __all__ = [
     "EmployeeDetailUpdateRequest",
+    "EmployeePasswordResetRequest",
     "EmployeesCreateRequest",
     "EmployeesListRequest",
     "EmployeesStatusUpdateRequest",

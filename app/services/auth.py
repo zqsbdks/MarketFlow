@@ -12,6 +12,7 @@ from app.crud.auth import (
     get_employee_by_id,
     update_employee_last_login,
 )
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.schemas.auth_responses import (
     AuthDepartmentResponse,
     AuthLoginEmployee,
@@ -117,6 +118,7 @@ async def change_password_service(
     new_password: str,
     confirm_password: str,
     db: AsyncSession,
+    reason: str | None = None,
 ) -> None:
     """修改当前登录员工密码。"""
 
@@ -155,6 +157,19 @@ async def change_password_service(
     employee.password_hash = hash_password(new_password)
     # 标记不再需要修改密码
     employee.must_change_password = False
+
+    # 密码属于敏感数据，审计记录只说明密码已修改，不保存密码或哈希值。
+    await create_operation_audit_log(
+        employee_id=employee_id,
+        module="auth",
+        action="change_password",
+        target_type="employee",
+        target_id=employee_id,
+        before_data=None,
+        after_data={"password_changed": True, "must_change_password": False},
+        reason=reason,
+        db=db,
+    )
 
     await db.commit()
 
