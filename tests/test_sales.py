@@ -37,7 +37,7 @@ def build_employee() -> Employee:
 
 
 def build_sale() -> Sale:
-    """构造包含两种商品、三件商品的销售单。"""
+    """构造同一商品分成两条批次明细、合计三件商品的销售单。"""
 
     product = Product(
         id=1,
@@ -106,7 +106,7 @@ async def override_employee_id() -> int:
 
 # region Service 测试
 async def test_sales_list_service_builds_receipt_summary(monkeypatch) -> None:
-    """一张销售单正确计算商品总数量和明细种类数。"""
+    """跨批次明细按商品去重计算种类数。"""
 
     async def get_employee(**_kwargs):
         return build_employee()
@@ -130,7 +130,7 @@ async def test_sales_list_service_builds_receipt_summary(monkeypatch) -> None:
     assert result.total == 1
     assert result.items[0].sale_no == "S202609010001"
     assert result.items[0].total_quantity == 3
-    assert result.items[0].item_count == 2
+    assert result.items[0].item_count == 1
 
 
 async def test_sales_list_service_rejects_reversed_date_range(monkeypatch) -> None:

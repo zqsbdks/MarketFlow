@@ -39,6 +39,7 @@ class SaleSource(StrEnum):
     """销售原始数据来源。"""
 
     DEMO_SEED = "demo_seed"  # 系统初始化生成的演示销售数据。
+    POS = "pos"  # 收银台创建的真实销售记录。
 
 
 class PurchaseStatus(StrEnum):

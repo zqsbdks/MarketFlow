@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.sales_requests import SalesListRequest
+from app.schemas.sales_requests import CreateSaleRequest, SalesListRequest
 from app.schemas.sales_responses import SaleDetailResponse, SalesListResponse
-from app.services.sales import get_sales_detail_service, get_sales_list_service
+from app.services.sales import create_sale_service, get_sales_detail_service, get_sales_list_service
 
 sales_router = APIRouter(tags=["sales"], prefix="/sales")
 
@@ -41,6 +41,31 @@ async def get_sales(
         message="获取销售单列表成功",
         data=sales,
     )
+
+
+# endregion
+
+
+# region 创建销售单
+@sales_router.post(
+    "",
+    response_model=ResponseModel[SaleDetailResponse],
+    summary="创建销售单",
+    description="模拟收银台扫码结账，按最早到期批次扣减库存并生成销售小票。",
+)
+async def create_sale(
+    request: CreateSaleRequest,
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[SaleDetailResponse]:
+    """接收商品及数量，返回合并同商品批次后的销售小票。"""
+
+    sale = await create_sale_service(
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[SaleDetailResponse](message="销售单创建成功", data=sale)
 
 
 # endregion

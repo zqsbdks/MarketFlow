@@ -32,4 +32,21 @@ class SalesListRequest(BaseModel):
 # endregion
 
 
-__all__ = ["SalesListRequest"]
+# region 创建销售单请求模型
+class CreateSaleItemRequest(BaseModel):
+    """收银台扫描的一种商品及购买数量。"""
+
+    product_id: int = Field(..., description="商品ID", ge=1)
+    quantity: int = Field(..., description="购买数量", ge=1)
+
+
+class CreateSaleRequest(BaseModel):
+    """收银台完成结账时提交的商品列表。"""
+
+    items: list[CreateSaleItemRequest] = Field(..., description="销售商品", min_length=1)
+
+
+# endregion
+
+
+__all__ = ["CreateSaleItemRequest", "CreateSaleRequest", "SalesListRequest"]

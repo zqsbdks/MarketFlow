@@ -35,7 +35,7 @@ class Sale(CreatedAtMixin, Base):
             "gross_profit = total_amount - total_cost",
             name="ck_sale_gross_profit_matches_totals",
         ),
-        CheckConstraint("source IN ('demo_seed')", name="sale_source"),
+        CheckConstraint("source IN ('demo_seed', 'pos')", name="sale_source"),
         UniqueConstraint("sale_no", name="uq_sale_sale_no"),
         {"mysql_charset": "utf8mb4", "comment": "销售单表"},
     )

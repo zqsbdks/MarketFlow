@@ -82,6 +82,7 @@ EXPECTED_COLUMNS = {
         "id",
         "sale_id",
         "product_id",
+        "inventory_batch_id",
         "product_no_snapshot",
         "product_name_snapshot",
         "department_id",
@@ -334,4 +335,4 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """批次状态自动化迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260917_0010"]
+    assert script.get_heads() == ["20260917_0011"]

@@ -625,5 +625,8 @@
     },
     "alembic/versions/20260917_0010_create_operation_audit_log.py": {
         "description": "以统一操作审计记录表替换库存专用调整表迁移"
+    },
+    "alembic/versions/20260917_0011_add_sale_item_batch.py": {
+        "description": "销售明细关联实际扣减库存批次并增加收银台来源迁移"
     }
 }

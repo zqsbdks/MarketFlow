@@ -12,6 +12,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.department import Department
+    from app.models.inventory_batch import InventoryBatch
     from app.models.product import Product
     from app.models.sale import Sale
 
@@ -55,6 +56,14 @@ class SaleItem(Base):
         index=True,
         comment="商品主键",
     )
+    # 历史演示销售没有批次来源，因此允许为空；新创建的销售明细必须填写。
+    inventory_batch_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("inventory_batch.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+        comment="实际扣减的库存批次ID",
+    )
     product_no_snapshot: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
@@ -96,6 +105,7 @@ class SaleItem(Base):
 
     sale: Mapped[Sale] = relationship(back_populates="items")
     product: Mapped[Product] = relationship(back_populates="sale_items")
+    inventory_batch: Mapped[InventoryBatch | None] = relationship()
     department: Mapped[Department] = relationship(back_populates="sale_items")
 
 
