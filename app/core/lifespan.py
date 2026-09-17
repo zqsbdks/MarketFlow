@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 
             logging.getLogger(__name__).exception("Redis initialization failed")
 
-    # 后台任务使用独立数据库会话，每天12点处理达到预计时间的进货单。
+    # 后台任务使用独立数据库会话，每天12点签收进货单并刷新库存批次状态。
     scheduler_stop_event = asyncio.Event()
     scheduler_task = asyncio.create_task(
         run_purchase_scheduler(scheduler_stop_event),

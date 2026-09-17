@@ -1,10 +1,11 @@
-"""进货单自动签收定时任务，每天本地时间12:00运行。"""
+"""进货单自动签收与库存批次状态刷新任务，每天本地时间12:00运行。"""
 
 import asyncio
 import logging
 from datetime import datetime, time, timedelta
 
 from app.core.database import async_session_factory
+from app.crud.inventory_batches import refresh_inventory_batch_statuses
 from app.crud.purchases import auto_receive_due_purchases
 
 logger = logging.getLogger(__name__)
@@ -20,21 +21,25 @@ def _next_run_time(now: datetime) -> datetime:
     return next_run
 
 
-async def _run_auto_receive_once() -> int:
-    """使用独立数据库会话执行一次到期进货单批量签收。"""
+async def _run_auto_receive_once() -> tuple[int, int]:
+    """执行进货单自动签收和批次状态刷新，并返回两项处理数量。"""
 
     async with async_session_factory() as db:
         try:
             purchases = await auto_receive_due_purchases(arrived_at=datetime.now(), db=db)
+            changed_batch_count = await refresh_inventory_batch_statuses(
+                current_date=datetime.now().date(),
+                db=db,
+            )
             await db.commit()
-            return len(purchases)
+            return len(purchases), changed_batch_count
         except Exception:
             await db.rollback()
             raise
 
 
 async def run_purchase_scheduler(stop_event: asyncio.Event) -> None:
-    """等待每日12点执行签收，并在应用关闭时安全停止。"""
+    """等待每日12点执行签收和批次状态刷新，并在应用关闭时安全停止。"""
 
     while not stop_event.is_set():
         now = datetime.now()
@@ -49,8 +54,9 @@ async def run_purchase_scheduler(stop_event: asyncio.Event) -> None:
             pass
 
         try:
-            received_count = await _run_auto_receive_once()
+            received_count, changed_batch_count = await _run_auto_receive_once()
             logger.info("进货单自动签收完成，共签收 %s 张", received_count)
+            logger.info("库存批次状态刷新完成，共更新 %s 个批次", changed_batch_count)
         except Exception:
             # 一次失败不终止循环；店长可补执行，次日任务也会继续运行。
             logger.exception("进货单自动签收失败")

@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,9 +45,9 @@ class InventoryBatch(TimestampMixin, Base):
             "OR expiration_date >= production_date",
             name="ck_inventory_batch_expiration_after_production",
         ),
-        # 批次状态只允许使用当前系统支持的三个固定值。
+        # 批次状态只允许使用可用、临期和售完三个自动状态。
         CheckConstraint(
-            "status IN ('available', 'sold_out', 'discarded')",
+            "status IN ('available', 'near_expiry', 'sold_out')",
             name="inventory_batch_status",
         ),
         {"mysql_charset": "utf8mb4", "comment": "库存批次表"},
@@ -104,7 +105,7 @@ class InventoryBatch(TimestampMixin, Base):
         nullable=False,
         comment="当前剩余数量",
     )
-    # status保存可用、售完或报废；是否过期不存状态，而是根据expiration_date判断。
+    # status由剩余数量、到期日期和商品临期提醒天数自动维护。
     status: Mapped[InventoryBatchStatus] = mapped_column(
         Enum(
             InventoryBatchStatus,
@@ -132,6 +133,19 @@ class InventoryBatch(TimestampMixin, Base):
     product: Mapped[Product] = relationship(back_populates="inventory_batches")
     # purchase_item让代码可以追溯该批次来源于哪条进货明细。
     purchase_item: Mapped[PurchaseItem] = relationship(back_populates="inventory_batch")
+
+
+@event.listens_for(InventoryBatch, "before_insert")
+@event.listens_for(InventoryBatch, "before_update")
+def _sync_sold_out_status(_mapper, _connection, batch: InventoryBatch) -> None:
+    """批次写入数据库前，根据剩余数量自动同步售完状态。"""
+
+    # 售完状态优先级最高；只要剩余数量为 0，就强制改为 sold_out。
+    if batch.remaining_quantity == 0:
+        batch.status = InventoryBatchStatus.SOLD_OUT
+    # 如果库存后来由 0 调整为正数，先恢复为可用；每日任务会继续判断是否临期。
+    elif batch.status == InventoryBatchStatus.SOLD_OUT:
+        batch.status = InventoryBatchStatus.AVAILABLE
 
 
 __all__ = ["InventoryBatch"]

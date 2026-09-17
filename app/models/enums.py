@@ -49,11 +49,11 @@ class PurchaseStatus(StrEnum):
 
 
 class InventoryBatchStatus(StrEnum):
-    """库存批次的人工处理状态；是否过期根据到期日期动态判断。"""
+    """库存批次根据剩余数量和到期日期自动维护的状态。"""
 
-    AVAILABLE = "available"  # 批次仍有库存并且没有被人工报废。
+    AVAILABLE = "available"  # 批次仍有库存，并且尚未进入临期提醒范围。
+    NEAR_EXPIRY = "near_expiry"  # 批次仍有库存，但已经进入临期提醒范围。
     SOLD_OUT = "sold_out"  # 批次的剩余数量已经变为0。
-    DISCARDED = "discarded"  # 批次因损坏等原因被人工报废。
 
 
 class RankingGroupBy(StrEnum):

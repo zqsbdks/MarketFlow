@@ -426,7 +426,7 @@
         "description": "自动生成且不提交的完整依赖快照"
     },
     "app/core/purchase_scheduler.py": {
-        "description": "每日12点自动签收待到货进货单调度器"
+        "description": "每日12点自动签收进货单与刷新批次状态调度器"
     },
     "app/crud/purchases.py": {
         "description": "进货单、明细、商品与库存批次数据访问函数"
@@ -610,5 +610,8 @@
     },
     "app/schemas/inventory_batches_responses.py": {
         "description": "库存批次列表项、分页列表与完整详情响应模型"
+    },
+    "alembic/versions/20260917_0008_update_inventory_batch_status.py": {
+        "description": "库存批次报废状态替换为临期状态的数据库迁移"
     }
 }

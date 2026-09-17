@@ -1,6 +1,6 @@
 """库存批次的数据访问函数。"""
 
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,6 +81,45 @@ async def get_inventory_batches_list(
 # endregion
 
 
+# region 自动刷新库存批次状态
+async def refresh_inventory_batch_statuses(
+    current_date: date,
+    db: AsyncSession,
+) -> int:
+    """根据剩余数量和临期日期刷新全部批次状态，并返回变更数量。"""
+
+    # 临期提醒天数保存在商品表，因此提前加载每个批次对应的正式商品。
+    statement = select(InventoryBatch).options(selectinload(InventoryBatch.product))
+    result = await db.scalars(statement)
+    batches = list(result.all())
+
+    changed_count = 0
+    for batch in batches:
+        # 状态优先级：售完 > 临期 > 可用。
+        if batch.remaining_quantity == 0:
+            new_status = InventoryBatchStatus.SOLD_OUT
+        elif (
+            batch.expiration_date is not None
+            and batch.product.expiry_warning_days is not None
+            and batch.expiration_date
+            <= current_date + timedelta(days=batch.product.expiry_warning_days)
+        ):
+            new_status = InventoryBatchStatus.NEAR_EXPIRY
+        else:
+            new_status = InventoryBatchStatus.AVAILABLE
+
+        if batch.status != new_status:
+            batch.status = new_status
+            changed_count += 1
+
+    # 这里只修改当前事务中的 ORM 对象，commit 仍由调用方统一执行。
+    await db.flush()
+    return changed_count
+
+
+# endregion
+
+
 # region 根据ID获取库存批次详情
 async def get_inventory_batch_by_id(
     # batch_id：要查询的库存批次主键。
@@ -111,4 +150,8 @@ async def get_inventory_batch_by_id(
 # endregion
 
 
-__all__ = ["get_inventory_batch_by_id", "get_inventory_batches_list"]
+__all__ = [
+    "get_inventory_batch_by_id",
+    "get_inventory_batches_list",
+    "refresh_inventory_batch_statuses",
+]
