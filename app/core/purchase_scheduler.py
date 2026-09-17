@@ -10,6 +10,7 @@ from datetime import datetime, time, timedelta
 
 from app.core.database import async_session_factory
 from app.crud.inventory_batches import refresh_inventory_batch_statuses
+from app.crud.products import StockInconsistency, get_stock_inconsistencies
 from app.crud.purchases import auto_receive_due_purchases
 
 logger = logging.getLogger(__name__)
@@ -80,8 +81,8 @@ async def _run_auto_receive_once() -> int:
             raise
 
 
-async def _run_batch_status_refresh_once() -> int:
-    """执行一次库存批次状态刷新，并提交本次数据库事务。"""
+async def _run_batch_status_refresh_once() -> tuple[int, list[StockInconsistency]]:
+    """刷新批次状态并只读检查库存一致性，不自动修复异常。"""
 
     async with async_session_factory() as db:
         try:
@@ -89,8 +90,9 @@ async def _run_batch_status_refresh_once() -> int:
                 current_date=datetime.now().date(),
                 db=db,
             )
+            inconsistencies = await get_stock_inconsistencies(db=db)
             await db.commit()
-            return changed_batch_count
+            return changed_batch_count, inconsistencies
         except Exception:
             await db.rollback()
             raise
@@ -123,8 +125,30 @@ async def _run_batch_status_scheduler(stop_event: asyncio.Event) -> None:
             break
 
         try:
-            changed_batch_count = await _run_batch_status_refresh_once()
+            changed_batch_count, inconsistencies = await _run_batch_status_refresh_once()
             logger.info("库存批次状态刷新完成，共更新 %s 个批次", changed_batch_count)
+            if not inconsistencies:
+                logger.info("商品总库存与批次剩余库存检查完成，未发现异常")
+            else:
+                logger.warning(
+                    "发现 %s 个商品库存不一致，本次检查不会自动修复", len(inconsistencies)
+                )
+                for (
+                    product_id,
+                    product_no,
+                    product_name,
+                    product_stock,
+                    batch_stock,
+                ) in inconsistencies:
+                    logger.warning(
+                        "库存不一致：商品ID=%s，编号=%s，名称=%s，商品库存=%s，批次库存=%s，差异=%s",
+                        product_id,
+                        product_no,
+                        product_name,
+                        product_stock,
+                        batch_stock,
+                        product_stock - batch_stock,
+                    )
         except Exception:
             # 单次失败只记录日志，半小时后仍会再次执行。
             logger.exception("库存批次状态刷新失败")

@@ -4,10 +4,28 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.sql.selectable import Subquery
 
 from app.models.enums import ProductStatus
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
+
+StockInconsistency = tuple[int, str, str, int, int]
+
+
+def _build_batch_stock_summary() -> Subquery:
+    """生成“每个商品的批次剩余库存合计”子查询，供列表和检查任务复用。"""
+
+    return (
+        select(
+            InventoryBatch.product_id.label("product_id"),
+            func.coalesce(func.sum(InventoryBatch.remaining_quantity), 0).label(
+                "batch_stock_quantity"
+            ),
+        )
+        .group_by(InventoryBatch.product_id)
+        .subquery()
+    )
 
 
 # region 获取商品列表
@@ -36,16 +54,7 @@ async def get_products_list(
 
     # 先按商品分组汇总所有批次的剩余数量，再作为子查询关联商品表。
     # 已售罄批次的 remaining_quantity 是 0，因此无需按批次状态排除。
-    batch_stock_summary = (
-        select(
-            InventoryBatch.product_id.label("product_id"),
-            func.coalesce(func.sum(InventoryBatch.remaining_quantity), 0).label(
-                "batch_stock_quantity"
-            ),
-        )
-        .group_by(InventoryBatch.product_id)
-        .subquery()
-    )
+    batch_stock_summary = _build_batch_stock_summary()
     # 没有任何批次的商品经过外连接后得到 NULL，这里把它转换成库存 0。
     batch_stock_quantity = func.coalesce(batch_stock_summary.c.batch_stock_quantity, 0)
 
@@ -88,6 +97,37 @@ async def get_products_list(
     products = [(product, int(batch_quantity)) for product, batch_quantity in list_result.all()]
 
     return products, total
+
+
+# endregion
+
+
+# region 检查商品与批次库存一致性
+async def get_stock_inconsistencies(db: AsyncSession) -> list[StockInconsistency]:
+    """查询库存不一致的商品；本函数只读取数据，不执行任何自动修复。"""
+
+    batch_stock_summary = _build_batch_stock_summary()
+    batch_stock_quantity = func.coalesce(batch_stock_summary.c.batch_stock_quantity, 0)
+    statement = (
+        select(
+            Product.id,
+            Product.product_no,
+            Product.name,
+            Product.stock_quantity,
+            batch_stock_quantity,
+        )
+        .outerjoin(
+            batch_stock_summary,
+            batch_stock_summary.c.product_id == Product.id,
+        )
+        .where(Product.stock_quantity != batch_stock_quantity)
+        .order_by(Product.id.asc())
+    )
+    result = await db.execute(statement)
+    return [
+        (product_id, product_no, name, product_stock, int(batch_stock))
+        for product_id, product_no, name, product_stock, batch_stock in result.all()
+    ]
 
 
 # endregion
@@ -150,4 +190,9 @@ async def update_product(
 # endregion
 
 
-__all__ = ["get_product_by_id", "get_products_list", "update_product"]
+__all__ = [
+    "get_product_by_id",
+    "get_products_list",
+    "get_stock_inconsistencies",
+    "update_product",
+]
