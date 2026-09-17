@@ -27,6 +27,20 @@ class ProductsListRequest(BaseModel):
 # endregion
 
 
+# region 修改商品状态请求模型
+class ProductStatusUpdateRequest(BaseModel):
+    """店长或正式员工修改商品销售状态时提交的数据。"""
+
+    # ProductStatus 只允许 on_sale（上架）和 stopped（停售）两个枚举值。
+    status: ProductStatus = Field(
+        ...,
+        description="商品销售状态：on_sale为上架，stopped为停售",
+    )
+
+
+# endregion
+
+
 # region 修改商品请求模型
 class UpdateProductRequest(BaseModel):
     """店长或正式员工修改商品资料时提交的可选字段。"""
@@ -67,4 +81,8 @@ class UpdateProductRequest(BaseModel):
 # endregion
 
 
-__all__ = ["ProductsListRequest", "UpdateProductRequest"]
+__all__ = [
+    "ProductStatusUpdateRequest",
+    "ProductsListRequest",
+    "UpdateProductRequest",
+]

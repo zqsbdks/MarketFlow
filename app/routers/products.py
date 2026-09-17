@@ -6,12 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.products_requests import ProductsListRequest, UpdateProductRequest
+from app.schemas.products_requests import (
+    ProductsListRequest,
+    ProductStatusUpdateRequest,
+    UpdateProductRequest,
+)
 from app.schemas.products_responses import ItemResponse, ProductsListResponse
 from app.services.products import (
     get_product_detail_service,
     get_products_list_service,
     update_product_service,
+    update_product_status_service,
 )
 
 products_router = APIRouter(prefix="/products", tags=["products"])
@@ -73,6 +78,43 @@ async def get_product_detail(
 
     return ResponseModel[ItemResponse](
         message="商品详情获取成功",
+        data=product,
+    )
+
+
+# endregion
+
+
+# region 修改商品状态接口
+@products_router.put(
+    "/{product_id}/status",
+    response_model=ResponseModel[ItemResponse],
+    summary="修改商品状态",
+    description="店长可修改全部商品，正式员工只能修改自己所属部门的商品状态。",
+)
+async def update_product_status(
+    # product_id 来自 URL 路径，例如 PUT /products/12/status 中的 12。
+    product_id: int = Path(..., description="商品ID", ge=1),
+    # request 是 JSON 请求体，只接收准备修改的新商品销售状态。
+    request: ProductStatusUpdateRequest = Body(...),
+    # current_employee_id 由登录令牌解析得到，用于判断角色和部门权限。
+    current_employee_id: int = Depends(get_current_employee_id),
+    # db 是当前请求使用的异步数据库会话。
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[ItemResponse]:
+    """接收商品 ID 和新状态，并返回修改后的完整商品详情。"""
+
+    # Router 负责接收参数，账号、角色和部门权限交给 Service 检查。
+    product = await update_product_status_service(
+        product_id=product_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    # 状态接口与商品详情、资料修改接口使用相同的响应模型。
+    return ResponseModel[ItemResponse](
+        message="商品状态修改成功",
         data=product,
     )
 

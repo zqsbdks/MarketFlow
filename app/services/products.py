@@ -8,7 +8,7 @@ from app.crud.auth import get_employee_by_id
 from app.crud.categories import get_category_by_id
 from app.crud.products import get_product_by_id, get_products_list, update_product
 from app.models.enums import EmployeeRole, ProductStatus
-from app.schemas.products_requests import UpdateProductRequest
+from app.schemas.products_requests import ProductStatusUpdateRequest, UpdateProductRequest
 from app.schemas.products_responses import (
     ItemResponse,
     ProductsItemResponse,
@@ -134,6 +134,93 @@ async def get_product_detail_service(
     # ItemResponse 配置了 from_attributes=True，因此可以直接从 Product ORM
     # 对象读取同名属性；嵌套的 department 和 category 也会自动转换。
     return ItemResponse.model_validate(product)
+
+
+# endregion
+
+
+# region 修改商品状态
+async def update_product_status_service(
+    # product_id：准备修改销售状态的商品 ID。
+    product_id: int,
+    # request：前端提交的新商品销售状态。
+    request: ProductStatusUpdateRequest,
+    # current_employee_id：当前登录员工 ID，用于账号和权限校验。
+    current_employee_id: int,
+    # db：当前请求的异步数据库会话。
+    db: AsyncSession,
+) -> ItemResponse:
+    """校验员工操作权限，修改商品销售状态并返回最新商品详情。"""
+
+    # 第一步：查询当前登录员工，读取账号状态、角色和所属部门。
+    employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 已停用账号不能修改商品状态。
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+
+    # 使用初始密码的员工必须先修改密码。
+    if employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # 第二步：只有店长和正式员工可以修改商品状态，契约工不能操作。
+    if employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以修改商品状态",
+        )
+
+    # 第三步：查询准备修改状态的商品。
+    product = await get_product_by_id(
+        product_id=product_id,
+        db=db,
+    )
+    if product is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="商品不存在",
+        )
+
+    # 第四步：店长可以操作所有商品，正式员工只能操作本部门商品。
+    if (
+        employee.role == EmployeeRole.REGULAR_EMPLOYEE
+        and employee.department_id != product.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能修改自己所属部门的商品状态",
+        )
+
+    # 第五步：复用商品更新 CRUD，只把新的 status 写入数据库。
+    updated_product = await update_product(
+        product_id=product_id,
+        update_data={"status": request.status},
+        db=db,
+    )
+
+    # 第六步：数据库更新成功后提交事务。
+    await db.commit()
+
+    # 第七步：返回与商品详情、商品资料修改接口相同的响应结构。
+    return ItemResponse.model_validate(updated_product)
 
 
 # endregion
@@ -277,5 +364,6 @@ async def update_product_service(
 __all__ = [
     "get_product_detail_service",
     "get_products_list_service",
+    "update_product_status_service",
     "update_product_service",
 ]

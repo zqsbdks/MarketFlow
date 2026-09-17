@@ -15,7 +15,12 @@ from app.services.employees import (
     update_employee_detail_service,
     update_employee_status_service,
 )
-from app.services.products import get_product_detail_service, get_products_list_service
+from app.services.products import (
+    get_product_detail_service,
+    get_products_list_service,
+    update_product_service,
+    update_product_status_service,
+)
 from app.services.reports import (
     get_departments_service,
     get_rankings_service,
@@ -52,4 +57,6 @@ __all__ = [
     "reset_employee_password_service",
     "update_employee_detail_service",
     "update_employee_status_service",
+    "update_product_service",
+    "update_product_status_service",
 ]
