@@ -1,14 +1,18 @@
 """商品查询 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.products_requests import ProductsListRequest
+from app.schemas.products_requests import ProductsListRequest, UpdateProductRequest
 from app.schemas.products_responses import ItemResponse, ProductsListResponse
-from app.services.products import get_product_detail_service, get_products_list_service
+from app.services.products import (
+    get_product_detail_service,
+    get_products_list_service,
+    update_product_service,
+)
 
 products_router = APIRouter(prefix="/products", tags=["products"])
 
@@ -69,6 +73,43 @@ async def get_product_detail(
 
     return ResponseModel[ItemResponse](
         message="商品详情获取成功",
+        data=product,
+    )
+
+
+# endregion
+
+
+# region 修改商品接口
+@products_router.put(
+    "/{product_id}",
+    response_model=ResponseModel[ItemResponse],
+    summary="修改商品",
+    description="根据商品ID修改商品的详细信息。",
+)
+async def update_product(
+    # product_id 来自 URL 路径，例如 PUT /products/12 中的 12。
+    product_id: int = Path(..., description="商品ID", ge=1),
+    # request 是前端提交的 JSON 请求体，只包含本次需要修改的商品字段。
+    request: UpdateProductRequest = Body(...),
+    # current_employee_id 由登录令牌解析得到，用于判断操作权限。
+    current_employee_id: int = Depends(get_current_employee_id),
+    # db 是当前请求使用的异步数据库会话。
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[ItemResponse]:
+    """接收商品 ID 和修改请求，并返回统一格式的商品详情响应。"""
+
+    # Router 只负责接收参数；权限校验、字段校验和数据库更新交给 Service。
+    product = await update_product_service(
+        product_id=product_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+    # 使用项目统一响应结构包装修改后的商品详情。
+    return ResponseModel[ItemResponse](
+        message="商品修改成功",
         data=product,
     )
 

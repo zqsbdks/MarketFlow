@@ -1,6 +1,6 @@
 """商品查询的数据访问函数。"""
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
@@ -73,6 +73,8 @@ async def get_product_by_id(
             selectinload(Product.category),
         )
         .where(Product.id == product_id)
+        # 如果当前会话已经加载过这个商品，也用数据库最新值覆盖缓存。
+        .execution_options(populate_existing=True)
     )
     result = await db.scalar(select_statement)
     return result
@@ -81,4 +83,37 @@ async def get_product_by_id(
 # endregion
 
 
-__all__ = ["get_product_by_id", "get_products_list"]
+# region 修改商品
+async def update_product(
+    # product_id：需要更新的商品主键。
+    product_id: int,
+    # update_data：经过 Service 校验后，真正需要写入数据库的字段和值。
+    update_data: dict[str, object],
+    # db：当前请求的异步数据库会话；CRUD 不在这里提交事务。
+    db: AsyncSession,
+) -> Product:
+    """更新指定商品，并返回包含部门和分类关系的最新商品对象。"""
+
+    # 第一步：创建 UPDATE 语句。
+    # update_data 已由 Service 使用 exclude_unset=True 过滤，只包含前端传入的字段。
+    update_statement = update(Product).where(Product.id == product_id).values(**update_data)
+
+    # 第二步：把 UPDATE 语句发送给数据库。
+    # 此处不调用 commit，由 Service 在全部业务操作成功后统一提交。
+    await db.execute(update_statement)
+
+    # 第三步：重新查询修改后的商品。
+    # UPDATE 只能修改商品表，selectinload 不能放在 UPDATE 上加载关联对象。
+    # 因此更新后重新查询一次，取得最新字段以及 department、category 关系。
+    updated_product = await get_product_by_id(product_id=product_id, db=db)
+    if updated_product is None:
+        # Service 已提前确认商品存在；这里只处理极少见的并发删除情况。
+        raise RuntimeError("商品更新后无法重新查询")
+
+    return updated_product
+
+
+# endregion
+
+
+__all__ = ["get_product_by_id", "get_products_list", "update_product"]

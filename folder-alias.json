@@ -147,7 +147,7 @@
         "description": "店长创建、查询、修改状态与重置密码API路由"
     },
     "app/routers/products.py": {
-        "description": "商品列表筛选与分页查询API路由"
+        "description": "商品列表、详情查询与资料修改API路由"
     },
     "app/routers/sales.py": {
         "description": "销售记录API路由"
@@ -174,7 +174,7 @@
         "description": "员工创建、查询、状态修改与密码重置业务逻辑"
     },
     "app/services/products.py": {
-        "description": "商品列表权限验证与响应组装业务逻辑"
+        "description": "商品查询、修改权限校验与响应组装业务逻辑"
     },
     "app/services/sales.py": {
         "description": "销售记录业务逻辑"
@@ -195,7 +195,7 @@
         "description": "员工创建、查询、状态修改与密码重置数据访问函数"
     },
     "app/crud/products.py": {
-        "description": "商品筛选、关系预加载与分页查询数据访问函数"
+        "description": "商品筛选、详情查询与资料更新数据访问函数"
     },
     "app/crud/sales.py": {
         "description": "销售记录数据访问函数"
@@ -228,10 +228,10 @@
         "description": "员工创建、列表、状态修改与密码重置响应模型"
     },
     "app/schemas/products_requests.py": {
-        "description": "商品列表分页与筛选查询参数模型"
+        "description": "商品列表筛选与资料修改请求模型"
     },
     "app/schemas/products_responses.py": {
-        "description": "商品列表项与分页结果响应模型"
+        "description": "商品列表、详情与修改结果响应模型"
     },
     "app/schemas/sales_requests.py": {
         "description": "销售记录查询参数模型"
@@ -424,5 +424,176 @@
     },
     "requirements-freeze.txt": {
         "description": "自动生成且不提交的完整依赖快照"
+    },
+    "app/core/purchase_scheduler.py": {
+        "description": "每日12点自动签收待到货进货单调度器"
+    },
+    "app/crud/purchases.py": {
+        "description": "进货单、明细、商品与库存批次数据访问函数"
+    },
+    "app/crud/suppliers.py": {
+        "description": "供应商查询、创建、状态与资料更新数据访问函数"
+    },
+    "app/crud/supplier_products.py": {
+        "description": "供应商商品目录查询、创建与更新数据访问函数"
+    },
+    "app/models/supplier_product.py": {
+        "description": "供应商商品目录、进货价与默认保质期ORM模型"
+    },
+    "app/routers/purchases.py": {
+        "description": "进货单查询、创建与自动签收API路由"
+    },
+    "app/routers/suppliers.py": {
+        "description": "供应商查询、创建、状态与资料修改API路由"
+    },
+    "app/routers/supplier_products.py": {
+        "description": "供应商商品目录查询、创建与修改API路由"
+    },
+    "app/schemas/purchases_requests.py": {
+        "description": "进货单列表筛选与创建请求模型"
+    },
+    "app/schemas/purchases_responses.py": {
+        "description": "进货单列表、详情与创建结果响应模型"
+    },
+    "app/schemas/suppliers_requests.py": {
+        "description": "供应商查询、创建、状态与资料修改请求模型"
+    },
+    "app/schemas/suppliers_responses.py": {
+        "description": "供应商列表与详情响应模型"
+    },
+    "app/schemas/supplier_products_requests.py": {
+        "description": "供应商商品目录查询、创建与修改请求模型"
+    },
+    "app/schemas/supplier_products_responses.py": {
+        "description": "供应商商品目录列表与详情响应模型"
+    },
+    "app/services/purchases.py": {
+        "description": "进货权限校验、单据创建与签收业务逻辑"
+    },
+    "app/services/suppliers.py": {
+        "description": "供应商查询、创建与修改业务逻辑"
+    },
+    "app/services/supplier_products.py": {
+        "description": "供应商商品目录查询、创建与修改业务逻辑"
+    },
+    "frontend/src/App.vue": {
+        "description": "Vue前端根组件与路由展示入口"
+    },
+    "frontend/src/main.ts": {
+        "description": "Vue应用创建、插件注册与挂载入口"
+    },
+    "frontend/src/utils.ts": {
+        "description": "前端日期、金额与文本格式化工具"
+    },
+    "frontend/src/vite-env.d.ts": {
+        "description": "Vite前端环境变量类型声明"
+    },
+    "frontend/src/api/http.ts": {
+        "description": "HTTP客户端、令牌注入与统一错误处理"
+    },
+    "frontend/src/api/index.ts": {
+        "description": "后端业务接口调用函数统一出口"
+    },
+    "frontend/src/components/LoadingBlock.vue": {
+        "description": "页面数据加载状态通用组件"
+    },
+    "frontend/src/components/ModalPanel.vue": {
+        "description": "通用弹窗面板组件"
+    },
+    "frontend/src/components/PageHeader.vue": {
+        "description": "页面标题、副标题与操作区组件"
+    },
+    "frontend/src/components/StatCard.vue": {
+        "description": "经营指标统计卡片组件"
+    },
+    "frontend/src/layouts/AppLayout.vue": {
+        "description": "经营管理台导航与页面整体布局"
+    },
+    "frontend/src/router/index.ts": {
+        "description": "前端页面路由、登录与角色权限守卫"
+    },
+    "frontend/src/stores/auth.ts": {
+        "description": "Pinia登录员工与访问令牌状态管理"
+    },
+    "frontend/src/types/api.ts": {
+        "description": "后端请求、响应与业务对象TypeScript类型"
+    },
+    "frontend/src/views/AnalyticsView.vue": {
+        "description": "综合营业指标与趋势图表分析页面"
+    },
+    "frontend/src/views/DashboardView.vue": {
+        "description": "店铺整体经营总览页面"
+    },
+    "frontend/src/views/DepartmentView.vue": {
+        "description": "单个部门经营数据分析页面"
+    },
+    "frontend/src/views/EmployeesView.vue": {
+        "description": "员工列表、创建与账号管理页面"
+    },
+    "frontend/src/views/LoginView.vue": {
+        "description": "员工账号登录页面"
+    },
+    "frontend/src/views/NotFoundView.vue": {
+        "description": "前端路由404提示页面"
+    },
+    "frontend/src/views/PasswordChangeView.vue": {
+        "description": "员工首次登录修改初始密码页面"
+    },
+    "frontend/src/views/ProcurementView.vue": {
+        "description": "进货单查询、创建与手动补签收页面"
+    },
+    "frontend/src/views/ProductsView.vue": {
+        "description": "商品筛选、库存与价格查询页面"
+    },
+    "frontend/src/views/SalesView.vue": {
+        "description": "销售单列表与明细查询页面"
+    },
+    "tests/test_employee_detail.py": {
+        "description": "员工详情查询与修改业务测试"
+    },
+    "tests/test_purchases.py": {
+        "description": "进货单查询、创建与签收业务测试"
+    },
+    "tests/test_suppliers.py": {
+        "description": "供应商查询、创建与修改业务测试"
+    },
+    "tests/test_supplier_products.py": {
+        "description": "供应商商品目录接口与业务规则测试"
+    },
+    "frontend/.env.example": {
+        "description": "前端环境变量配置示例"
+    },
+    "frontend/index.html": {
+        "description": "Vue前端HTML页面入口"
+    },
+    "frontend/package-lock.json": {
+        "description": "前端依赖版本锁定文件"
+    },
+    "frontend/tsconfig.app.json": {
+        "description": "前端应用TypeScript编译配置"
+    },
+    "frontend/tsconfig.app.tsbuildinfo": {
+        "description": "TypeScript增量编译缓存信息"
+    },
+    "frontend/tsconfig.json": {
+        "description": "前端TypeScript项目总配置"
+    },
+    "frontend/vite.config.ts": {
+        "description": "Vite开发服务与前端构建配置"
+    },
+    "frontend/src/modern.css": {
+        "description": "现代深色经营管理界面样式"
+    },
+    "frontend/src/styles.css": {
+        "description": "前端基础布局与通用组件样式"
+    },
+    "alembic/versions/20260913_0007_add_supplier_product_category.py": {
+        "description": "为供应商商品目录增加分类字段迁移"
+    },
+    "alembic/versions/372ffba6f65b_add_supplier_product_catalog.py": {
+        "description": "创建供应商商品目录表及商品来源关联迁移"
+    },
+    "alembic/versions/3878bf50f212_remove_product_shelf_life_days.py": {
+        "description": "移除正式商品默认保质期字段迁移"
     }
 }
