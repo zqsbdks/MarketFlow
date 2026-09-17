@@ -595,5 +595,20 @@
     },
     "alembic/versions/3878bf50f212_remove_product_shelf_life_days.py": {
         "description": "移除正式商品默认保质期字段迁移"
+    },
+    "app/routers/inventory_batches.py": {
+        "description": "库存批次分页列表与完整详情API路由"
+    },
+    "app/services/inventory_batches.py": {
+        "description": "库存批次列表、详情查询与响应组装业务逻辑"
+    },
+    "app/crud/inventory_batches.py": {
+        "description": "库存批次分页列表与完整详情数据访问函数"
+    },
+    "app/schemas/inventory_batches_requests.py": {
+        "description": "库存批次分页与状态筛选请求模型"
+    },
+    "app/schemas/inventory_batches_responses.py": {
+        "description": "库存批次列表项、分页列表与完整详情响应模型"
     }
 }
