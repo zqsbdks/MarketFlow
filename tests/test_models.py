@@ -64,6 +64,7 @@ EXPECTED_COLUMNS = {
         "sale_price",
         "stock_quantity",
         "expiry_warning_days",
+        "low_stock_threshold",
         "status",
         "created_at",
         "updated_at",
@@ -335,4 +336,4 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """批次状态自动化迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260917_0011"]
+    assert script.get_heads() == ["20260920_0013"]

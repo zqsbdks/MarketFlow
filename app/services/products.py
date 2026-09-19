@@ -80,6 +80,7 @@ async def get_products_list_service(
             batch_stock_quantity=batch_stock_quantity,
             stock_difference=product.stock_quantity - batch_stock_quantity,
             is_stock_consistent=product.stock_quantity == batch_stock_quantity,
+            low_stock_threshold=product.low_stock_threshold,
             status=product.status,
         )
         for product, batch_stock_quantity in products

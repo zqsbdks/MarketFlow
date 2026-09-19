@@ -43,6 +43,10 @@ class Product(TimestampMixin, Base):
             "expiry_warning_days IS NULL OR expiry_warning_days >= 0",
             name="ck_product_expiry_warning_days_non_negative",
         ),
+        CheckConstraint(
+            "low_stock_threshold IS NULL OR low_stock_threshold >= 0",
+            name="ck_product_low_stock_threshold_non_negative",
+        ),
         CheckConstraint("status IN ('on_sale', 'stopped')", name="product_status"),
         UniqueConstraint("product_no", name="uq_product_product_no"),
         ForeignKeyConstraint(
@@ -110,6 +114,12 @@ class Product(TimestampMixin, Base):
         Integer,
         nullable=True,
         comment="临期提前提醒天数",
+    )
+    # low_stock_threshold为空时不启用提醒；有值时库存小于等于该值即视为低库存。
+    low_stock_threshold: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="低库存预警阈值",
     )
     status: Mapped[ProductStatus] = mapped_column(
         Enum(

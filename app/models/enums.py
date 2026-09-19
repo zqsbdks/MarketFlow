@@ -54,6 +54,7 @@ class InventoryBatchStatus(StrEnum):
 
     AVAILABLE = "available"  # 批次仍有库存，并且尚未进入临期提醒范围。
     NEAR_EXPIRY = "near_expiry"  # 批次仍有库存，但已经进入临期提醒范围。
+    EXPIRED = "expired"  # 批次仍有剩余数量，但到期日期已经早于当前日期。
     SOLD_OUT = "sold_out"  # 批次的剩余数量已经变为0。
 
 

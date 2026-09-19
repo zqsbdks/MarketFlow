@@ -59,6 +59,7 @@ const canEditDetail = computed(() => {
 const statusLabel: Record<InventoryBatchStatus, string> = {
   available: '可用',
   near_expiry: '临期',
+  expired: '已过期',
   sold_out: '售罄',
 }
 
@@ -160,6 +161,7 @@ onMounted(async () => {
         <option value="">全部状态</option>
         <option value="available">可用</option>
         <option value="near_expiry">临期</option>
+        <option value="expired">已过期</option>
         <option value="sold_out">售罄</option>
       </select>
       <select v-model="filters.department_id">

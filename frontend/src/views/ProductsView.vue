@@ -26,7 +26,14 @@ const detailOpen = ref(false)
 const editOpen = ref(false)
 const saving = ref(false)
 const notice = ref('')
-const editForm = reactive({ name: '', category_id: 0, sale_price: '', expiry_warning_days: 1, reason: '' })
+const editForm = reactive({
+  name: '',
+  category_id: 0,
+  sale_price: '',
+  expiry_warning_days: 1,
+  low_stock_threshold: '' as number | '',
+  reason: '',
+})
 const loading = ref(false)
 const error = ref('')
 const keyword = ref('')
@@ -85,6 +92,7 @@ async function openEditor() {
   editForm.category_id = detail.value.category.id
   editForm.sale_price = detail.value.sale_price
   editForm.expiry_warning_days = detail.value.expiry_warning_days ?? 1
+  editForm.low_stock_threshold = detail.value.low_stock_threshold ?? ''
   editForm.reason = ''
   categories.value = await getCategories(detail.value.department.id)
   editOpen.value = true
@@ -100,6 +108,8 @@ async function submitEdit() {
       category_id: editForm.category_id,
       sale_price: editForm.sale_price,
       expiry_warning_days: editForm.expiry_warning_days,
+      low_stock_threshold:
+        editForm.low_stock_threshold === '' ? null : editForm.low_stock_threshold,
       reason: editForm.reason || undefined,
     })
     editOpen.value = false
@@ -189,7 +199,7 @@ onMounted(async () => {
     <ModalPanel title="商品详情" :open="detailOpen" @close="detailOpen = false">
       <div v-if="detail" class="detail-sheet">
         <div class="detail-hero"><span>{{ detail.name.slice(0, 1) }}</span><div><p>{{ detail.product_no }}</p><h3>{{ detail.name }}</h3></div></div>
-        <dl><div><dt>所属部门</dt><dd>{{ detail.department.name }}</dd></div><div><dt>商品分类</dt><dd>{{ detail.category.name }}</dd></div><div><dt>进货价格</dt><dd>{{ formatMoney(detail.purchase_price) }}</dd></div><div><dt>销售价格</dt><dd>{{ formatMoney(detail.sale_price) }}</dd></div><div><dt>当前库存</dt><dd>{{ detail.stock_quantity }} 件</dd></div><div><dt>临期提醒</dt><dd>提前 {{ detail.expiry_warning_days ?? 0 }} 天</dd></div><div><dt>销售状态</dt><dd>{{ detail.status === 'on_sale' ? '在售' : '停售' }}</dd></div></dl>
+        <dl><div><dt>所属部门</dt><dd>{{ detail.department.name }}</dd></div><div><dt>商品分类</dt><dd>{{ detail.category.name }}</dd></div><div><dt>进货价格</dt><dd>{{ formatMoney(detail.purchase_price) }}</dd></div><div><dt>销售价格</dt><dd>{{ formatMoney(detail.sale_price) }}</dd></div><div><dt>当前库存</dt><dd>{{ detail.stock_quantity }} 件</dd></div><div><dt>临期提醒</dt><dd>提前 {{ detail.expiry_warning_days ?? 0 }} 天</dd></div><div><dt>低库存阈值</dt><dd>{{ detail.low_stock_threshold === null ? '未启用' : `${detail.low_stock_threshold} 件` }}</dd></div><div><dt>销售状态</dt><dd>{{ detail.status === 'on_sale' ? '在售' : '停售' }}</dd></div></dl>
         <div v-if="canEditDetail" class="detail-actions"><button class="primary-button" @click="openEditor"><Pencil :size="16" />修改资料</button><button class="secondary-button" @click="toggleDetailStatus">{{ detail.status === 'on_sale' ? '设为停售' : '重新上架' }}</button></div>
       </div>
     </ModalPanel>
@@ -200,6 +210,7 @@ onMounted(async () => {
         <label><span>商品分类</span><select v-model.number="editForm.category_id" required><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
         <label><span>销售价格</span><input v-model="editForm.sale_price" type="number" min="0" step="0.01" required /></label>
         <label><span>临期提前提醒天数</span><input v-model.number="editForm.expiry_warning_days" type="number" min="0" required /></label>
+        <label><span>低库存预警阈值（留空关闭）</span><input v-model.number="editForm.low_stock_threshold" type="number" min="0" placeholder="例如 10" /></label>
         <label><span>修改理由（可选）</span><textarea v-model="editForm.reason" maxlength="255" /></label>
         <button class="primary-button full" :disabled="saving">保存修改</button>
       </form>

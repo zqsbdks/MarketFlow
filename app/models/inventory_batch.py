@@ -45,9 +45,9 @@ class InventoryBatch(TimestampMixin, Base):
             "OR expiration_date >= production_date",
             name="ck_inventory_batch_expiration_after_production",
         ),
-        # 批次状态只允许使用可用、临期和售完三个自动状态。
+        # 批次状态只允许使用可用、临期、过期和售完四个自动状态。
         CheckConstraint(
-            "status IN ('available', 'near_expiry', 'sold_out')",
+            "status IN ('available', 'near_expiry', 'expired', 'sold_out')",
             name="inventory_batch_status",
         ),
         {"mysql_charset": "utf8mb4", "comment": "库存批次表"},

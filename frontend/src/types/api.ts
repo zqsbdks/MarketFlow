@@ -142,6 +142,7 @@ export interface ProductListItem {
   batch_stock_quantity: number
   stock_difference: number
   is_stock_consistent: boolean
+  low_stock_threshold: number | null
   status: ProductStatus
 }
 
@@ -155,10 +156,11 @@ export interface ProductDetail {
   sale_price: string
   stock_quantity: number
   expiry_warning_days?: number | null
+  low_stock_threshold: number | null
   status: ProductStatus
 }
 
-export type InventoryBatchStatus = 'available' | 'near_expiry' | 'sold_out'
+export type InventoryBatchStatus = 'available' | 'near_expiry' | 'expired' | 'sold_out'
 
 export interface InventoryBatchListItem {
   id: number

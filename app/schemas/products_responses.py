@@ -33,6 +33,7 @@ class ProductsItemResponse(BaseModel):
         ...,
         description="商品总库存是否等于所有批次剩余数量合计",
     )
+    low_stock_threshold: int | None = Field(None, description="低库存预警阈值", ge=0)
     status: ProductStatus = Field(..., description="商品销售状态")
 
     model_config = ConfigDict(from_attributes=True)
@@ -88,6 +89,7 @@ class ItemResponse(BaseModel):
     sale_price: Decimal = Field(..., description="销售价", ge=0)
     stock_quantity: int = Field(..., description="库存数量", ge=0)
     expiry_warning_days: int | None = Field(None, description="临期提前提醒天数", ge=0)
+    low_stock_threshold: int | None = Field(None, description="低库存预警阈值", ge=0)
     status: ProductStatus = Field(..., description="商品销售状态")
 
     model_config = ConfigDict(from_attributes=True)
