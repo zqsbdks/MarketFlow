@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { CalendarDays, Layers3, PackageSearch, Pencil, Search } from '@lucide/vue'
+import { CalendarDays, Layers3, PackageSearch, Pencil, Search, Trash2 } from '@lucide/vue'
 
 import {
+  discardExpiredInventoryBatch,
   getDepartments,
   getInventoryBatch,
   getInventoryBatches,
@@ -124,6 +125,26 @@ async function submitQuantity() {
   }
 }
 
+async function discardExpiredBatch() {
+  if (!detail.value || detail.value.status !== 'expired' || detail.value.remaining_quantity <= 0) {
+    return
+  }
+  if (!window.confirm(`确认废弃批次 ${detail.value.batch_no} 的全部剩余库存吗？`)) return
+
+  const reason = window.prompt('请输入废弃原因（可不填）') || undefined
+  saving.value = true
+  error.value = ''
+  try {
+    detail.value = await discardExpiredInventoryBatch(detail.value.id, reason)
+    notice.value = '过期批次已废弃，商品总库存已同步扣减。'
+    await loadBatches()
+  } catch (cause) {
+    error.value = getErrorMessage(cause)
+  } finally {
+    saving.value = false
+  }
+}
+
 function applyFilters() {
   page.value = 1
   loadBatches()
@@ -219,7 +240,10 @@ onMounted(async () => {
           <div><dt>生产日期</dt><dd>{{ detail.production_date || '—' }}</dd></div><div><dt>到期日期</dt><dd>{{ detail.expiration_date || '未设置' }}</dd></div>
           <div><dt>批次状态</dt><dd>{{ statusLabel[detail.status] }}</dd></div><div><dt>到货时间</dt><dd>{{ formatDateTime(detail.arrived_at) }}</dd></div>
         </dl>
-        <button v-if="canEditDetail" class="primary-button" @click="openQuantityEditor"><Pencil :size="16" />盘点并修改数量</button>
+        <div v-if="canEditDetail" class="detail-actions">
+          <button class="primary-button" @click="openQuantityEditor"><Pencil :size="16" />盘点并修改数量</button>
+          <button v-if="detail.status === 'expired' && detail.remaining_quantity > 0" class="danger-button" :disabled="saving" @click="discardExpiredBatch"><Trash2 :size="16" />废弃过期库存</button>
+        </div>
       </div>
     </ModalPanel>
 
@@ -235,5 +259,5 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.batch-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:18px;margin-bottom:18px}.batch-filter select,.batch-filter input{min-width:130px}.batch-filter label{display:flex;align-items:center;gap:7px}.filter-heading{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:700}.block{display:block;margin-top:4px;color:var(--muted)}textarea{min-height:90px;resize:vertical;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}@media(max-width:760px){.batch-filter>*{flex:1 1 100%}}
+.batch-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:18px;margin-bottom:18px}.batch-filter select,.batch-filter input{min-width:130px}.batch-filter label{display:flex;align-items:center;gap:7px}.filter-heading{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:700}.block{display:block;margin-top:4px;color:var(--muted)}.detail-actions{display:flex;gap:10px;flex-wrap:wrap}.danger-button{display:inline-flex;align-items:center;gap:7px;padding:10px 14px;border:1px solid #ff7c68;border-radius:9px;background:rgba(255,124,104,.1);color:#ff7c68;font-weight:700}.danger-button:disabled{opacity:.55;cursor:not-allowed}textarea{min-height:90px;resize:vertical;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}@media(max-width:760px){.batch-filter>*{flex:1 1 100%}}
 </style>

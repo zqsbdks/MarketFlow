@@ -28,7 +28,10 @@ from app.schemas.employees_responses import (
     EmployeesResetPasswordResponse,
     EmployeesStatusUpdateResponse,
 )
-from app.schemas.inventory_batches_requests import InventoryBatchListRequest
+from app.schemas.inventory_batches_requests import (
+    InventoryBatchDiscardRequest,
+    InventoryBatchListRequest,
+)
 from app.schemas.inventory_batches_responses import (
     InventoryBatchDetailResponse,
     InventoryBatchItemResponse,
@@ -131,6 +134,7 @@ __all__ = [
     "EmployeesStatusUpdateResponse",
     "ItemResponse",
     "InventoryBatchDetailResponse",
+    "InventoryBatchDiscardRequest",
     "InventoryBatchItemResponse",
     "InventoryBatchListRequest",
     "InventoryBatchListResponse",

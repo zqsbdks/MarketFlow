@@ -7,6 +7,7 @@ from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
 from app.schemas.inventory_batches_requests import (
+    InventoryBatchDiscardRequest,
     InventoryBatchListRequest,
     InventoryBatchQuantityUpdateRequest,
 )
@@ -15,6 +16,7 @@ from app.schemas.inventory_batches_responses import (
     InventoryBatchListResponse,
 )
 from app.services.inventory_batches import (
+    discard_expired_inventory_batch_service,
     get_inventory_batch_detail_service,
     get_inventory_batches_list_service,
     update_inventory_batch_quantity_service,
@@ -89,6 +91,36 @@ async def update_inventory_batch_quantity(
     )
     return ResponseModel[InventoryBatchDetailResponse](
         message="库存批次数量修改成功",
+        data=batch,
+    )
+
+
+# endregion
+
+
+# region 废弃过期批次库存
+@inventory_batches_router.post(
+    "/{batch_id}/discard",
+    response_model=ResponseModel[InventoryBatchDetailResponse],
+    summary="废弃过期批次库存",
+    description="店长或本部门正式员工确认下架过期批次，并扣减其全部剩余库存。",
+)
+async def discard_expired_inventory_batch(
+    batch_id: int = Path(..., description="库存批次ID", ge=1),
+    request: InventoryBatchDiscardRequest = Body(...),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[InventoryBatchDetailResponse]:
+    """废弃指定过期批次的全部剩余库存，并返回处理后的批次详情。"""
+
+    batch = await discard_expired_inventory_batch_service(
+        batch_id=batch_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[InventoryBatchDetailResponse](
+        message="过期批次库存已废弃",
         data=batch,
     )
 

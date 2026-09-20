@@ -222,7 +222,56 @@ async def update_inventory_batch_quantity(
 # endregion
 
 
+# region 废弃过期批次库存
+async def discard_expired_inventory_batch(
+    batch: InventoryBatch,
+    employee_id: int,
+    reason: str | None,
+    db: AsyncSession,
+) -> InventoryBatch:
+    """清空一个过期批次的剩余库存，同步商品总库存并写入审计记录。"""
+
+    discarded_quantity = batch.remaining_quantity
+    previous_status = batch.status
+
+    # 废弃表示剩余实物已经下架处理，因此批次剩余数量归零并转为售罄。
+    batch.remaining_quantity = 0
+    batch.status = InventoryBatchStatus.SOLD_OUT
+    await db.flush()
+
+    # 商品表保存全部批次剩余数量的汇总值，批次数量变化后必须同时重新计算。
+    batch_stock_statement = select(
+        func.coalesce(func.sum(InventoryBatch.remaining_quantity), 0)
+    ).where(InventoryBatch.product_id == batch.product_id)
+    batch.product.stock_quantity = int(await db.scalar(batch_stock_statement) or 0)
+
+    # 审计记录保留废弃前数量和实际废弃数量，之后仍能统计过期损耗。
+    await create_operation_audit_log(
+        employee_id=employee_id,
+        module="inventory",
+        action="discard_expired",
+        target_type="inventory_batch",
+        target_id=batch.id,
+        before_data={
+            "remaining_quantity": discarded_quantity,
+            "status": previous_status,
+        },
+        after_data={
+            "remaining_quantity": 0,
+            "status": InventoryBatchStatus.SOLD_OUT,
+            "discarded_quantity": discarded_quantity,
+        },
+        reason=reason or "过期商品下架废弃",
+        db=db,
+    )
+    return batch
+
+
+# endregion
+
+
 __all__ = [
+    "discard_expired_inventory_batch",
     "get_inventory_batch_by_id",
     "get_inventory_batches_list",
     "refresh_inventory_batch_statuses",

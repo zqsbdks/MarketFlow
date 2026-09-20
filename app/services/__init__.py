@@ -16,6 +16,7 @@ from app.services.employees import (
     update_employee_status_service,
 )
 from app.services.inventory_batches import (
+    discard_expired_inventory_batch_service,
     get_inventory_batch_detail_service,
     get_inventory_batches_list_service,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "auth_login_service",
     "change_password_service",
     "create_employee_service",
+    "discard_expired_inventory_batch_service",
     "get_current_employee_info_service",
     "get_categories_list_service",
     "get_departments_list_service",

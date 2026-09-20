@@ -8,12 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.inventory_batches import (
+    discard_expired_inventory_batch,
     get_inventory_batch_by_id,
     get_inventory_batches_list,
     update_inventory_batch_quantity,
 )
 from app.models.enums import EmployeeRole, InventoryBatchStatus
-from app.schemas.inventory_batches_requests import InventoryBatchQuantityUpdateRequest
+from app.schemas.inventory_batches_requests import (
+    InventoryBatchDiscardRequest,
+    InventoryBatchQuantityUpdateRequest,
+)
 from app.schemas.inventory_batches_responses import (
     InventoryBatchDetailResponse,
     InventoryBatchItemResponse,
@@ -212,6 +216,93 @@ async def update_inventory_batch_quantity_service(
 # endregion
 
 
+# region 废弃过期批次库存
+async def discard_expired_inventory_batch_service(
+    batch_id: int,
+    request: InventoryBatchDiscardRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> InventoryBatchDetailResponse:
+    """验证账号、部门和过期状态，废弃批次剩余库存并同步商品库存。"""
+
+    # 第一步：确认当前员工存在、账号启用并且已经修改初始密码。
+    current_employee = await get_employee_by_id(
+        employee_id=current_employee_id,
+        db=db,
+    )
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # 第二步：店长可以处理全部部门，正式员工只能处理自己部门的过期批次。
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以废弃过期库存",
+        )
+
+    batch = await get_inventory_batch_by_id(batch_id=batch_id, db=db)
+    if batch is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="库存批次不存在",
+        )
+    if (
+        current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
+        and current_employee.department_id != batch.product.department_id
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="正式员工只能废弃自己所属部门的过期库存",
+        )
+
+    # 第三步：以到期日期判断是否真正过期，不依赖凌晨状态任务是否已经执行。
+    if batch.expiration_date is None or batch.expiration_date >= date.today():
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="只有已经过期的库存批次可以废弃",
+        )
+    if batch.remaining_quantity == 0:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="该过期批次已经没有剩余库存",
+        )
+
+    await discard_expired_inventory_batch(
+        batch=batch,
+        employee_id=current_employee.id,
+        reason=request.reason,
+        db=db,
+    )
+    await db.commit()
+
+    # 第四步：重新查询并返回废弃后的批次详情。
+    return await get_inventory_batch_detail_service(
+        batch_id=batch_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+
+
+# endregion
+
+
 # region 获取库存批次详情
 async def get_inventory_batch_detail_service(
     # batch_id：准备查看的库存批次 ID。
@@ -286,6 +377,7 @@ async def get_inventory_batch_detail_service(
 
 
 __all__ = [
+    "discard_expired_inventory_batch_service",
     "get_inventory_batch_detail_service",
     "get_inventory_batches_list_service",
     "update_inventory_batch_quantity_service",

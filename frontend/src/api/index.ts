@@ -165,6 +165,14 @@ export async function updateInventoryBatchQuantity(
   return unwrap(response.data)
 }
 
+export async function discardExpiredInventoryBatch(batchId: number, reason?: string) {
+  const response = await http.post<ApiResponse<InventoryBatchDetail>>(
+    `/inventory-batches/${batchId}/discard`,
+    { reason: reason || undefined },
+  )
+  return unwrap(response.data)
+}
+
 export async function getSales(params: Record<string, unknown>) {
   const response = await http.get<ApiResponse<PageResult<SaleListItem>>>('/sales/list', { params })
   return unwrap(response.data)

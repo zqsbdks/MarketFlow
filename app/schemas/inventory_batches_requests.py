@@ -45,4 +45,25 @@ class InventoryBatchQuantityUpdateRequest(BaseModel):
 # endregion
 
 
-__all__ = ["InventoryBatchListRequest", "InventoryBatchQuantityUpdateRequest"]
+# region 废弃过期批次请求模型
+class InventoryBatchDiscardRequest(BaseModel):
+    """确认下架并废弃某个过期批次时提交的可选说明。"""
+
+    reason: str | None = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="废弃原因，可不填写；未填写时由后端使用默认原因",
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+# endregion
+
+
+__all__ = [
+    "InventoryBatchDiscardRequest",
+    "InventoryBatchListRequest",
+    "InventoryBatchQuantityUpdateRequest",
+]
