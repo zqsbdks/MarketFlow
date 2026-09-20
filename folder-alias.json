@@ -624,7 +624,19 @@
         "description": "统一保存各模块修改前后数据与理由的审计ORM模型"
     },
     "app/crud/operation_audit_logs.py": {
-        "description": "统一创建操作审计记录的数据访问函数"
+        "description": "操作审计记录创建、分页筛选与员工姓名关联查询函数"
+    },
+    "app/routers/operation_audit_logs.py": {
+        "description": "店长分页筛选操作审计记录API路由"
+    },
+    "app/schemas/operation_audit_logs_requests.py": {
+        "description": "操作审计记录分页及多条件筛选请求模型"
+    },
+    "app/schemas/operation_audit_logs_responses.py": {
+        "description": "操作审计记录列表项与分页结果响应模型"
+    },
+    "app/services/operation_audit_logs.py": {
+        "description": "操作审计查看权限校验与分页响应组装业务逻辑"
     },
     "alembic/versions/20260917_0010_create_operation_audit_log.py": {
         "description": "以统一操作审计记录表替换库存专用调整表迁移"
