@@ -95,7 +95,9 @@ async def create_sale(
     sale_items: list[SaleItem] = []
 
     # requested_quantities 已在 Service 中合并，因此每个商品只处理一次。
-    for product_id, requested_quantity in requested_quantities.items():
+    # 多商品销售统一按商品 ID 从小到大加锁，避免两张销售单反向加锁导致死锁。
+    for product_id in sorted(requested_quantities):
+        requested_quantity = requested_quantities[product_id]
         # 第一步：读取并锁定商品行，避免两个收银请求同时扣减同一商品库存。
         product = await db.scalar(select(Product).where(Product.id == product_id).with_for_update())
         if product is None:

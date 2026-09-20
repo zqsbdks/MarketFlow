@@ -171,8 +171,13 @@ async def update_inventory_batch_quantity_service(
             detail="只有店长或正式员工可以修改库存批次数量",
         )
 
-    # 第三步：查询批次及其商品、部门和进货来源信息。
-    batch = await get_inventory_batch_by_id(batch_id=batch_id, db=db)
+    # 第三步：锁定该批次及其商品行，再读取最新库存。
+    # 在本事务提交前，销售扣库存和其他盘点请求会等待，避免互相覆盖。
+    batch = await get_inventory_batch_by_id(
+        batch_id=batch_id,
+        db=db,
+        for_update=True,
+    )
     if batch is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
@@ -257,7 +262,12 @@ async def discard_expired_inventory_batch_service(
             detail="只有店长或正式员工可以废弃过期库存",
         )
 
-    batch = await get_inventory_batch_by_id(batch_id=batch_id, db=db)
+    # 废弃也会修改批次和商品库存，因此使用与销售相同的行锁。
+    batch = await get_inventory_batch_by_id(
+        batch_id=batch_id,
+        db=db,
+        for_update=True,
+    )
     if batch is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,

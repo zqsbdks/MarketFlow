@@ -143,8 +143,23 @@ async def get_inventory_batch_by_id(
     batch_id: int,
     # db：当前请求使用的异步数据库会话。
     db: AsyncSession,
+    # for_update：修改库存时传 True，使商品和批次行一直锁定到事务提交。
+    for_update: bool = False,
 ) -> InventoryBatch | None:
-    """根据批次 ID 查询批次，并提前加载商品和进货来源关系。"""
+    """根据批次 ID 查询批次，可选锁定其商品和批次数据行。"""
+
+    if for_update:
+        # 先用一次轻量查询取得批次所属的商品 ID。
+        # product_id 在批次创建后不会修改，因此这里不需要先锁批次。
+        product_id = await db.scalar(
+            select(InventoryBatch.product_id).where(InventoryBatch.id == batch_id)
+        )
+        if product_id is None:
+            return None
+
+        # 所有库存写入都统一按“商品→批次”的顺序加锁。
+        # 销售扣库存也使用相同顺序，可减少两个事务互相等待的死锁风险。
+        await db.scalar(select(Product).where(Product.id == product_id).with_for_update())
 
     # 第一步：以库存批次为主对象，并声明详情响应需要提前加载的关系路径。
     statement = (
@@ -159,6 +174,11 @@ async def get_inventory_batch_by_id(
         )
         .where(InventoryBatch.id == batch_id)
     )
+
+    if for_update:
+        # SELECT ... FOR UPDATE 会锁定这条批次记录，直到 commit 或 rollback。
+        # 其他销售或人工盘点请求必须等待，不会用旧数量相互覆盖。
+        statement = statement.with_for_update()
 
     # 第二步：执行查询。batch_id 是唯一主键，未查到时返回 None。
     return await db.scalar(statement)
