@@ -17,12 +17,12 @@ class OperationAuditLog(CreatedAtMixin, Base):
     id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True, comment="审计记录主键"
     )
-    employee_id: Mapped[int] = mapped_column(
+    employee_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("employee.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="操作员工ID",
+        comment="操作员工ID；系统自动任务为空",
     )
     module: Mapped[str] = mapped_column(String(50), nullable=False, index=True, comment="业务模块")
     action: Mapped[str] = mapped_column(String(50), nullable=False, comment="操作类型")

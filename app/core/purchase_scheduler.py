@@ -83,7 +83,11 @@ async def _run_auto_receive_once() -> int:
 
     async with async_session_factory() as db:
         try:
-            purchases = await auto_receive_due_purchases(arrived_at=datetime.now(), db=db)
+            purchases = await auto_receive_due_purchases(
+                arrived_at=datetime.now(),
+                employee_id=None,
+                db=db,
+            )
             await db.commit()
             return len(purchases)
         except Exception:

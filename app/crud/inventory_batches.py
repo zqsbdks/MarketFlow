@@ -96,9 +96,12 @@ async def refresh_inventory_batch_statuses(
 
     changed_count = 0
     for batch in batches:
-        # 状态优先级：售完 > 临期 > 可用。
+        # 状态优先级：售罄 > 已过期 > 临期 > 可用。
+        # 今天到期的批次当天仍可销售，因此只有到期日期早于今天才算过期。
         if batch.remaining_quantity == 0:
             new_status = InventoryBatchStatus.SOLD_OUT
+        elif batch.expiration_date is not None and batch.expiration_date < current_date:
+            new_status = InventoryBatchStatus.EXPIRED
         elif (
             batch.expiration_date is not None
             and batch.product.expiry_warning_days is not None
@@ -110,8 +113,21 @@ async def refresh_inventory_batch_statuses(
             new_status = InventoryBatchStatus.AVAILABLE
 
         if batch.status != new_status:
+            previous_status = batch.status
             batch.status = new_status
             changed_count += 1
+            # 凌晨定时任务没有登录员工，因此 employee_id 为空，表示系统自动操作。
+            await create_operation_audit_log(
+                employee_id=None,
+                module="inventory",
+                action="refresh_batch_status",
+                target_type="inventory_batch",
+                target_id=batch.id,
+                before_data={"status": previous_status},
+                after_data={"status": new_status},
+                reason="系统根据库存数量和到期日期自动刷新批次状态",
+                db=db,
+            )
 
     # 这里只修改当前事务中的 ORM 对象，commit 仍由调用方统一执行。
     await db.flush()
@@ -164,9 +180,13 @@ async def update_inventory_batch_quantity(
     before_quantity = batch.remaining_quantity
     batch.remaining_quantity = remaining_quantity
 
-    # 修改后立即同步批次状态，不必等待半小时定时任务。
+    # 修改后立即同步批次状态，不必等待每日凌晨的批次状态刷新任务。
+    # 判断顺序必须与自动刷新函数保持一致：售罄 > 已过期 > 临期 > 可用。
     if remaining_quantity == 0:
         batch.status = InventoryBatchStatus.SOLD_OUT
+    elif batch.expiration_date is not None and batch.expiration_date < date.today():
+        # 今天到期的批次当天仍可销售，第二天才转为已过期。
+        batch.status = InventoryBatchStatus.EXPIRED
     elif (
         batch.expiration_date is not None
         and batch.product.expiry_warning_days is not None

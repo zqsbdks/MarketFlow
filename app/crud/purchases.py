@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole, InventoryBatchStatus, ProductStatus, PurchaseStatus
 from app.models.inventory_batch import InventoryBatch
@@ -240,6 +241,7 @@ async def create_purchase(
 # region 自动签收到货
 async def auto_receive_due_purchases(
     arrived_at: datetime,
+    employee_id: int | None,
     db: AsyncSession,
 ) -> list[Purchase]:
     """签收所有达到预计到货时间的待到货进货单，并同步商品与批次库存。"""
@@ -296,6 +298,7 @@ async def auto_receive_due_purchases(
         for purchase_item in purchase.items:
             catalog_product = purchase_item.supplier_product
             product = catalog_product.product
+            product_was_created = product is None
             if product is None:
                 if catalog_product.category_id is None or catalog_product.category is None:
                     raise ValueError(f"供应商商品目录ID {catalog_product.id} 尚未设置商品分类")
@@ -317,28 +320,87 @@ async def auto_receive_due_purchases(
                 db.add(product)
                 await db.flush()
 
+            before_product_stock = product.stock_quantity
+            before_purchase_price = product.purchase_price
             product.purchase_price = purchase_item.unit_cost
             product.stock_quantity += purchase_item.quantity
             purchase_item.product_id = product.id
 
             batch_number += 1
-            db.add(
-                InventoryBatch(
-                    batch_no=f"BAT{arrived_at:%Y%m%d}{batch_number:04d}",
-                    product_id=product.id,
-                    purchase_item_id=purchase_item.id,
-                    production_date=purchase_item.production_date,
-                    expiration_date=purchase_item.expiration_date,
-                    initial_quantity=purchase_item.quantity,
-                    remaining_quantity=purchase_item.quantity,
-                    status=InventoryBatchStatus.AVAILABLE,
-                    arrived_at=arrived_at,
-                )
+            inventory_batch = InventoryBatch(
+                batch_no=f"BAT{arrived_at:%Y%m%d}{batch_number:04d}",
+                product_id=product.id,
+                purchase_item_id=purchase_item.id,
+                production_date=purchase_item.production_date,
+                expiration_date=purchase_item.expiration_date,
+                initial_quantity=purchase_item.quantity,
+                remaining_quantity=purchase_item.quantity,
+                status=InventoryBatchStatus.AVAILABLE,
+                arrived_at=arrived_at,
+            )
+            db.add(inventory_batch)
+            await db.flush()
+
+            # 首次到货会生成正式商品；后续到货则只增加已有商品的汇总库存。
+            await create_operation_audit_log(
+                employee_id=employee_id,
+                module="product",
+                action="create_from_purchase" if product_was_created else "increase_stock",
+                target_type="product",
+                target_id=product.id,
+                before_data=None
+                if product_was_created
+                else {
+                    "stock_quantity": before_product_stock,
+                    "purchase_price": before_purchase_price,
+                },
+                after_data={
+                    "product_no": product.product_no,
+                    "stock_quantity": product.stock_quantity,
+                    "purchase_price": product.purchase_price,
+                },
+                reason="进货单签收入库",
+                db=db,
+            )
+            await create_operation_audit_log(
+                employee_id=employee_id,
+                module="inventory",
+                action="create_batch",
+                target_type="inventory_batch",
+                target_id=inventory_batch.id,
+                before_data=None,
+                after_data={
+                    "batch_no": inventory_batch.batch_no,
+                    "product_id": inventory_batch.product_id,
+                    "purchase_item_id": inventory_batch.purchase_item_id,
+                    "remaining_quantity": inventory_batch.remaining_quantity,
+                    "expiration_date": inventory_batch.expiration_date,
+                    "status": inventory_batch.status,
+                },
+                reason="进货单签收入库",
+                db=db,
             )
 
+        before_purchase_status = purchase.status
         purchase.received_by = receiver.id
         purchase.arrived_at = arrived_at
         purchase.status = PurchaseStatus.ARRIVED
+
+        await create_operation_audit_log(
+            employee_id=employee_id,
+            module="purchase",
+            action="auto_receive" if employee_id is None else "manual_receive",
+            target_type="purchase",
+            target_id=purchase.id,
+            before_data={"status": before_purchase_status},
+            after_data={
+                "status": purchase.status,
+                "received_by": purchase.received_by,
+                "arrived_at": purchase.arrived_at,
+            },
+            reason="系统按预计到货时间自动签收" if employee_id is None else "店长手动补执行签收",
+            db=db,
+        )
 
     await db.flush()
     return due_purchases

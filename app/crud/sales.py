@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.enums import InventoryBatchStatus, ProductStatus, SaleSource
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
@@ -81,6 +82,8 @@ async def create_sale(
     requested_quantities: dict[int, int],
     # sold_at：本次结账时间，同时用于生成销售单号。
     sold_at: datetime,
+    # employee_id：实际执行收银操作的员工 ID，用于审计记录。
+    employee_id: int,
     # db：当前请求共用的数据库会话；本函数只 flush，不负责 commit。
     db: AsyncSession,
 ) -> Sale:
@@ -144,6 +147,8 @@ async def create_sale(
             if quantity_left == 0:
                 break
             # 当前批次数量不足时全部扣完，剩余需求继续从下一个批次扣。
+            before_batch_quantity = batch.remaining_quantity
+            before_batch_status = batch.status
             deducted_quantity = min(batch.remaining_quantity, quantity_left)
             batch.remaining_quantity -= deducted_quantity
             if batch.remaining_quantity == 0:
@@ -171,8 +176,29 @@ async def create_sale(
             total_cost += cost_subtotal
             quantity_left -= deducted_quantity
 
+            # 每个被扣减的批次分别留痕，之后可以准确追踪库存从哪里减少。
+            await create_operation_audit_log(
+                employee_id=employee_id,
+                module="inventory",
+                action="sale_deduction",
+                target_type="inventory_batch",
+                target_id=batch.id,
+                before_data={
+                    "remaining_quantity": before_batch_quantity,
+                    "status": before_batch_status,
+                },
+                after_data={
+                    "remaining_quantity": batch.remaining_quantity,
+                    "status": batch.status,
+                    "deducted_quantity": deducted_quantity,
+                },
+                reason="创建销售单时自动扣减库存",
+                db=db,
+            )
+
         # 第五步：先把批次扣减写入当前事务，再重新求和同步商品总库存。
         # 这样不仅完成本次扣减，也能消除商品表之前可能存在的汇总差异。
+        before_product_stock = product.stock_quantity
         await db.flush()
         product.stock_quantity = int(
             await db.scalar(
@@ -181,6 +207,17 @@ async def create_sale(
                 )
             )
             or 0
+        )
+        await create_operation_audit_log(
+            employee_id=employee_id,
+            module="product",
+            action="sync_stock_after_sale",
+            target_type="product",
+            target_id=product.id,
+            before_data={"stock_quantity": before_product_stock},
+            after_data={"stock_quantity": product.stock_quantity},
+            reason="销售扣减批次后重新汇总商品库存",
+            db=db,
         )
 
     # 第六步：生成当天递增销售单号，例如 S202609170001。
@@ -202,6 +239,34 @@ async def create_sale(
     db.add(sale)
     # flush 取得数据库生成的 sale.id，但最终提交仍由 Service 统一负责。
     await db.flush()
+    await create_operation_audit_log(
+        employee_id=employee_id,
+        module="sale",
+        action="create",
+        target_type="sale",
+        target_id=sale.id,
+        before_data=None,
+        after_data={
+            "sale_no": sale.sale_no,
+            "total_amount": sale.total_amount,
+            "total_cost": sale.total_cost,
+            "gross_profit": sale.gross_profit,
+            "item_count": len(sale.items),
+            "sold_at": sale.sold_at,
+            "items": [
+                {
+                    "sale_item_id": item.id,
+                    "product_id": item.product_id,
+                    "inventory_batch_id": item.inventory_batch_id,
+                    "quantity": item.quantity,
+                    "subtotal": item.subtotal,
+                }
+                for item in sale.items
+            ],
+        },
+        reason=None,
+        db=db,
+    )
     return sale
 
 

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.employees import get_department_by_id
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.purchases import auto_receive_due_purchases, get_all_purchases, get_purchase_by_id
 from app.crud.purchases import create_purchase as create_purchase_crud
 from app.models.enums import EmployeeRole, PurchaseStatus
@@ -270,6 +271,35 @@ async def create_purchase_service(
             db=db,
         )
 
+        # 主表和明细由同一个 CRUD 创建，这里用一条审计记录描述整张进货单的创建。
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="purchase",
+            action="create",
+            target_type="purchase",
+            target_id=new_purchase.id,
+            before_data=None,
+            after_data={
+                "purchase_no": new_purchase.purchase_no,
+                "department_id": new_purchase.department_id,
+                "status": new_purchase.status,
+                "total_amount": new_purchase.total_amount,
+                "item_count": len(new_purchase.items),
+                "items": [
+                    {
+                        "purchase_item_id": item.id,
+                        "supplier_product_id": item.supplier_product_id,
+                        "quantity": item.quantity,
+                        "unit_cost": item.unit_cost,
+                        "subtotal": item.subtotal,
+                    }
+                    for item in new_purchase.items
+                ],
+            },
+            reason=None,
+            db=db,
+        )
+
         # 复用详情服务，把 ORM 数据组装成接口要求的 PurchaseDetailResponse。
         # flush 已经生成了 new_purchase.id，未 commit 时也能在当前事务内查询。
         response = await get_purchase_detail_service(
@@ -327,7 +357,11 @@ async def auto_receive_purchases_service(
 
     now = datetime.now()
     try:
-        received = await auto_receive_due_purchases(arrived_at=now, db=db)
+        received = await auto_receive_due_purchases(
+            arrived_at=now,
+            employee_id=current_employee_id,
+            db=db,
+        )
         responses: list[PurchaseDetailResponse] = []
         for purchase in received:
             refreshed = await get_purchase_by_id(purchase_id=purchase.id, db=db)

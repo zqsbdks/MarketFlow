@@ -339,6 +339,25 @@ async def create_supplier_service(
             address=request.address,
             db=db,
         )
+        # 供应商和审计记录一起提交，任意一步失败都会整体回滚。
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="supplier",
+            action="create",
+            target_type="supplier",
+            target_id=created_supplier.id,
+            before_data=None,
+            after_data={
+                "supplier_no": created_supplier.supplier_no,
+                "name": created_supplier.name,
+                "contact_name": created_supplier.contact_name,
+                "phone": created_supplier.phone,
+                "address": created_supplier.address,
+                "is_active": created_supplier.is_active,
+            },
+            reason=None,
+            db=db,
+        )
         await db.commit()
     except IntegrityError as exc:
         # 并发创建仍可能撞上唯一约束；发生时撤销当前事务并返回409。

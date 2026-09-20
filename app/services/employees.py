@@ -98,6 +98,25 @@ async def create_employee_service(
         db=db,
     )
 
+    # 创建员工也属于数据变更，必须和员工记录在同一个事务中写入审计表。
+    await create_operation_audit_log(
+        employee_id=current_employee_id,
+        module="employee",
+        action="create",
+        target_type="employee",
+        target_id=new_employee.id,
+        before_data=None,
+        after_data={
+            "employee_no": new_employee.employee_no,
+            "name": new_employee.name,
+            "role": new_employee.role,
+            "department_id": new_employee.department_id,
+            "is_active": new_employee.is_active,
+        },
+        reason=None,
+        db=db,
+    )
+
     await db.commit()
 
     return EmployeesCreateResponse(

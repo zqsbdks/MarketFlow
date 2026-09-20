@@ -196,6 +196,7 @@ async def create_sale_service(
         sale = await create_sale(
             requested_quantities=requested_quantities,
             sold_at=sold_at,
+            employee_id=current_employee_id,
             db=db,
         )
         await db.commit()

@@ -10,7 +10,7 @@ from app.models.operation_audit_log import OperationAuditLog
 
 async def create_operation_audit_log(
     *,
-    employee_id: int,
+    employee_id: int | None,
     module: str,
     action: str,
     target_type: str,
@@ -20,7 +20,7 @@ async def create_operation_audit_log(
     reason: str | None,
     db: AsyncSession,
 ) -> OperationAuditLog:
-    """把一次修改操作加入当前事务，不在 CRUD 层单独提交。"""
+    """把一次数据变更加入当前事务；系统自动任务的员工 ID 可以为空。"""
 
     log = OperationAuditLog(
         employee_id=employee_id,

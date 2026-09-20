@@ -203,6 +203,25 @@ async def create_supplier_product_service(
             shelf_life_days=request.shelf_life_days,
             db=db,
         )
+        # 新增目录商品属于数据变更，记录创建人和创建后的关键业务字段。
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="supplier_product",
+            action="create",
+            target_type="supplier_product",
+            target_id=created_product.id,
+            before_data=None,
+            after_data={
+                "supplier_id": created_product.supplier_id,
+                "category_id": created_product.category_id,
+                "name": created_product.name,
+                "unit_cost": created_product.unit_cost,
+                "shelf_life_days": created_product.shelf_life_days,
+                "is_active": created_product.is_active,
+            },
+            reason=None,
+            db=db,
+        )
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()

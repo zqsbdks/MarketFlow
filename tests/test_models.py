@@ -333,7 +333,7 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """批次状态自动化迁移是当前唯一的 Alembic 版本头。"""
+    """系统审计记录迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260920_0013"]
+    assert script.get_heads() == ["20260920_0014"]
