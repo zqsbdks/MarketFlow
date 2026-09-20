@@ -19,6 +19,7 @@ from app.services.inventory_batches import (
     get_inventory_batch_detail_service,
     get_inventory_batches_list_service,
 )
+from app.services.operation_audit_logs import get_operation_audit_logs_service
 from app.services.products import (
     get_product_detail_service,
     get_products_list_service,
@@ -50,6 +51,7 @@ __all__ = [
     "get_inventory_batch_detail_service",
     "get_inventory_batches_list_service",
     "get_list_employees_service",
+    "get_operation_audit_logs_service",
     "get_product_detail_service",
     "get_products_list_service",
     "get_rankings_service",
