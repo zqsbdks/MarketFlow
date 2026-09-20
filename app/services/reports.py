@@ -311,7 +311,7 @@ async def get_rankings_service(
 # endregion
 
 
-# region 获取营业分析
+# region 计算百分比
 def _percentage(numerator: Decimal, denominator: Decimal) -> Decimal | None:
     """计算百分数，并将结果保留两位小数。
 
@@ -330,6 +330,10 @@ def _percentage(numerator: Decimal, denominator: Decimal) -> Decimal | None:
     return (numerator / denominator * Decimal(100)).quantize(Decimal("0.01"))
 
 
+# endregion
+
+
+# region 组装营业趋势
 def _build_sales_trend(
     raw_values: list[tuple[datetime, Decimal, Decimal, Decimal, int, int]],
     start_time: datetime,
@@ -404,6 +408,10 @@ def _build_sales_trend(
     return result
 
 
+# endregion
+
+
+# region 获取营业分析
 async def get_report_analytics_service(
     db: AsyncSession,
     employee_id: int,

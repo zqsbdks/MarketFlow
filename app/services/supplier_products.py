@@ -29,7 +29,7 @@ from app.schemas.supplier_products_responses import (
 )
 
 
-# region 供应商商品目录业务逻辑
+# region 组装供应商商品响应
 def _build_supplier_product_response(
     supplier_product: SupplierProduct,
 ) -> SupplierProductItemResponse:
@@ -48,6 +48,12 @@ def _build_supplier_product_response(
         created_at=supplier_product.created_at,
         updated_at=supplier_product.updated_at,
     )
+
+
+# endregion
+
+
+# region 获取供应商商品列表
 
 
 async def get_supplier_products_list_service(
@@ -99,6 +105,12 @@ async def get_supplier_products_list_service(
     )
 
 
+# endregion
+
+
+# region 获取供应商商品详情
+
+
 async def get_supplier_product_detail_service(
     supplier_product_id: int,
     current_employee_id: int,
@@ -131,6 +143,12 @@ async def get_supplier_product_detail_service(
             detail="供应商商品不存在",
         )
     return _build_supplier_product_response(supplier_product)
+
+
+# endregion
+
+
+# region 创建供应商商品
 
 
 async def create_supplier_product_service(
@@ -240,6 +258,12 @@ async def create_supplier_product_service(
     return _build_supplier_product_response(saved_product)
 
 
+# endregion
+
+
+# region 修改供应商商品状态
+
+
 async def update_supplier_product_status_service(
     supplier_product_id: int,
     is_active: bool,
@@ -315,6 +339,12 @@ async def update_supplier_product_status_service(
     if updated_product is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商商品不存在")
     return _build_supplier_product_response(updated_product)
+
+
+# endregion
+
+
+# region 修改供应商商品详情
 
 
 async def update_supplier_product_service(
@@ -442,6 +472,9 @@ async def update_supplier_product_service(
     return _build_supplier_product_response(updated_product)
 
 
+# endregion
+
+
 __all__ = [
     "create_supplier_product_service",
     "get_supplier_product_detail_service",
@@ -449,4 +482,3 @@ __all__ = [
     "update_supplier_product_service",
     "update_supplier_product_status_service",
 ]
-# endregion

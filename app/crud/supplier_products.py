@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.models.supplier_product import SupplierProduct
 
 
-# region 供应商商品目录数据库操作
+# region 获取供应商商品列表
 async def get_all_supplier_products(
     offset: int,
     page_size: int,
@@ -43,6 +43,12 @@ async def get_all_supplier_products(
     return list(result.all()), total
 
 
+# endregion
+
+
+# region 获取供应商商品详情
+
+
 async def get_supplier_product_by_id(
     supplier_product_id: int,
     db: AsyncSession,
@@ -57,6 +63,12 @@ async def get_supplier_product_by_id(
     )
     result = await db.execute(statement)
     return result.scalar_one_or_none()
+
+
+# endregion
+
+
+# region 根据名称检查重复商品
 
 
 async def get_supplier_product_by_name(
@@ -75,6 +87,12 @@ async def get_supplier_product_by_name(
         statement = statement.where(SupplierProduct.id != excluded_supplier_product_id)
     result = await db.execute(statement)
     return result.scalar_one_or_none()
+
+
+# endregion
+
+
+# region 创建供应商商品
 
 
 async def create_supplier_product(
@@ -99,6 +117,12 @@ async def create_supplier_product(
     return supplier_product
 
 
+# endregion
+
+
+# region 修改供应商商品状态
+
+
 async def update_supplier_product_status(
     supplier_product_id: int,
     is_active: bool,
@@ -112,6 +136,12 @@ async def update_supplier_product_status(
         .values(is_active=is_active)
     )
     await db.execute(statement)
+
+
+# endregion
+
+
+# region 修改供应商商品详情
 
 
 async def update_supplier_product(
@@ -129,6 +159,9 @@ async def update_supplier_product(
     await db.execute(statement)
 
 
+# endregion
+
+
 __all__ = [
     "create_supplier_product",
     "get_all_supplier_products",
@@ -137,4 +170,3 @@ __all__ = [
     "update_supplier_product",
     "update_supplier_product_status",
 ]
-# endregion

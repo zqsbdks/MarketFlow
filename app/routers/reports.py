@@ -34,6 +34,7 @@ reports_router = APIRouter(
 
 
 # region 获取营业概览接口
+# region 获取营业分析接口
 @reports_router.get(
     "/overview",
     response_model=ResponseModel[ReportResponse],
@@ -174,6 +175,9 @@ async def get_report_analytics(
         message="获取营业分析成功",
         data=analytics,
     )
+
+
+# endregion
 
 
 __all__ = ["reports_router"]

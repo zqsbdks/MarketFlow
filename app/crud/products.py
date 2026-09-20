@@ -13,6 +13,7 @@ from app.models.product import Product
 StockInconsistency = tuple[int, str, str, int, int]
 
 
+# region 构建批次库存汇总子查询
 def _build_batch_stock_summary() -> Subquery:
     """生成“每个商品的批次剩余库存合计”子查询，供列表和检查任务复用。"""
 
@@ -26,6 +27,9 @@ def _build_batch_stock_summary() -> Subquery:
         .group_by(InventoryBatch.product_id)
         .subquery()
     )
+
+
+# endregion
 
 
 # region 获取商品列表

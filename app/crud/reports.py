@@ -107,6 +107,7 @@ async def get_reports(
 # endregion
 
 
+# region 获取部门营业对比
 async def get_departments_reports(
     db: AsyncSession,
     start_time: datetime | None = None,
@@ -166,6 +167,9 @@ async def get_departments_reports(
         departments.append(department)
 
     return departments
+
+
+# endregion
 
 
 # region 获取销售排行

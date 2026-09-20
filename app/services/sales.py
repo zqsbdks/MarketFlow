@@ -22,6 +22,7 @@ BUSINESS_OPENING_TIME = time(9, 0)
 BUSINESS_CLOSING_TIME = time(21, 0)
 
 
+# region 组装销售单详情响应
 def _build_sale_detail_response(sale: Sale) -> SaleDetailResponse:
     """把同一商品因跨批次产生的多条数据库明细合并成小票中的一行。"""
 
@@ -49,6 +50,9 @@ def _build_sale_detail_response(sale: Sale) -> SaleDetailResponse:
         total_amount=sale.total_amount,
         items=list(grouped_items.values()),
     )
+
+
+# endregion
 
 
 # region 获取销售单列表

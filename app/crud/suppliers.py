@@ -105,7 +105,7 @@ async def update_supplier(
 # endregion
 
 
-# region 创建供应商
+# region 生成供应商编号
 async def get_next_supplier_no(db: AsyncSession) -> str:
     """读取现有供应商编号中的最大数字，并生成下一个编号。"""
 
@@ -118,6 +118,10 @@ async def get_next_supplier_no(db: AsyncSession) -> str:
     return f"SUP{current_max_number + 1:05d}"
 
 
+# endregion
+
+
+# region 创建供应商
 async def create_supplier(
     supplier_no: str,
     name: str,

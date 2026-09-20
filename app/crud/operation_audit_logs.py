@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.operation_audit_log import OperationAuditLog
 
 
+# region 创建操作审计记录
 async def create_operation_audit_log(
     *,
     employee_id: int | None,
@@ -35,6 +36,9 @@ async def create_operation_audit_log(
     db.add(log)
     await db.flush()
     return log
+
+
+# endregion
 
 
 __all__ = ["create_operation_audit_log"]
