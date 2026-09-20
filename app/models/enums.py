@@ -58,6 +58,30 @@ class InventoryBatchStatus(StrEnum):
     SOLD_OUT = "sold_out"  # 批次的剩余数量已经变为0。
 
 
+class DiscountType(StrEnum):
+    """折扣规则支持的价格计算方式。"""
+
+    PERCENTAGE = "percentage"  # 按原价乘以比例，例如0.80表示八折。
+    AMOUNT_OFF = "amount_off"  # 从每件商品原价中减去固定金额。
+    FIXED_PRICE = "fixed_price"  # 直接使用指定金额作为最终成交单价。
+
+
+class DiscountScheduleType(StrEnum):
+    """折扣规则的时间执行方式。"""
+
+    ONCE = "once"  # 只在指定的开始和结束日期时间内执行一次。
+    DAILY = "daily"  # 每天在指定时间段内循环执行。
+    WEEKLY = "weekly"  # 每周在指定星期和时间段内循环执行。
+
+
+class DiscountScopeType(StrEnum):
+    """折扣规则可以作用的数据范围。"""
+
+    PRODUCT = "product"  # 只作用于指定正式商品。
+    CATEGORY = "category"  # 作用于指定分类下的全部商品。
+    DEPARTMENT = "department"  # 作用于指定部门下的全部商品。
+
+
 class RankingGroupBy(StrEnum):
     """销售排行的汇总方式。"""
 
@@ -97,6 +121,9 @@ class ReportMetric(StrEnum):
 
 
 __all__ = [
+    "DiscountScheduleType",
+    "DiscountScopeType",
+    "DiscountType",
     "EmployeeGender",
     "EmployeeRole",
     "EmploymentStatus",

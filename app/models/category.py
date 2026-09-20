@@ -11,6 +11,7 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.department import Department
+    from app.models.discount_rule_scope import DiscountRuleScope
     from app.models.product import Product
 
 
@@ -52,6 +53,8 @@ class Category(TimestampMixin, Base):
         back_populates="category",
         overlaps="department,products",
     )
+    # discount_scopes表示作用于整个分类的折扣规则范围。
+    discount_scopes: Mapped[list[DiscountRuleScope]] = relationship(back_populates="category")
 
 
 __all__ = ["Category"]

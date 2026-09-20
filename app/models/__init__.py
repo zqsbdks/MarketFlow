@@ -8,9 +8,14 @@ Alembic 只会看到导入进 ``Base.metadata`` 的模型。新增模型后，�
 from app.models.base import Base
 from app.models.category import Category
 from app.models.department import Department
+from app.models.discount_rule import DiscountRule
+from app.models.discount_rule_scope import DiscountRuleScope
 from app.models.employee import Employee
 from app.models.employee_detail import EmployeeDetail
 from app.models.enums import (
+    DiscountScheduleType,
+    DiscountScopeType,
+    DiscountType,
     EmployeeGender,
     EmployeeRole,
     EmploymentStatus,
@@ -38,6 +43,11 @@ __all__ = [
     "Base",
     "Category",
     "Department",
+    "DiscountRule",
+    "DiscountRuleScope",
+    "DiscountScheduleType",
+    "DiscountScopeType",
+    "DiscountType",
     "Employee",
     "EmployeeDetail",
     "EmployeeGender",

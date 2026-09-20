@@ -25,6 +25,7 @@ from app.models.enums import ProductStatus
 if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.department import Department
+    from app.models.discount_rule_scope import DiscountRuleScope
     from app.models.inventory_batch import InventoryBatch
     from app.models.purchase_item import PurchaseItem
     from app.models.sale_item import SaleItem
@@ -150,6 +151,8 @@ class Product(TimestampMixin, Base):
     purchase_items: Mapped[list[PurchaseItem]] = relationship(back_populates="product")
     # inventory_batches保存该商品每次到货后生成的批次库存。
     inventory_batches: Mapped[list[InventoryBatch]] = relationship(back_populates="product")
+    # discount_scopes表示直接指定当前商品的折扣规则范围。
+    discount_scopes: Mapped[list[DiscountRuleScope]] = relationship(back_populates="product")
     # supplier_product用于取得该商品的来源供应商、目录报价和默认保质期。
     supplier_product: Mapped[SupplierProduct] = relationship(back_populates="product")
 

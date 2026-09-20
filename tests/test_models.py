@@ -9,6 +9,10 @@ from sqlalchemy.schema import CreateTable
 
 from app.models import (
     Base,
+    DiscountRule,
+    DiscountScheduleType,
+    DiscountScopeType,
+    DiscountType,
     Employee,
     EmployeeDetail,
     EmployeeGender,
@@ -171,6 +175,33 @@ EXPECTED_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "discount_rule": {
+        "id",
+        "name",
+        "discount_type",
+        "discount_value",
+        "schedule_type",
+        "starts_at",
+        "ends_at",
+        "daily_start_time",
+        "daily_end_time",
+        "weekdays",
+        "start_stock_threshold",
+        "end_stock_threshold",
+        "is_active",
+        "created_by",
+        "created_at",
+        "updated_at",
+    },
+    "discount_rule_scope": {
+        "id",
+        "discount_rule_id",
+        "scope_type",
+        "product_id",
+        "category_id",
+        "department_id",
+        "created_at",
+    },
 }
 
 EXPECTED_TABLE_COMMENTS = {
@@ -187,6 +218,8 @@ EXPECTED_TABLE_COMMENTS = {
     "inventory_batch": "库存批次表",
     "operation_audit_log": "操作审计记录表",
     "supplier_product": "供应商商品目录表",
+    "discount_rule": "折扣规则表",
+    "discount_rule_scope": "折扣规则适用范围表",
 }
 
 
@@ -261,6 +294,7 @@ def test_money_columns_use_exact_decimal_types() -> None:
         ("purchase_item", "unit_cost"): (10, 2),
         ("purchase_item", "subtotal"): (12, 2),
         ("supplier_product", "unit_cost"): (10, 2),
+        ("discount_rule", "discount_value"): (12, 4),
     }
 
     for (table_name, column_name), (precision, scale) in expected_precision.items():
@@ -282,6 +316,15 @@ def test_enum_values_match_confirmed_business_values() -> None:
     assert Purchase.__table__.c.status.type.enums == [item.value for item in PurchaseStatus]
     assert InventoryBatch.__table__.c.status.type.enums == [
         item.value for item in InventoryBatchStatus
+    ]
+    assert DiscountRule.__table__.c.discount_type.type.enums == [
+        item.value for item in DiscountType
+    ]
+    assert DiscountRule.__table__.c.schedule_type.type.enums == [
+        item.value for item in DiscountScheduleType
+    ]
+    assert Base.metadata.tables["discount_rule_scope"].c.scope_type.type.enums == [
+        item.value for item in DiscountScopeType
     ]
 
     expected_constraint_names = {
@@ -321,6 +364,7 @@ def test_mutable_master_tables_update_timestamp_in_mysql() -> None:
         "purchase",
         "inventory_batch",
         "supplier_product",
+        "discount_rule",
     ):
         ddl = str(CreateTable(Base.metadata.tables[table_name]).compile(dialect=mysql.dialect()))
         assert "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" in ddl
@@ -333,7 +377,18 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """系统审计记录迁移是当前唯一的 Alembic 版本头。"""
+    """折扣数据表迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260920_0014"]
+    assert script.get_heads() == ["20260921_0015"]
+
+
+def test_discount_scope_requires_exactly_one_target() -> None:
+    """折扣范围每行只能关联商品、分类或部门中的一种目标。"""
+
+    check_names = {
+        constraint.name
+        for constraint in Base.metadata.tables["discount_rule_scope"].constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_discount_rule_scope_single_target" in check_names

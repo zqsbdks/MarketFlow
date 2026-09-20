@@ -11,6 +11,7 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.category import Category
+    from app.models.discount_rule_scope import DiscountRuleScope
     from app.models.employee import Employee
     from app.models.product import Product
     from app.models.purchase import Purchase
@@ -52,6 +53,8 @@ class Department(TimestampMixin, Base):
     sale_items: Mapped[list[SaleItem]] = relationship(back_populates="department")
     # 一个部门可以创建多张进货单，每张进货单只能包含该部门的商品。
     purchases: Mapped[list[Purchase]] = relationship(back_populates="department")
+    # discount_scopes表示作用于整个部门的折扣规则范围。
+    discount_scopes: Mapped[list[DiscountRuleScope]] = relationship(back_populates="department")
 
 
 __all__ = ["Department"]

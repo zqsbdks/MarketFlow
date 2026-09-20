@@ -23,6 +23,7 @@ from app.models.enums import EmployeeRole
 
 if TYPE_CHECKING:
     from app.models.department import Department
+    from app.models.discount_rule import DiscountRule
     from app.models.employee_detail import EmployeeDetail
     from app.models.purchase import Purchase
 
@@ -109,6 +110,10 @@ class Employee(TimestampMixin, Base):
     received_purchases: Mapped[list[Purchase]] = relationship(
         back_populates="received_by_employee",
         foreign_keys="Purchase.received_by",
+    )
+    # created_discount_rules保存当前员工创建过的实际折扣活动。
+    created_discount_rules: Mapped[list[DiscountRule]] = relationship(
+        back_populates="creator",
     )
 
 
