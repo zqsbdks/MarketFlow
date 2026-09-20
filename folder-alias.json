@@ -627,24 +627,30 @@
         "description": "统一保存各模块修改前后数据与理由的审计ORM模型"
     },
     "app/crud/operation_audit_logs.py": {
-        "description": "操作审计记录创建、分页筛选与员工姓名关联查询函数"
+        "description": "操作审计与库存变动流水分页关联查询函数"
     },
     "app/routers/operation_audit_logs.py": {
-        "description": "店长分页筛选操作审计记录API路由"
+        "description": "店长查询操作审计与库存变动流水API路由"
     },
     "app/schemas/operation_audit_logs_requests.py": {
-        "description": "操作审计记录分页及多条件筛选请求模型"
+        "description": "操作审计与库存流水分页筛选请求模型"
     },
     "app/schemas/operation_audit_logs_responses.py": {
-        "description": "操作审计记录列表项与分页结果响应模型"
+        "description": "操作审计与库存流水列表响应模型"
     },
     "app/services/operation_audit_logs.py": {
-        "description": "操作审计查看权限校验与分页响应组装业务逻辑"
+        "description": "操作审计与库存流水权限校验及响应组装"
     },
     "alembic/versions/20260917_0010_create_operation_audit_log.py": {
         "description": "以统一操作审计记录表替换库存专用调整表迁移"
     },
     "alembic/versions/20260917_0011_add_sale_item_batch.py": {
         "description": "销售明细关联实际扣减库存批次并增加收银台来源迁移"
+    },
+    "frontend/src/views/InventoryMovementsView.vue": {
+        "description": "进货、销售、盘点与过期废弃库存变动流水页面"
+    },
+    "tests/test_operation_audit_logs.py": {
+        "description": "库存变动流水数量计算、响应组装与API路由测试"
     }
 }

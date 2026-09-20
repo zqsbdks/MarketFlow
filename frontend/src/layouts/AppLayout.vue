@@ -6,6 +6,7 @@ import {
   ChartNoAxesCombined,
   Boxes,
   Layers3,
+  History,
   ChevronDown,
   LayoutDashboard,
   LogOut,
@@ -34,7 +35,10 @@ const navItems = computed(() => {
     { to: '/procurement', label: '进货管理', icon: Truck },
     { to: '/inventory-batches', label: '库存批次', icon: Layers3 },
   ]
-  if (auth.isManager) items.push({ to: '/employees', label: '员工管理', icon: Users })
+  if (auth.isManager) {
+    items.push({ to: '/inventory-movements', label: '库存流水', icon: History })
+    items.push({ to: '/employees', label: '员工管理', icon: Users })
+  }
   if (auth.employee) items.push({ to: `/employees/${auth.employee.id}`, label: '我的档案', icon: Users })
   return items
 })

@@ -14,6 +14,8 @@ import type {
   LoginResult,
   InventoryBatchDetail,
   InventoryBatchListItem,
+  InventoryMovement,
+  InventoryMovementAction,
   OverviewReport,
   PageResult,
   ProductDetail,
@@ -169,6 +171,23 @@ export async function discardExpiredInventoryBatch(batchId: number, reason?: str
   const response = await http.post<ApiResponse<InventoryBatchDetail>>(
     `/inventory-batches/${batchId}/discard`,
     { reason: reason || undefined },
+  )
+  return unwrap(response.data)
+}
+
+export async function getInventoryMovements(params: {
+  page?: number
+  page_size?: number
+  keyword?: string
+  action?: InventoryMovementAction
+  batch_id?: number
+  product_id?: number
+  start_time?: string
+  end_time?: string
+}) {
+  const response = await http.get<ApiResponse<PageResult<InventoryMovement>>>(
+    '/operation-audit-logs/inventory-movements',
+    { params },
   )
   return unwrap(response.data)
 }

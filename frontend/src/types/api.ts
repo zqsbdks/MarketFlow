@@ -196,6 +196,30 @@ export interface InventoryBatchDetail extends InventoryBatchListItem {
   updated_at: string
 }
 
+export type InventoryMovementAction =
+  | 'create_batch'
+  | 'sale_deduction'
+  | 'update_quantity'
+  | 'discard_expired'
+
+export interface InventoryMovement {
+  id: number
+  batch_id: number
+  batch_no: string | null
+  product_id: number | null
+  product_no: string | null
+  product_name: string | null
+  employee_id: number | null
+  employee_name: string
+  action: InventoryMovementAction
+  action_name: string
+  before_quantity: number | null
+  change_quantity: number | null
+  after_quantity: number | null
+  reason: string | null
+  created_at: string
+}
+
 export interface SaleListItem {
   sale_no: string
   sold_at: string

@@ -66,6 +66,12 @@ const router = createRouter({
           meta: { title: '库存批次' },
         },
         {
+          path: 'inventory-movements',
+          name: 'inventory-movements',
+          component: () => import('../views/InventoryMovementsView.vue'),
+          meta: { title: '库存流水', managerOnly: true },
+        },
+        {
           path: 'employees',
           name: 'employees',
           component: () => import('../views/EmployeesView.vue'),

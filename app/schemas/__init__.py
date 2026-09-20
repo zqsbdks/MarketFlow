@@ -37,8 +37,13 @@ from app.schemas.inventory_batches_responses import (
     InventoryBatchItemResponse,
     InventoryBatchListResponse,
 )
-from app.schemas.operation_audit_logs_requests import OperationAuditLogListRequest
+from app.schemas.operation_audit_logs_requests import (
+    InventoryMovementListRequest,
+    OperationAuditLogListRequest,
+)
 from app.schemas.operation_audit_logs_responses import (
+    InventoryMovementItemResponse,
+    InventoryMovementListResponse,
     OperationAuditLogItemResponse,
     OperationAuditLogListResponse,
 )
@@ -138,6 +143,9 @@ __all__ = [
     "InventoryBatchItemResponse",
     "InventoryBatchListRequest",
     "InventoryBatchListResponse",
+    "InventoryMovementItemResponse",
+    "InventoryMovementListRequest",
+    "InventoryMovementListResponse",
     "OperationAuditLogItemResponse",
     "OperationAuditLogListRequest",
     "OperationAuditLogListResponse",
