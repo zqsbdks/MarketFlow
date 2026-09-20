@@ -1,28 +1,110 @@
 """商品查询的数据访问函数。"""
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.selectable import Subquery
 
-from app.models.enums import ProductStatus
+from app.models.enums import InventoryBatchStatus, ProductStatus
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
 
 StockInconsistency = tuple[int, str, str, int, int]
+ProductInventorySummary = tuple[int, int, int, int, int, int]
 
 
 # region 构建批次库存汇总子查询
 def _build_batch_stock_summary() -> Subquery:
-    """生成“每个商品的批次剩余库存合计”子查询，供列表和检查任务复用。"""
+    """按商品汇总全部、可售、临期和过期批次库存，供列表与检查任务复用。"""
 
     return (
         select(
             InventoryBatch.product_id.label("product_id"),
+            # 全部库存包含所有批次当前仍然存在的数量，包括临期和过期商品。
             func.coalesce(func.sum(InventoryBatch.remaining_quantity), 0).label(
                 "batch_stock_quantity"
             ),
+            # 可售库存排除已经过期的批次；当天到期的商品当天仍允许销售。
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            or_(
+                                InventoryBatch.expiration_date.is_(None),
+                                InventoryBatch.expiration_date >= func.current_date(),
+                            ),
+                            InventoryBatch.remaining_quantity,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("saleable_stock_quantity"),
+            # 临期数量和批次数使用定时任务维护的批次状态统计。
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                InventoryBatch.status == InventoryBatchStatus.NEAR_EXPIRY,
+                                InventoryBatch.expiration_date >= func.current_date(),
+                                InventoryBatch.remaining_quantity > 0,
+                            ),
+                            InventoryBatch.remaining_quantity,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("near_expiry_stock_quantity"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                InventoryBatch.status == InventoryBatchStatus.NEAR_EXPIRY,
+                                InventoryBatch.expiration_date >= func.current_date(),
+                                InventoryBatch.remaining_quantity > 0,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("near_expiry_batch_count"),
+            # 过期统计直接比较到期日期，避免凌晨状态任务尚未执行时漏掉当天的新过期批次。
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                InventoryBatch.expiration_date < func.current_date(),
+                                InventoryBatch.remaining_quantity > 0,
+                            ),
+                            InventoryBatch.remaining_quantity,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("expired_stock_quantity"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                InventoryBatch.expiration_date < func.current_date(),
+                                InventoryBatch.remaining_quantity > 0,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("expired_batch_count"),
         )
         .group_by(InventoryBatch.product_id)
         .subquery()
@@ -41,8 +123,9 @@ async def get_products_list(
     category_id: int | None,
     status: ProductStatus | None,
     stock_consistent: bool | None,
+    low_stock: bool | None,
     db: AsyncSession,
-) -> tuple[list[tuple[Product, int]], int]:
+) -> tuple[list[tuple[Product, ProductInventorySummary]], int]:
     """按条件分页查询商品，并返回当前页商品和符合条件的总数。"""
 
     # 只添加调用方实际传入的条件；空条件列表表示查询全部商品。
@@ -61,12 +144,49 @@ async def get_products_list(
     batch_stock_summary = _build_batch_stock_summary()
     # 没有任何批次的商品经过外连接后得到 NULL，这里把它转换成库存 0。
     batch_stock_quantity = func.coalesce(batch_stock_summary.c.batch_stock_quantity, 0)
+    saleable_stock_quantity = func.coalesce(
+        batch_stock_summary.c.saleable_stock_quantity,
+        0,
+    )
+    near_expiry_stock_quantity = func.coalesce(
+        batch_stock_summary.c.near_expiry_stock_quantity,
+        0,
+    )
+    near_expiry_batch_count = func.coalesce(
+        batch_stock_summary.c.near_expiry_batch_count,
+        0,
+    )
+    expired_stock_quantity = func.coalesce(
+        batch_stock_summary.c.expired_stock_quantity,
+        0,
+    )
+    expired_batch_count = func.coalesce(
+        batch_stock_summary.c.expired_batch_count,
+        0,
+    )
 
     # stock_consistent 未传时不筛选；传 true/false 时分别查询一致或不一致商品。
     if stock_consistent is True:
         conditions.append(Product.stock_quantity == batch_stock_quantity)
     elif stock_consistent is False:
         conditions.append(Product.stock_quantity != batch_stock_quantity)
+
+    # 低库存以“可售库存”和每个商品自己的预警阈值比较，不使用包含过期批次的全部库存。
+    if low_stock is True:
+        conditions.extend(
+            [
+                Product.low_stock_threshold.is_not(None),
+                saleable_stock_quantity <= Product.low_stock_threshold,
+            ]
+        )
+    elif low_stock is False:
+        # 没有设置阈值的商品不会触发预警，因此也属于“未触发低库存预警”。
+        conditions.append(
+            or_(
+                Product.low_stock_threshold.is_(None),
+                saleable_stock_quantity > Product.low_stock_threshold,
+            )
+        )
 
     # 列表查询和数量查询使用完全相同的筛选条件，保证分页数据准确。
     count_statement = (
@@ -82,7 +202,15 @@ async def get_products_list(
 
     offset = (page - 1) * page_size
     list_statement = (
-        select(Product, batch_stock_quantity)
+        select(
+            Product,
+            batch_stock_quantity,
+            saleable_stock_quantity,
+            near_expiry_stock_quantity,
+            near_expiry_batch_count,
+            expired_stock_quantity,
+            expired_batch_count,
+        )
         # Service 需要部门名和分类名，因此在异步会话中提前加载两个关系。
         .options(
             selectinload(Product.department),
@@ -98,7 +226,28 @@ async def get_products_list(
         .limit(page_size)
     )
     list_result = await db.execute(list_statement)
-    products = [(product, int(batch_quantity)) for product, batch_quantity in list_result.all()]
+    products = [
+        (
+            product,
+            (
+                int(total_stock),
+                int(saleable_stock),
+                int(near_expiry_stock),
+                int(near_expiry_batches),
+                int(expired_stock),
+                int(expired_batches),
+            ),
+        )
+        for (
+            product,
+            total_stock,
+            saleable_stock,
+            near_expiry_stock,
+            near_expiry_batches,
+            expired_stock,
+            expired_batches,
+        ) in list_result.all()
+    ]
 
     return products, total
 
@@ -195,6 +344,7 @@ async def update_product(
 
 
 __all__ = [
+    "ProductInventorySummary",
     "get_product_by_id",
     "get_products_list",
     "get_stock_inconsistencies",

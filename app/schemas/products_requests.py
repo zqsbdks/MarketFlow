@@ -26,6 +26,10 @@ class ProductsListRequest(BaseModel):
         None,
         description="库存一致性；true只查询一致商品，false只查询不一致商品",
     )
+    low_stock: bool | None = Field(
+        None,
+        description="低库存状态；true只查询低库存商品，false查询未触发预警的商品",
+    )
 
 
 # endregion

@@ -91,7 +91,8 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
         return manager
 
     async def get_products(**_kwargs):
-        return [(product, 10)], 1
+        # 汇总值依次为：全部库存、可售库存、临期数量、临期批次数、过期数量、过期批次数。
+        return [(product, (10, 7, 2, 1, 3, 1))], 1
 
     monkeypatch.setattr("app.services.products.get_employee_by_id", get_current)
     monkeypatch.setattr("app.services.products.get_products_list", get_products)
@@ -104,6 +105,7 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
         category_id=None,
         status=None,
         stock_consistent=None,
+        low_stock=None,
         current_employee_id=manager.id,
         db=AsyncMock(spec=AsyncSession),
     )
@@ -113,6 +115,12 @@ async def test_products_list_service_returns_department_and_category(monkeypatch
     assert result.items[0].department_name == "精肉部"
     assert result.items[0].category_name == "牛肉"
     assert result.items[0].batch_stock_quantity == 10
+    assert result.items[0].total_stock_quantity == 10
+    assert result.items[0].saleable_stock_quantity == 7
+    assert result.items[0].near_expiry_stock_quantity == 2
+    assert result.items[0].near_expiry_batch_count == 1
+    assert result.items[0].expired_stock_quantity == 3
+    assert result.items[0].expired_batch_count == 1
     assert result.items[0].stock_difference == 0
     assert result.items[0].is_stock_consistent is True
 
@@ -127,7 +135,7 @@ async def test_regular_employee_can_view_products_list(monkeypatch) -> None:
         return employee
 
     async def get_products(**_kwargs):
-        return [(product, 8)], 1
+        return [(product, (8, 8, 0, 0, 0, 0))], 1
 
     monkeypatch.setattr("app.services.products.get_employee_by_id", get_current)
     monkeypatch.setattr("app.services.products.get_products_list", get_products)
@@ -140,6 +148,7 @@ async def test_regular_employee_can_view_products_list(monkeypatch) -> None:
         category_id=None,
         status=None,
         stock_consistent=None,
+        low_stock=None,
         current_employee_id=employee.id,
         db=AsyncMock(spec=AsyncSession),
     )

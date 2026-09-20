@@ -26,6 +26,7 @@ async def get_products_list_service(
     category_id: int | None,
     status: ProductStatus | None,
     stock_consistent: bool | None,
+    low_stock: bool | None,
     current_employee_id: int,
     db: AsyncSession,
 ) -> ProductsListResponse:
@@ -63,28 +64,49 @@ async def get_products_list_service(
         category_id=category_id,
         status=status,
         stock_consistent=stock_consistent,
+        low_stock=low_stock,
         db=db,
     )
 
     # 将 ORM 对象转换成明确的响应模型，避免返回未公开的商品字段。
-    items = [
-        ProductsItemResponse(
-            id=product.id,
-            product_no=product.product_no,
-            name=product.name,
-            department_name=product.department.name,
-            category_name=product.category.name,
-            purchase_price=product.purchase_price,
-            sale_price=product.sale_price,
-            stock_quantity=product.stock_quantity,
-            batch_stock_quantity=batch_stock_quantity,
-            stock_difference=product.stock_quantity - batch_stock_quantity,
-            is_stock_consistent=product.stock_quantity == batch_stock_quantity,
-            low_stock_threshold=product.low_stock_threshold,
-            status=product.status,
+    items: list[ProductsItemResponse] = []
+    for product, inventory_summary in products:
+        (
+            total_stock_quantity,
+            saleable_stock_quantity,
+            near_expiry_stock_quantity,
+            near_expiry_batch_count,
+            expired_stock_quantity,
+            expired_batch_count,
+        ) = inventory_summary
+        is_low_stock = (
+            product.low_stock_threshold is not None
+            and saleable_stock_quantity <= product.low_stock_threshold
         )
-        for product, batch_stock_quantity in products
-    ]
+        items.append(
+            ProductsItemResponse(
+                id=product.id,
+                product_no=product.product_no,
+                name=product.name,
+                department_name=product.department.name,
+                category_name=product.category.name,
+                purchase_price=product.purchase_price,
+                sale_price=product.sale_price,
+                stock_quantity=product.stock_quantity,
+                batch_stock_quantity=total_stock_quantity,
+                total_stock_quantity=total_stock_quantity,
+                saleable_stock_quantity=saleable_stock_quantity,
+                near_expiry_stock_quantity=near_expiry_stock_quantity,
+                near_expiry_batch_count=near_expiry_batch_count,
+                expired_stock_quantity=expired_stock_quantity,
+                expired_batch_count=expired_batch_count,
+                stock_difference=product.stock_quantity - total_stock_quantity,
+                is_stock_consistent=product.stock_quantity == total_stock_quantity,
+                low_stock_threshold=product.low_stock_threshold,
+                is_low_stock=is_low_stock,
+                status=product.status,
+            )
+        )
 
     total_pages = (total + page_size - 1) // page_size
 

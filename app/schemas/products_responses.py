@@ -25,6 +25,20 @@ class ProductsItemResponse(BaseModel):
         description="该商品所有库存批次的剩余数量合计",
         ge=0,
     )
+    total_stock_quantity: int = Field(
+        ...,
+        description="全部库存，即所有批次当前剩余数量合计，包含临期和过期库存",
+        ge=0,
+    )
+    saleable_stock_quantity: int = Field(
+        ...,
+        description="可售库存，即全部未过期批次的剩余数量合计",
+        ge=0,
+    )
+    near_expiry_stock_quantity: int = Field(..., description="临期批次剩余数量合计", ge=0)
+    near_expiry_batch_count: int = Field(..., description="仍有库存的临期批次数量", ge=0)
+    expired_stock_quantity: int = Field(..., description="过期批次剩余数量合计", ge=0)
+    expired_batch_count: int = Field(..., description="仍有库存的过期批次数量", ge=0)
     stock_difference: int = Field(
         ...,
         description="库存差异，计算方式为商品总库存减去批次库存合计",
@@ -34,6 +48,7 @@ class ProductsItemResponse(BaseModel):
         description="商品总库存是否等于所有批次剩余数量合计",
     )
     low_stock_threshold: int | None = Field(None, description="低库存预警阈值", ge=0)
+    is_low_stock: bool = Field(..., description="可售库存是否达到低库存预警阈值")
     status: ProductStatus = Field(..., description="商品销售状态")
 
     model_config = ConfigDict(from_attributes=True)

@@ -140,9 +140,16 @@ export interface ProductListItem {
   sale_price: string
   stock_quantity: number
   batch_stock_quantity: number
+  total_stock_quantity: number
+  saleable_stock_quantity: number
+  near_expiry_stock_quantity: number
+  near_expiry_batch_count: number
+  expired_stock_quantity: number
+  expired_batch_count: number
   stock_difference: number
   is_stock_consistent: boolean
   low_stock_threshold: number | null
+  is_low_stock: boolean
   status: ProductStatus
 }
 

@@ -27,7 +27,7 @@ products_router = APIRouter(prefix="/products", tags=["products"])
     "/list",
     response_model=ResponseModel[ProductsListResponse],
     summary="获取商品列表",
-    description="按照商品名称、部门、分类、销售状态和库存一致性筛选商品，并分页返回。",
+    description="按照名称、部门、分类、销售状态、库存一致性和低库存状态筛选商品。",
 )
 async def get_products_list(
     request: ProductsListRequest = Depends(),
@@ -44,6 +44,7 @@ async def get_products_list(
         category_id=request.category_id,
         status=request.status,
         stock_consistent=request.stock_consistent,
+        low_stock=request.low_stock,
         current_employee_id=current_employee_id,
         db=db,
     )

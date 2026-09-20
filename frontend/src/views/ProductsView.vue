@@ -41,6 +41,7 @@ const departmentId = ref<number | ''>('')
 const categoryId = ref<number | ''>('')
 const status = ref<ProductStatus | ''>('')
 const stockConsistent = ref<'' | 'true' | 'false'>('')
+const lowStock = ref<'' | 'true' | 'false'>('')
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -66,6 +67,7 @@ async function loadProducts() {
       category_id: categoryId.value || undefined,
       status: status.value || undefined,
       stock_consistent: stockConsistent.value || undefined,
+      low_stock: lowStock.value || undefined,
     })
     products.value = result.items
     total.value = result.total
@@ -170,6 +172,7 @@ onMounted(async () => {
       <select v-model="categoryId" @change="search"><option value="">全部分类</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select>
       <select v-model="status" @change="search"><option value="">全部状态</option><option value="on_sale">在售</option><option value="stopped">停售</option></select>
       <select v-model="stockConsistent" @change="search"><option value="">全部库存</option><option value="true">库存一致</option><option value="false">库存不一致</option></select>
+      <select v-model="lowStock" @change="search"><option value="">全部预警状态</option><option value="true">仅低库存</option><option value="false">未触发低库存</option></select>
       <button class="primary-button" @click="search"><SlidersHorizontal :size="17" />应用筛选</button>
     </section>
 
@@ -178,18 +181,29 @@ onMounted(async () => {
     <section class="panel table-panel">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>商品</th><th>部门 / 分类</th><th>进货价</th><th>销售价</th><th>商品库存 / 批次库存</th><th>库存校验</th><th>状态</th><th></th></tr></thead>
+          <thead><tr><th>商品</th><th>部门 / 分类</th><th>进货价</th><th>销售价</th><th>库存概览</th><th>临期 / 过期</th><th>库存校验</th><th>状态</th><th></th></tr></thead>
           <tbody>
             <tr v-for="item in products" :key="item.id">
               <td><div class="product-cell"><span>{{ item.name.slice(0, 1) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.product_no }}</small></div></div></td>
               <td><strong class="plain">{{ item.department_name }}</strong><small class="block">{{ item.category_name }}</small></td>
               <td>{{ formatMoney(item.purchase_price) }}</td><td><strong>{{ formatMoney(item.sale_price) }}</strong></td>
-              <td><span :class="['stock-badge', { low: item.stock_quantity <= 5 }]">{{ item.stock_quantity }} / {{ item.batch_stock_quantity }} 件</span></td>
+              <td>
+                <div class="inventory-overview">
+                  <span :class="['stock-badge', { low: item.is_low_stock }]">可售 {{ item.saleable_stock_quantity }} 件</span>
+                  <small>全部 {{ item.total_stock_quantity }} 件</small>
+                </div>
+              </td>
+              <td>
+                <div class="inventory-overview warning-stock">
+                  <span>临期 {{ item.near_expiry_stock_quantity }} 件 / {{ item.near_expiry_batch_count }} 批</span>
+                  <small :class="{ expired: item.expired_stock_quantity > 0 }">过期 {{ item.expired_stock_quantity }} 件 / {{ item.expired_batch_count }} 批</small>
+                </div>
+              </td>
               <td><span :class="['status-badge', item.is_stock_consistent ? 'on_sale' : 'stopped']">{{ item.is_stock_consistent ? '一致' : `相差 ${item.stock_difference}` }}</span></td>
               <td><span :class="['status-badge', item.status]">{{ item.status === 'on_sale' ? '在售' : '停售' }}</span></td>
               <td><button class="text-button" @click="openDetail(item.id)">详情</button></td>
             </tr>
-            <tr v-if="!loading && !products.length"><td colspan="8" class="empty-cell">没有找到符合条件的商品</td></tr>
+            <tr v-if="!loading && !products.length"><td colspan="9" class="empty-cell">没有找到符合条件的商品</td></tr>
           </tbody>
         </table>
       </div>
@@ -219,5 +233,5 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.detail-actions{display:flex;gap:10px;margin-top:20px}textarea{min-height:80px;resize:vertical;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+.detail-actions{display:flex;gap:10px;margin-top:20px}.inventory-overview{display:flex;flex-direction:column;align-items:flex-start;gap:5px}.inventory-overview small{color:var(--muted)}.warning-stock span{color:#f0b84b}.warning-stock .expired{color:#ff7c68;font-weight:700}textarea{min-height:80px;resize:vertical;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
 </style>
