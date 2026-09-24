@@ -5,6 +5,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from app.models.enums import (
 from app.schemas.discount_rule_requests import GetDiscountRuleListRequest
 from app.services.discount_rule import (
     calculate_discount_rule_status,
+    get_discount_rule_detail_service,
     get_discount_rule_list_service,
 )
 
@@ -136,3 +138,52 @@ async def test_get_discount_rule_list_service_builds_pagination(monkeypatch) -> 
     assert result.total_pages == 1
     assert result.items[0].created_by_name == "测试店长"
     assert result.items[0].computed_status == DiscountComputedStatus.ACTIVE
+
+
+async def test_get_discount_rule_detail_service_returns_rule(monkeypatch) -> None:
+    """详情Service应返回指定规则、创建员工姓名和当前动态状态。"""
+
+    employee = build_employee()
+    rule = build_once_rule(datetime.now())
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+
+    result = await get_discount_rule_detail_service(
+        discount_rule_id=rule.id,
+        current_employee_id=employee.id,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.id == rule.id
+    assert result.name == "测试单次折扣"
+    assert result.created_by_name == "测试店长"
+    assert result.computed_status == DiscountComputedStatus.ACTIVE
+
+
+async def test_get_discount_rule_detail_service_rejects_missing_rule(monkeypatch) -> None:
+    """查询不存在的折扣规则时，Service应返回404错误。"""
+
+    employee = build_employee()
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=None),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await get_discount_rule_detail_service(
+            discount_rule_id=999,
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 404

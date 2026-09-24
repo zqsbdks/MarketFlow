@@ -134,9 +134,31 @@ async def get_discount_rules_list(
 # endregion
 
 
+# region 获取折扣规则详情
+async def get_discount_rule_by_id(
+    discount_rule_id: int,
+    db: AsyncSession,
+) -> DiscountRule | None:
+    """根据规则ID查询一条折扣规则，并提前加载创建员工。"""
+
+    # 详情响应需要显示创建员工姓名，所以查询规则时一并加载creator关系。
+    statement = (
+        select(DiscountRule)
+        .options(selectinload(DiscountRule.creator))
+        .where(DiscountRule.id == discount_rule_id)
+        # 如果会话中已经存在该对象，仍使用数据库最新值覆盖旧的会话缓存。
+        .execution_options(populate_existing=True)
+    )
+    result = await db.execute(statement)
+    return result.scalar_one_or_none()
+
+
+# endregion
+
+
 # region 折扣适用范围数据库操作
 # 后续添加：范围查询、批量添加和删除函数。
 # endregion
 
 
-__all__ = ["get_discount_rules_list"]
+__all__ = ["get_discount_rule_by_id", "get_discount_rules_list"]

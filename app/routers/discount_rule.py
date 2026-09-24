@@ -1,14 +1,20 @@
 """折扣规则与适用范围 API 路由。"""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
 from app.schemas.discount_rule_requests import GetDiscountRuleListRequest
-from app.schemas.discount_rule_responses import DiscountRuleListResponse
-from app.services.discount_rule import get_discount_rule_list_service
+from app.schemas.discount_rule_responses import (
+    DiscountRuleListItemResponse,
+    DiscountRuleListResponse,
+)
+from app.services.discount_rule import (
+    get_discount_rule_detail_service,
+    get_discount_rule_list_service,
+)
 
 # 本模块内的接口都会以 /api/v1/discount-rules 开头。
 discount_rules_router = APIRouter(
@@ -54,8 +60,36 @@ async def get_discount_rule_list(
 # endregion
 
 
+# region 获取折扣规则详情
+@discount_rules_router.get(
+    "/{discount_rule_id}",
+    response_model=ResponseModel[DiscountRuleListItemResponse],
+    summary="获取折扣规则详情",
+    description="根据折扣规则ID获取完整规则资料、创建员工和当前动态状态。",
+)
+async def get_discount_rule_detail(
+    discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DiscountRuleListItemResponse]:
+    """接收折扣规则ID，并返回统一响应格式的折扣规则详情。"""
+
+    rule = await get_discount_rule_detail_service(
+        discount_rule_id=discount_rule_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DiscountRuleListItemResponse](
+        message="获取折扣规则详情成功",
+        data=rule,
+    )
+
+
+# endregion
+
+
 # region 其他折扣规则接口
-# 后续添加：详情、创建、启停、修改和删除接口。
+# 后续添加：创建、启停、修改和删除接口。
 # endregion
 
 

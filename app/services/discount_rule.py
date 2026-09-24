@@ -7,7 +7,7 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
-from app.crud.discount_rule import get_discount_rules_list
+from app.crud.discount_rule import get_discount_rule_by_id, get_discount_rules_list
 from app.models.discount_rule import DiscountRule
 from app.models.enums import (
     DiscountComputedStatus,
@@ -161,9 +161,55 @@ async def get_discount_rule_list_service(
 # endregion
 
 
+# region 获取折扣规则详情
+async def get_discount_rule_detail_service(
+    discount_rule_id: int,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DiscountRuleListItemResponse:
+    """验证当前账号，并返回指定折扣规则的完整资料和动态状态。"""
+
+    # 详情接口允许所有正常登录的员工查询，但仍需验证账号的最新状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # CRUD只负责按ID查询；找不到记录时由Service转换成前端可读的404错误。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+
+    # 详情和列表复用同一个响应组装函数，保证字段和状态计算方式一致。
+    return _build_discount_rule_list_item(rule, datetime.now())
+
+
+# endregion
+
+
 # region 折扣适用范围业务逻辑
 # 后续添加：目标存在性、部门权限和重复范围校验函数。
 # endregion
 
 
-__all__ = ["calculate_discount_rule_status", "get_discount_rule_list_service"]
+__all__ = [
+    "calculate_discount_rule_status",
+    "get_discount_rule_detail_service",
+    "get_discount_rule_list_service",
+]
