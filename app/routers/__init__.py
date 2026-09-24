@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from app.routers.auth import auth_router
 from app.routers.categories import categories_router
 from app.routers.departments import departments_router
+from app.routers.discount_rule import discount_rules_router
 from app.routers.employees import employees_router
 from app.routers.inventory_batches import inventory_batches_router
 from app.routers.operation_audit_logs import operation_audit_logs_router
@@ -25,6 +26,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(departments_router)
 api_router.include_router(categories_router)
+api_router.include_router(discount_rules_router)
 api_router.include_router(employees_router)
 api_router.include_router(inventory_batches_router)
 api_router.include_router(operation_audit_logs_router)
@@ -40,6 +42,7 @@ __all__ = [
     "auth_router",
     "categories_router",
     "departments_router",
+    "discount_rules_router",
     "employees_router",
     "inventory_batches_router",
     "operation_audit_logs_router",

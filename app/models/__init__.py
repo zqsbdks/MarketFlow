@@ -13,6 +13,7 @@ from app.models.discount_rule_scope import DiscountRuleScope
 from app.models.employee import Employee
 from app.models.employee_detail import EmployeeDetail
 from app.models.enums import (
+    DiscountComputedStatus,
     DiscountScheduleType,
     DiscountScopeType,
     DiscountType,
@@ -45,6 +46,7 @@ __all__ = [
     "Department",
     "DiscountRule",
     "DiscountRuleScope",
+    "DiscountComputedStatus",
     "DiscountScheduleType",
     "DiscountScopeType",
     "DiscountType",

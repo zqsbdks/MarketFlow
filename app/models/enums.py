@@ -82,6 +82,15 @@ class DiscountScopeType(StrEnum):
     DEPARTMENT = "department"  # 作用于指定部门下的全部商品。
 
 
+class DiscountComputedStatus(StrEnum):
+    """后端根据人工开关和当前执行时间计算出的折扣规则状态。"""
+
+    DISABLED = "disabled"  # 规则被人工关闭。
+    SCHEDULED = "scheduled"  # 规则已开启，但当前不在执行时间内。
+    ACTIVE = "active"  # 规则已开启，并且当前处于执行时间内。
+    ENDED = "ended"  # 单次折扣的结束时间已经过去。
+
+
 class RankingGroupBy(StrEnum):
     """销售排行的汇总方式。"""
 
@@ -121,6 +130,7 @@ class ReportMetric(StrEnum):
 
 
 __all__ = [
+    "DiscountComputedStatus",
     "DiscountScheduleType",
     "DiscountScopeType",
     "DiscountType",

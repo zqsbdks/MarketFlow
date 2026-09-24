@@ -659,6 +659,24 @@
     "app/models/discount_rule_scope.py": {
         "description": "折扣规则与商品、分类或部门适用范围关联ORM模型"
     },
+    "app/routers/discount_rule.py": {
+        "description": "折扣规则与适用范围API路由"
+    },
+    "app/crud/discount_rule.py": {
+        "description": "折扣规则与适用范围数据库访问函数"
+    },
+    "app/services/discount_rule.py": {
+        "description": "折扣规则计算状态、权限校验与业务逻辑"
+    },
+    "app/schemas/discount_rule_requests.py": {
+        "description": "折扣规则筛选、创建、修改与适用范围请求模型"
+    },
+    "app/schemas/discount_rule_responses.py": {
+        "description": "折扣规则列表、详情、计算状态与适用范围响应模型"
+    },
+    "tests/test_discount_rules.py": {
+        "description": "折扣规则动态状态、请求校验与分页列表业务测试"
+    },
     "alembic/versions/20260921_0015_create_discount_tables.py": {
         "description": "创建折扣规则与折扣适用范围表迁移"
     }
