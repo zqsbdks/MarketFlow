@@ -186,8 +186,6 @@ EXPECTED_COLUMNS = {
         "daily_start_time",
         "daily_end_time",
         "weekdays",
-        "start_stock_threshold",
-        "end_stock_threshold",
         "is_active",
         "created_by",
         "created_at",
@@ -377,10 +375,10 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """折扣数据表迁移是当前唯一的 Alembic 版本头。"""
+    """删除折扣库存阈值的迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260921_0015"]
+    assert script.get_heads() == ["20260927_0016"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

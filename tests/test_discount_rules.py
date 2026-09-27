@@ -17,9 +17,16 @@ from app.models.enums import (
     DiscountType,
     EmployeeRole,
 )
-from app.schemas.discount_rule_requests import GetDiscountRuleListRequest
+from app.models.product import Product
+from app.schemas.discount_rule_requests import (
+    AddDiscountRuleProductsRequest,
+    CreateDiscountRuleRequest,
+    GetDiscountRuleListRequest,
+)
 from app.services.discount_rule import (
+    add_discount_rule_products_service,
     calculate_discount_rule_status,
+    create_discount_rule_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
 )
@@ -35,6 +42,27 @@ def build_employee() -> Employee:
         password_hash="test-hash",
         role=EmployeeRole.STORE_MANAGER,
         department_id=None,
+        is_active=True,
+        must_change_password=False,
+    )
+
+
+def build_product(*, product_id: int = 1, department_id: int = 1) -> Product:
+    """构造用于折扣商品部门权限测试的正式商品。"""
+
+    return Product(id=product_id, department_id=department_id)
+
+
+def build_regular_employee(*, department_id: int | None = 1) -> Employee:
+    """构造已启用的正式员工，可通过department_id模拟是否已分配部门。"""
+
+    return Employee(
+        id=2,
+        employee_no="E00002",
+        name="测试正式员工",
+        password_hash="test-hash",
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        department_id=department_id,
         is_active=True,
         must_change_password=False,
     )
@@ -187,3 +215,256 @@ async def test_get_discount_rule_detail_service_rejects_missing_rule(monkeypatch
         )
 
     assert exception_info.value.status_code == 404
+
+
+async def test_manager_can_create_daily_discount_rule(monkeypatch) -> None:
+    """店长可以创建通过时间校验的每日折扣规则并写入审计记录。"""
+
+    employee = build_employee()
+    now = datetime.now()
+    rule = build_once_rule(now)
+    rule.name = "晚间生鲜八折"
+    rule.schedule_type = DiscountScheduleType.DAILY
+    rule.starts_at = None
+    rule.ends_at = None
+    rule.daily_start_time = time(18, 0)
+    rule.daily_end_time = time(21, 0)
+
+    create_record = AsyncMock(return_value=rule)
+    audit_record = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_name",
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_discount_rule",
+        create_record,
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_record,
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await create_discount_rule_service(
+        request=CreateDiscountRuleRequest(
+            name="晚间生鲜八折",
+            discount_type=DiscountType.PERCENTAGE,
+            discount_value=Decimal("0.8000"),
+            schedule_type=DiscountScheduleType.DAILY,
+            daily_start_time=time(18, 0),
+            daily_end_time=time(21, 0),
+        ),
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.name == "晚间生鲜八折"
+    assert result.computed_status in (
+        DiscountComputedStatus.ACTIVE,
+        DiscountComputedStatus.SCHEDULED,
+    )
+    create_record.assert_awaited_once()
+    audit_record.assert_awaited_once()
+    db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_with_department_can_create_discount_rule(monkeypatch) -> None:
+    """已分配部门的正式员工可以创建规则，商品范围在后续接口中限制为本部门。"""
+
+    employee = build_regular_employee()
+    now = datetime.now()
+    rule = build_once_rule(now)
+    rule.name = "本部门晚间折扣"
+    rule.created_by = employee.id
+    rule.creator = employee
+
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_name",
+        AsyncMock(return_value=None),
+    )
+    create_record = AsyncMock(return_value=rule)
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_discount_rule",
+        create_record,
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await create_discount_rule_service(
+        request=CreateDiscountRuleRequest(
+            name="本部门晚间折扣",
+            discount_type=DiscountType.PERCENTAGE,
+            discount_value=Decimal("0.8000"),
+            schedule_type=DiscountScheduleType.ONCE,
+            starts_at=now + timedelta(hours=1),
+            ends_at=now + timedelta(hours=2),
+        ),
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.created_by == employee.id
+    create_record.assert_awaited_once()
+    db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_without_department_cannot_create_discount_rule(
+    monkeypatch,
+) -> None:
+    """未分配部门的正式员工无法确定管理范围，因此不能创建折扣规则。"""
+
+    employee = build_regular_employee(department_id=None)
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await create_discount_rule_service(
+            request=CreateDiscountRuleRequest(
+                name="无所属部门折扣",
+                discount_type=DiscountType.PERCENTAGE,
+                discount_value=Decimal("0.8000"),
+                schedule_type=DiscountScheduleType.DAILY,
+                daily_start_time=time(18, 0),
+                daily_end_time=time(21, 0),
+            ),
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 403
+    assert exception_info.value.detail == "正式员工未分配所属部门，不能创建折扣规则"
+
+
+async def test_create_discount_rule_rejects_invalid_percentage(monkeypatch) -> None:
+    """比例折扣为1或更大时应在写入数据库前返回400。"""
+
+    employee = build_employee()
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_name",
+        AsyncMock(return_value=None),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await create_discount_rule_service(
+            request=CreateDiscountRuleRequest(
+                name="无效比例折扣",
+                discount_type=DiscountType.PERCENTAGE,
+                discount_value=Decimal("1.0000"),
+                schedule_type=DiscountScheduleType.DAILY,
+                daily_start_time=time(18, 0),
+                daily_end_time=time(21, 0),
+            ),
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 400
+
+
+async def test_manager_can_add_products_from_any_department(monkeypatch) -> None:
+    """店长可以把不同部门的商品添加到现有折扣规则。"""
+
+    employee = build_employee()
+    rule = build_once_rule(datetime.now())
+    products = [
+        build_product(product_id=1, department_id=1),
+        build_product(product_id=2, department_id=2),
+    ]
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_products_by_ids",
+        AsyncMock(return_value=products),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_existing_discount_product_ids",
+        AsyncMock(return_value=set()),
+    )
+    create_scopes = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_discount_rule_product_scopes",
+        create_scopes,
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        AsyncMock(),
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await add_discount_rule_products_service(
+        discount_rule_id=rule.id,
+        request=AddDiscountRuleProductsRequest(product_ids=[2, 1, 1]),
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.discount_rule_id == rule.id
+    assert result.product_ids == [1, 2]
+    create_scopes.assert_awaited_once_with(
+        discount_rule_id=rule.id,
+        product_ids=[1, 2],
+        db=db,
+    )
+    db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_cannot_add_other_department_product(monkeypatch) -> None:
+    """正式员工把其他部门商品加入折扣时，应在写入关联前返回403。"""
+
+    employee = build_regular_employee(department_id=1)
+    rule = build_once_rule(datetime.now())
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_products_by_ids",
+        AsyncMock(return_value=[build_product(product_id=8, department_id=2)]),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await add_discount_rule_products_service(
+            discount_rule_id=rule.id,
+            request=AddDiscountRuleProductsRequest(product_ids=[8]),
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 403
+    assert exception_info.value.detail == "正式员工只能添加自己所属部门的商品：8"

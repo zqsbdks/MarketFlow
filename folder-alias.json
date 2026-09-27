@@ -669,15 +669,18 @@
         "description": "折扣规则计算状态、权限校验与业务逻辑"
     },
     "app/schemas/discount_rule_requests.py": {
-        "description": "折扣规则筛选、创建、修改与适用范围请求模型"
+        "description": "折扣规则列表筛选、创建与适用范围请求模型"
     },
     "app/schemas/discount_rule_responses.py": {
         "description": "折扣规则列表、详情、计算状态与适用范围响应模型"
     },
     "tests/test_discount_rules.py": {
-        "description": "折扣规则动态状态、请求校验与分页列表业务测试"
+        "description": "折扣规则动态状态、列表、详情与创建业务测试"
     },
     "alembic/versions/20260921_0015_create_discount_tables.py": {
         "description": "创建折扣规则与折扣适用范围表迁移"
+    },
+    "alembic/versions/20260927_0016_remove_discount_stock_thresholds.py": {
+        "description": "删除折扣规则开始与停止库存阈值字段迁移"
     }
 }

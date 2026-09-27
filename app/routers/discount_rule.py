@@ -6,12 +6,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
-from app.schemas.discount_rule_requests import GetDiscountRuleListRequest
+from app.schemas.discount_rule_requests import (
+    AddDiscountRuleProductsRequest,
+    CreateDiscountRuleRequest,
+    GetDiscountRuleListRequest,
+)
 from app.schemas.discount_rule_responses import (
+    AddDiscountRuleProductsResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
 )
 from app.services.discount_rule import (
+    add_discount_rule_products_service,
+    create_discount_rule_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
 )
@@ -60,6 +67,64 @@ async def get_discount_rule_list(
 # endregion
 
 
+# region 创建折扣规则
+@discount_rules_router.post(
+    "",
+    response_model=ResponseModel[DiscountRuleListItemResponse],
+    summary="创建折扣规则",
+    description="创建并保存折扣配置；适用商品通过添加折扣商品接口另行设置。",
+)
+async def create_discount_rule(
+    request: CreateDiscountRuleRequest,
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DiscountRuleListItemResponse]:
+    """接收折扣配置，并返回创建成功后的完整规则资料。"""
+
+    rule = await create_discount_rule_service(
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DiscountRuleListItemResponse](
+        message="创建折扣规则成功",
+        data=rule,
+    )
+
+
+# endregion
+
+
+# region 添加折扣商品
+@discount_rules_router.post(
+    "/{discount_rule_id}/products",
+    response_model=ResponseModel[AddDiscountRuleProductsResponse],
+    summary="添加折扣商品",
+    description="店长可以添加任意部门商品，正式员工只能添加自己所属部门的商品。",
+)
+async def add_discount_rule_products(
+    request: AddDiscountRuleProductsRequest,
+    discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[AddDiscountRuleProductsResponse]:
+    """接收折扣规则ID和商品ID列表，批量建立规则与商品的关联。"""
+
+    result = await add_discount_rule_products_service(
+        discount_rule_id=discount_rule_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[AddDiscountRuleProductsResponse](
+        message="添加折扣商品成功",
+        data=result,
+    )
+
+
+# endregion
+
+
 # region 获取折扣规则详情
 @discount_rules_router.get(
     "/{discount_rule_id}",
@@ -89,12 +154,12 @@ async def get_discount_rule_detail(
 
 
 # region 其他折扣规则接口
-# 后续添加：创建、启停、修改和删除接口。
+# 后续添加：启停、修改和删除接口。
 # endregion
 
 
 # region 折扣适用范围接口
-# 后续添加：适用范围列表、添加和删除接口。
+# 后续添加：适用范围列表和删除接口。
 # endregion
 
 

@@ -15,7 +15,6 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
-    Integer,
     Numeric,
     String,
     Time,
@@ -65,19 +64,6 @@ class DiscountRule(TimestampMixin, Base):
             "daily_start_time IS NULL OR daily_end_time IS NULL "
             "OR daily_start_time < daily_end_time",
             name="ck_discount_rule_daily_time_range",
-        ),
-        CheckConstraint(
-            "start_stock_threshold IS NULL OR start_stock_threshold >= 0",
-            name="ck_discount_rule_start_stock_non_negative",
-        ),
-        CheckConstraint(
-            "end_stock_threshold IS NULL OR end_stock_threshold >= 0",
-            name="ck_discount_rule_end_stock_non_negative",
-        ),
-        CheckConstraint(
-            "start_stock_threshold IS NULL OR end_stock_threshold IS NULL "
-            "OR end_stock_threshold < start_stock_threshold",
-            name="ck_discount_rule_stock_range",
         ),
         Index("ix_discount_rule_active_schedule", "is_active", "schedule_type"),
         {"mysql_charset": "utf8mb4", "comment": "折扣规则表"},
@@ -147,16 +133,6 @@ class DiscountRule(TimestampMixin, Base):
         JSON,
         nullable=True,
         comment="每周执行日列表；1至7表示周一至周日",
-    )
-    start_stock_threshold: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        comment="可售库存小于等于该值时开始打折",
-    )
-    end_stock_threshold: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        comment="可售库存小于等于该值时停止打折",
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,

@@ -1,6 +1,7 @@
 """折扣规则与适用范围数据库访问函数。"""
 
-from datetime import datetime
+from datetime import datetime, time
+from decimal import Decimal
 
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,14 +9,17 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.discount_rule import DiscountRule
+from app.models.discount_rule_scope import DiscountRuleScope
 from app.models.enums import (
     DiscountComputedStatus,
     DiscountScheduleType,
+    DiscountScopeType,
     DiscountType,
 )
+from app.models.product import Product
 
 
-# region 折扣规则动态状态查询条件
+# region 获取当前执行时间条件
 def _get_active_schedule_condition(now: datetime) -> ColumnElement[bool]:
     """生成“当前处于规则执行时间内”的SQL查询条件。"""
 
@@ -53,6 +57,10 @@ def _get_active_schedule_condition(now: datetime) -> ColumnElement[bool]:
     return or_(once_is_active, daily_is_active, weekly_is_active)
 
 
+# endregion
+
+
+# region 获取动态状态查询条件
 def _get_computed_status_condition(
     computed_status: DiscountComputedStatus,
     now: datetime,
@@ -156,9 +164,131 @@ async def get_discount_rule_by_id(
 # endregion
 
 
-# region 折扣适用范围数据库操作
-# 后续添加：范围查询、批量添加和删除函数。
+# region 根据名称查询折扣规则
+async def get_discount_rule_by_name(
+    name: str,
+    db: AsyncSession,
+    excluded_discount_rule_id: int | None = None,
+) -> DiscountRule | None:
+    """查询同名折扣规则；修改规则时可以排除规则自身。"""
+
+    statement = select(DiscountRule).where(DiscountRule.name == name)
+    if excluded_discount_rule_id is not None:
+        statement = statement.where(DiscountRule.id != excluded_discount_rule_id)
+    result = await db.execute(statement)
+    return result.scalar_one_or_none()
+
+
 # endregion
 
 
-__all__ = ["get_discount_rule_by_id", "get_discount_rules_list"]
+# region 创建折扣规则
+async def create_discount_rule(
+    name: str,
+    discount_type: DiscountType,
+    discount_value: Decimal,
+    schedule_type: DiscountScheduleType,
+    starts_at: datetime | None,
+    ends_at: datetime | None,
+    daily_start_time: time | None,
+    daily_end_time: time | None,
+    weekdays: list[int] | None,
+    is_active: bool,
+    created_by: int,
+    db: AsyncSession,
+) -> DiscountRule:
+    """创建折扣规则并取得自增ID；事务提交由Service统一负责。"""
+
+    rule = DiscountRule(
+        name=name,
+        discount_type=discount_type,
+        discount_value=discount_value,
+        schedule_type=schedule_type,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        daily_start_time=daily_start_time,
+        daily_end_time=daily_end_time,
+        weekdays=weekdays,
+        is_active=is_active,
+        created_by=created_by,
+    )
+    db.add(rule)
+    await db.flush()
+    await db.refresh(rule)
+    return rule
+
+
+# endregion
+
+
+# region 根据ID列表获取折扣商品
+async def get_discount_products_by_ids(
+    product_ids: list[int],
+    db: AsyncSession,
+) -> list[Product]:
+    """一次查询准备加入折扣规则的全部正式商品。"""
+
+    # IN条件会查出ID位于product_ids中的商品；按ID排序让查询结果保持稳定。
+    statement = select(Product).where(Product.id.in_(product_ids)).order_by(Product.id.asc())
+    result = await db.scalars(statement)
+    return list(result.all())
+
+
+# endregion
+
+
+# region 获取已经关联的折扣商品ID
+async def get_existing_discount_product_ids(
+    discount_rule_id: int,
+    product_ids: list[int],
+    db: AsyncSession,
+) -> set[int]:
+    """查询指定规则在本次商品ID中已经存在的关联。"""
+
+    statement = select(DiscountRuleScope.product_id).where(
+        DiscountRuleScope.discount_rule_id == discount_rule_id,
+        DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
+        DiscountRuleScope.product_id.in_(product_ids),
+    )
+    result = await db.scalars(statement)
+    return {product_id for product_id in result.all() if product_id is not None}
+
+
+# endregion
+
+
+# region 批量创建折扣商品关联
+async def create_discount_rule_product_scopes(
+    discount_rule_id: int,
+    product_ids: list[int],
+    db: AsyncSession,
+) -> list[DiscountRuleScope]:
+    """批量创建商品类型的折扣适用范围；事务提交由Service统一负责。"""
+
+    scopes = [
+        DiscountRuleScope(
+            discount_rule_id=discount_rule_id,
+            scope_type=DiscountScopeType.PRODUCT,
+            product_id=product_id,
+            category_id=None,
+            department_id=None,
+        )
+        for product_id in product_ids
+    ]
+    db.add_all(scopes)
+    await db.flush()
+    return scopes
+
+
+# endregion
+
+
+__all__ = [
+    "create_discount_rule",
+    "create_discount_rule_product_scopes",
+    "get_discount_products_by_ids",
+    "get_existing_discount_product_ids",
+    "get_discount_rule_by_id",
+    "get_discount_rule_by_name",
+    "get_discount_rules_list",
+]

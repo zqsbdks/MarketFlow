@@ -12,7 +12,7 @@ from app.models.enums import (
 )
 
 
-# region 折扣规则列表响应模型
+# region 折扣规则列表项响应模型
 class DiscountRuleListItemResponse(BaseModel):
     """折扣规则列表中的一条完整规则。"""
 
@@ -26,8 +26,6 @@ class DiscountRuleListItemResponse(BaseModel):
     daily_start_time: time | None = Field(None, description="每日循环开始时间")
     daily_end_time: time | None = Field(None, description="每日循环结束时间")
     weekdays: list[int] | None = Field(None, description="每周执行日；1至7表示周一至周日")
-    start_stock_threshold: int | None = Field(None, ge=0, description="开始打折库存阈值")
-    end_stock_threshold: int | None = Field(None, ge=0, description="停止打折库存阈值")
     is_active: bool = Field(..., description="人工启停开关")
     computed_status: DiscountComputedStatus = Field(..., description="后端动态计算状态")
     created_by: int = Field(..., ge=1, description="创建员工ID")
@@ -36,6 +34,10 @@ class DiscountRuleListItemResponse(BaseModel):
     updated_at: datetime = Field(..., description="更新时间")
 
 
+# endregion
+
+
+# region 折扣规则分页列表响应模型
 class DiscountRuleListResponse(BaseModel):
     """折扣规则分页列表及分页信息。"""
 
@@ -49,9 +51,24 @@ class DiscountRuleListResponse(BaseModel):
 # endregion
 
 
+# region 添加折扣商品响应模型
+class AddDiscountRuleProductsResponse(BaseModel):
+    """向折扣规则批量添加商品后的响应。"""
+
+    discount_rule_id: int = Field(..., ge=1, description="折扣规则ID")
+    product_ids: list[int] = Field(..., description="本次成功添加的商品ID列表")
+
+
+# endregion
+
+
 # region 折扣适用范围响应模型
 # 后续添加：商品、分类或部门适用范围响应模型。
 # endregion
 
 
-__all__ = ["DiscountRuleListItemResponse", "DiscountRuleListResponse"]
+__all__ = [
+    "AddDiscountRuleProductsResponse",
+    "DiscountRuleListItemResponse",
+    "DiscountRuleListResponse",
+]
