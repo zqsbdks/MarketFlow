@@ -10,17 +10,20 @@ from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
     CreateDiscountRuleRequest,
     GetDiscountRuleListRequest,
+    GetDiscountRuleProductsRequest,
 )
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
+    DiscountRuleProductListResponse,
 )
 from app.services.discount_rule import (
     add_discount_rule_products_service,
     create_discount_rule_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
+    get_discount_rule_products_service,
 )
 
 # 本模块内的接口都会以 /api/v1/discount-rules 开头。
@@ -119,6 +122,36 @@ async def add_discount_rule_products(
     return ResponseModel[AddDiscountRuleProductsResponse](
         message="添加折扣商品成功",
         data=result,
+    )
+
+
+# endregion
+
+
+# region 获取折扣商品列表
+@discount_rules_router.get(
+    "/{discount_rule_id}/products",
+    response_model=ResponseModel[DiscountRuleProductListResponse],
+    summary="获取折扣商品列表",
+    description="分页查询指定折扣规则关联的商品，并返回原价和计算后的折后价。",
+)
+async def get_discount_rule_products(
+    discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
+    request: GetDiscountRuleProductsRequest = Depends(),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DiscountRuleProductListResponse]:
+    """接收规则ID与筛选条件，返回统一响应格式的分页折扣商品列表。"""
+
+    products = await get_discount_rule_products_service(
+        discount_rule_id=discount_rule_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DiscountRuleProductListResponse](
+        message="获取折扣商品列表成功",
+        data=products,
     )
 
 

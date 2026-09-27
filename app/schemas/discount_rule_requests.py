@@ -102,6 +102,28 @@ class AddDiscountRuleProductsRequest(BaseModel):
 # endregion
 
 
+# region 获取折扣商品列表请求模型
+class GetDiscountRuleProductsRequest(BaseModel):
+    """分页查询某条折扣规则下商品的筛选参数。"""
+
+    page: int = Field(1, ge=1, description="当前页码")
+    page_size: int = Field(10, ge=1, le=100, description="每页数量")
+    keyword: str | None = Field(
+        None,
+        min_length=1,
+        max_length=100,
+        description="商品编号或商品名称关键字",
+    )
+    department_id: int | None = Field(None, ge=1, description="所属部门ID")
+    category_id: int | None = Field(None, ge=1, description="所属分类ID")
+
+    # 去掉搜索关键字首尾空格，避免空格影响商品编号或名称匹配。
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+# endregion
+
+
 # region 后续折扣规则请求模型
 # 后续添加：启停和资料修改请求模型。
 # endregion
@@ -115,4 +137,5 @@ __all__ = [
     "AddDiscountRuleProductsRequest",
     "CreateDiscountRuleRequest",
     "GetDiscountRuleListRequest",
+    "GetDiscountRuleProductsRequest",
 ]

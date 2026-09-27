@@ -283,10 +283,68 @@ async def create_discount_rule_product_scopes(
 # endregion
 
 
+# region 获取折扣商品分页列表
+async def get_discount_rule_products_list(
+    discount_rule_id: int,
+    offset: int,
+    page_size: int,
+    keyword: str | None,
+    department_id: int | None,
+    category_id: int | None,
+    db: AsyncSession,
+) -> tuple[list[DiscountRuleScope], int]:
+    """分页查询一条折扣规则直接关联的商品，并返回符合条件的总数。"""
+
+    # 所有条件同时用于列表查询和总数查询，保证筛选后的分页信息准确。
+    conditions: list[ColumnElement[bool]] = [
+        DiscountRuleScope.discount_rule_id == discount_rule_id,
+        DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
+    ]
+    if keyword is not None:
+        fuzzy_keyword = f"%{keyword}%"
+        conditions.append(
+            or_(
+                Product.product_no.ilike(fuzzy_keyword),
+                Product.name.ilike(fuzzy_keyword),
+            )
+        )
+    if department_id is not None:
+        conditions.append(Product.department_id == department_id)
+    if category_id is not None:
+        conditions.append(Product.category_id == category_id)
+
+    # 关联Product是为了执行商品字段筛选；selectinload提前加载响应需要的部门和分类。
+    list_statement = (
+        select(DiscountRuleScope)
+        .join(Product, Product.id == DiscountRuleScope.product_id)
+        .options(
+            selectinload(DiscountRuleScope.product).selectinload(Product.department),
+            selectinload(DiscountRuleScope.product).selectinload(Product.category),
+        )
+        .where(*conditions)
+        .order_by(DiscountRuleScope.id.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    count_statement = (
+        select(func.count(DiscountRuleScope.id))
+        .join(Product, Product.id == DiscountRuleScope.product_id)
+        .where(*conditions)
+    )
+
+    total = int(await db.scalar(count_statement) or 0)
+    result = await db.scalars(list_statement)
+    return list(result.all()), total
+
+
+# endregion
+
+
 __all__ = [
     "create_discount_rule",
     "create_discount_rule_product_scopes",
     "get_discount_products_by_ids",
+    "get_discount_rule_products_list",
     "get_existing_discount_product_ids",
     "get_discount_rule_by_id",
     "get_discount_rule_by_name",

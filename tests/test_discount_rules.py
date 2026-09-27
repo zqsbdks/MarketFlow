@@ -9,19 +9,25 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.category import Category
+from app.models.department import Department
 from app.models.discount_rule import DiscountRule
+from app.models.discount_rule_scope import DiscountRuleScope
 from app.models.employee import Employee
 from app.models.enums import (
     DiscountComputedStatus,
     DiscountScheduleType,
+    DiscountScopeType,
     DiscountType,
     EmployeeRole,
+    ProductStatus,
 )
 from app.models.product import Product
 from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
     CreateDiscountRuleRequest,
     GetDiscountRuleListRequest,
+    GetDiscountRuleProductsRequest,
 )
 from app.services.discount_rule import (
     add_discount_rule_products_service,
@@ -29,6 +35,7 @@ from app.services.discount_rule import (
     create_discount_rule_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
+    get_discount_rule_products_service,
 )
 
 
@@ -468,3 +475,79 @@ async def test_regular_employee_cannot_add_other_department_product(monkeypatch)
 
     assert exception_info.value.status_code == 403
     assert exception_info.value.detail == "正式员工只能添加自己所属部门的商品：8"
+
+
+async def test_get_discount_rule_products_service_builds_page_and_price(monkeypatch) -> None:
+    """折扣商品列表应返回分页资料、商品信息以及计算后的折后价。"""
+
+    employee = build_employee()
+    now = datetime.now()
+    rule = build_once_rule(now)
+    department = Department(id=1, name="生鲜部", is_active=True)
+    category = Category(id=1, department_id=1, name="肉类", is_active=True)
+    product = Product(
+        id=1,
+        product_no="P00001",
+        name="猪五花肉",
+        supplier_product_id=1,
+        department_id=1,
+        category_id=1,
+        purchase_price=Decimal("5.00"),
+        sale_price=Decimal("10.00"),
+        stock_quantity=20,
+        status=ProductStatus.ON_SALE,
+    )
+    product.department = department
+    product.category = category
+    scope = DiscountRuleScope(
+        id=10,
+        discount_rule_id=rule.id,
+        scope_type=DiscountScopeType.PRODUCT,
+        product_id=product.id,
+        created_at=now,
+    )
+    scope.product = product
+
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    list_query = AsyncMock(return_value=([scope], 1))
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_products_list",
+        list_query,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await get_discount_rule_products_service(
+        discount_rule_id=rule.id,
+        request=GetDiscountRuleProductsRequest(
+            page=1,
+            page_size=10,
+            keyword="猪肉",
+            department_id=1,
+            category_id=1,
+        ),
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.total == 1
+    assert result.total_pages == 1
+    assert result.items[0].scope_id == 10
+    assert result.items[0].product_name == "猪五花肉"
+    assert result.items[0].original_price == Decimal("10.00")
+    assert result.items[0].discounted_price == Decimal("8.00")
+    list_query.assert_awaited_once_with(
+        discount_rule_id=rule.id,
+        offset=0,
+        page_size=10,
+        keyword="猪肉",
+        department_id=1,
+        category_id=1,
+        db=db,
+    )

@@ -1,6 +1,7 @@
 """折扣规则与适用范围业务逻辑。"""
 
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import HTTPException
 from fastapi import status as http_status
@@ -14,6 +15,7 @@ from app.crud.discount_rule import (
     get_discount_products_by_ids,
     get_discount_rule_by_id,
     get_discount_rule_by_name,
+    get_discount_rule_products_list,
     get_discount_rules_list,
     get_existing_discount_product_ids,
 )
@@ -28,11 +30,14 @@ from app.models.enums import (
 from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
     CreateDiscountRuleRequest,
+    GetDiscountRuleProductsRequest,
 )
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
+    DiscountRuleProductItemResponse,
+    DiscountRuleProductListResponse,
 )
 
 
@@ -109,6 +114,28 @@ def _build_discount_rule_list_item(
         created_at=rule.created_at,
         updated_at=rule.updated_at,
     )
+
+
+# endregion
+
+
+# region 计算商品折后价
+def _calculate_discounted_price(
+    original_price: Decimal,
+    discount_type: DiscountType,
+    discount_value: Decimal,
+) -> Decimal:
+    """按照折扣方式计算商品价格，并统一保留两位小数。"""
+
+    if discount_type == DiscountType.PERCENTAGE:
+        discounted_price = original_price * discount_value
+    elif discount_type == DiscountType.AMOUNT_OFF:
+        # 立减金额大于商品原价时，最终价格最低为0元，不返回负数。
+        discounted_price = max(original_price - discount_value, Decimal("0"))
+    else:
+        # fixed_price表示不再计算，直接把规则中的折扣数值作为成交单价。
+        discounted_price = discount_value
+    return discounted_price.quantize(Decimal("0.01"))
 
 
 # endregion
@@ -212,6 +239,97 @@ async def get_discount_rule_detail_service(
 
     # 详情和列表复用同一个响应组装函数，保证字段和状态计算方式一致。
     return _build_discount_rule_list_item(rule, datetime.now())
+
+
+# endregion
+
+
+# region 获取折扣商品列表
+async def get_discount_rule_products_service(
+    discount_rule_id: int,
+    request: GetDiscountRuleProductsRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DiscountRuleProductListResponse:
+    """验证账号和折扣规则，并组装分页折扣商品列表。"""
+
+    # 第一步：查询接口允许所有正常登录员工使用，但仍需检查账号最新状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # 第二步：先确认规则存在，同时取得计算折后价所需的折扣方式和折扣数值。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+
+    # 第三步：根据筛选条件查询当前页的商品关联。
+    offset = (request.page - 1) * request.page_size
+    scopes, total = await get_discount_rule_products_list(
+        discount_rule_id=discount_rule_id,
+        offset=offset,
+        page_size=request.page_size,
+        keyword=request.keyword,
+        department_id=request.department_id,
+        category_id=request.category_id,
+        db=db,
+    )
+
+    # 第四步：把关联对象、商品资料和规则价格合并成前端直接展示的一行数据。
+    items: list[DiscountRuleProductItemResponse] = []
+    for scope in scopes:
+        product = scope.product
+        if product is None:
+            # 商品外键受数据库约束保护；这里防止异常脏数据导致整个列表接口报错。
+            continue
+        items.append(
+            DiscountRuleProductItemResponse(
+                scope_id=scope.id,
+                discount_rule_id=discount_rule_id,
+                product_id=product.id,
+                product_no=product.product_no,
+                product_name=product.name,
+                department_id=product.department_id,
+                department_name=product.department.name,
+                category_id=product.category_id,
+                category_name=product.category.name,
+                original_price=product.sale_price,
+                discount_type=rule.discount_type,
+                discount_value=rule.discount_value,
+                discounted_price=_calculate_discounted_price(
+                    original_price=product.sale_price,
+                    discount_type=rule.discount_type,
+                    discount_value=rule.discount_value,
+                ),
+                product_status=product.status,
+                created_at=scope.created_at,
+            )
+        )
+
+    return DiscountRuleProductListResponse(
+        items=items,
+        page=request.page,
+        page_size=request.page_size,
+        total=total,
+        total_pages=(total + request.page_size - 1) // request.page_size,
+    )
 
 
 # endregion
@@ -533,4 +651,5 @@ __all__ = [
     "create_discount_rule_service",
     "get_discount_rule_detail_service",
     "get_discount_rule_list_service",
+    "get_discount_rule_products_service",
 ]
