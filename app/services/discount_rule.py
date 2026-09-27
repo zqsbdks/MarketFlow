@@ -23,6 +23,7 @@ from app.crud.discount_rule import (
     get_discount_rules_for_delete,
     get_discount_rules_list,
     get_existing_discount_product_ids,
+    update_discount_rule,
     update_discount_rule_status,
 )
 from app.crud.employees import get_department_by_id
@@ -38,6 +39,7 @@ from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
     CreateDiscountRuleRequest,
     GetDiscountRuleProductsRequest,
+    UpdateDiscountRuleRequest,
     UpdateDiscountRuleStatusRequest,
 )
 from app.schemas.discount_rule_responses import (
@@ -935,6 +937,262 @@ async def delete_all_discount_rule_products_service(
 # endregion
 
 
+# region 修改折扣规则资料
+async def update_discount_rule_service(
+    discount_rule_id: int,
+    request: UpdateDiscountRuleRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DiscountRuleListItemResponse:
+    """验证账号、部门权限和规则配置，并修改折扣规则资料。"""
+
+    # 第一步：检查当前登录员工是否仍然可以执行数据修改操作。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以修改折扣规则",
+        )
+
+    # 第二步：查询要修改的规则，并限制正式员工只能管理本部门规则。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if rule.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能修改自己所属部门的折扣规则",
+            )
+
+    # exclude_unset=True只保留前端实际传入的字段；reason只写入审计表，不更新规则表。
+    requested_data = request.model_dump(exclude_unset=True, exclude={"reason"})
+    if not requested_data:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="至少传入一个需要修改的字段",
+        )
+
+    # 第三步：不允许把规则的必填配置显式修改为null。
+    required_field_names = (
+        "name",
+        "discount_type",
+        "discount_value",
+        "schedule_type",
+    )
+    for field_name in required_field_names:
+        if field_name in requested_data and requested_data[field_name] is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="规则名称、折扣方式、折扣数值和执行周期不能设置为空",
+            )
+
+    # 修改名称时排除规则自身，防止保留原名称被误判为重复。
+    new_name = requested_data.get("name")
+    if isinstance(new_name, str) and new_name != rule.name:
+        same_name_rule = await get_discount_rule_by_name(
+            name=new_name,
+            excluded_discount_rule_id=rule.id,
+            db=db,
+        )
+        if same_name_rule is not None:
+            raise HTTPException(
+                status_code=http_status.HTTP_409_CONFLICT,
+                detail="折扣规则名称已存在",
+            )
+
+    # 第四步：把未修改的折扣字段沿用旧值，再校验组合后的折扣配置。
+    new_discount_type = rule.discount_type
+    if request.discount_type is not None:
+        new_discount_type = request.discount_type
+
+    new_discount_value = rule.discount_value
+    if request.discount_value is not None:
+        new_discount_value = request.discount_value
+
+    if new_discount_type == DiscountType.PERCENTAGE and new_discount_value >= 1:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="比例折扣必须大于0且小于1，例如0.8表示八折",
+        )
+
+    # 第五步：只要修改了执行周期相关字段，就重新整理并校验整套时间配置。
+    schedule_field_names = (
+        "schedule_type",
+        "starts_at",
+        "ends_at",
+        "daily_start_time",
+        "daily_end_time",
+        "weekdays",
+    )
+    schedule_was_changed = False
+    for field_name in schedule_field_names:
+        if field_name in requested_data:
+            schedule_was_changed = True
+            break
+
+    if schedule_was_changed:
+        new_schedule_type = rule.schedule_type
+        if request.schedule_type is not None:
+            new_schedule_type = request.schedule_type
+
+        if new_schedule_type == DiscountScheduleType.ONCE:
+            new_starts_at = rule.starts_at
+            if "starts_at" in requested_data:
+                new_starts_at = request.starts_at
+
+            new_ends_at = rule.ends_at
+            if "ends_at" in requested_data:
+                new_ends_at = request.ends_at
+
+            if new_starts_at is None or new_ends_at is None:
+                raise HTTPException(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    detail="单次折扣必须填写开始时间和结束时间",
+                )
+            if new_starts_at >= new_ends_at:
+                raise HTTPException(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    detail="单次折扣的结束时间必须晚于开始时间",
+                )
+            if new_ends_at <= datetime.now():
+                raise HTTPException(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    detail="单次折扣的结束时间必须晚于当前时间",
+                )
+
+            # 单次规则只保留完整日期时间，自动清空循环规则才使用的字段。
+            requested_data["schedule_type"] = new_schedule_type
+            requested_data["starts_at"] = new_starts_at
+            requested_data["ends_at"] = new_ends_at
+            requested_data["daily_start_time"] = None
+            requested_data["daily_end_time"] = None
+            requested_data["weekdays"] = None
+        else:
+            new_daily_start_time = rule.daily_start_time
+            if "daily_start_time" in requested_data:
+                new_daily_start_time = request.daily_start_time
+
+            new_daily_end_time = rule.daily_end_time
+            if "daily_end_time" in requested_data:
+                new_daily_end_time = request.daily_end_time
+
+            if new_daily_start_time is None or new_daily_end_time is None:
+                raise HTTPException(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    detail="每日或每周折扣必须填写每天的开始时间和结束时间",
+                )
+            if new_daily_start_time >= new_daily_end_time:
+                raise HTTPException(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    detail="每日结束时间必须晚于每日开始时间",
+                )
+
+            normalized_weekdays: list[int] | None = None
+            if new_schedule_type == DiscountScheduleType.WEEKLY:
+                new_weekdays = rule.weekdays
+                if "weekdays" in requested_data:
+                    new_weekdays = request.weekdays
+                if not new_weekdays:
+                    raise HTTPException(
+                        status_code=http_status.HTTP_400_BAD_REQUEST,
+                        detail="每周折扣至少选择一个执行日",
+                    )
+
+                # 使用普通循环检查范围并去重，1至7分别代表周一至周日。
+                normalized_weekdays = []
+                for weekday in new_weekdays:
+                    if weekday < 1 or weekday > 7:
+                        raise HTTPException(
+                            status_code=http_status.HTTP_400_BAD_REQUEST,
+                            detail="每周执行日只能使用1至7表示周一至周日",
+                        )
+                    if weekday not in normalized_weekdays:
+                        normalized_weekdays.append(weekday)
+                normalized_weekdays.sort()
+
+            # 循环规则只保留每天的执行时段；每日规则不需要weekdays。
+            requested_data["schedule_type"] = new_schedule_type
+            requested_data["starts_at"] = None
+            requested_data["ends_at"] = None
+            requested_data["daily_start_time"] = new_daily_start_time
+            requested_data["daily_end_time"] = new_daily_end_time
+            requested_data["weekdays"] = normalized_weekdays
+
+    # 第六步：只保存真正发生变化的字段，并记录每个字段修改前后的值。
+    update_data: dict[str, object] = {}
+    before_data: dict[str, object] = {}
+    for field_name, new_value in requested_data.items():
+        old_value = getattr(rule, field_name)
+        if old_value != new_value:
+            update_data[field_name] = new_value
+            before_data[field_name] = old_value
+
+    # 前端提交的值与数据库完全相同时直接返回，不产生空审计记录。
+    if not update_data:
+        return _build_discount_rule_list_item(rule, datetime.now())
+
+    # 第七步：更新规则和写入审计记录共用一个事务，任一步失败都会回滚。
+    try:
+        await update_discount_rule(
+            discount_rule_id=discount_rule_id,
+            update_data=update_data,
+            db=db,
+        )
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="discount",
+            action="update",
+            target_type="discount_rule",
+            target_id=discount_rule_id,
+            before_data=before_data,
+            after_data=update_data,
+            reason=request.reason,
+            db=db,
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="折扣规则修改失败，名称可能已经存在",
+        ) from exc
+
+    # 第八步：重新查询，以取得最新更新时间及已加载的员工、部门关系。
+    updated_rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if updated_rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="修改后的折扣规则不存在",
+        )
+    return _build_discount_rule_list_item(updated_rule, datetime.now())
+
+
+# endregion
+
+
 # region 修改折扣规则状态
 async def update_discount_rule_status_service(
     discount_rule_id: int,
@@ -1224,5 +1482,6 @@ __all__ = [
     "get_discount_rule_detail_service",
     "get_discount_rule_list_service",
     "get_discount_rule_products_service",
+    "update_discount_rule_service",
     "update_discount_rule_status_service",
 ]

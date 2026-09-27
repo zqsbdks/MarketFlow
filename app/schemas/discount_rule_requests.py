@@ -147,8 +147,35 @@ class UpdateDiscountRuleStatusRequest(BaseModel):
 # endregion
 
 
-# region 后续折扣规则请求模型
-# 后续添加：启停和资料修改请求模型。
+# region 修改折扣规则资料请求模型
+class UpdateDiscountRuleRequest(BaseModel):
+    """修改折扣规则配置时提交的可选字段。"""
+
+    name: str | None = Field(None, min_length=1, max_length=100, description="折扣规则名称")
+    discount_type: DiscountType | None = Field(None, description="折扣计算方式")
+    discount_value: Decimal | None = Field(
+        None,
+        gt=0,
+        max_digits=12,
+        decimal_places=4,
+        description="折扣比例、立减金额或固定价格",
+    )
+    schedule_type: DiscountScheduleType | None = Field(None, description="折扣执行周期")
+    starts_at: datetime | None = Field(None, description="单次活动开始时间")
+    ends_at: datetime | None = Field(None, description="单次活动结束时间")
+    daily_start_time: time | None = Field(None, description="每日循环开始时间")
+    daily_end_time: time | None = Field(None, description="每日循环结束时间")
+    weekdays: list[int] | None = Field(None, description="每周执行日；1至7表示周一至周日")
+    reason: str | None = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="可选的资料修改理由",
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 # endregion
 
 
@@ -162,4 +189,5 @@ __all__ = [
     "GetDiscountRuleListRequest",
     "GetDiscountRuleProductsRequest",
     "UpdateDiscountRuleStatusRequest",
+    "UpdateDiscountRuleRequest",
 ]

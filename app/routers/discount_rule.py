@@ -11,6 +11,7 @@ from app.schemas.discount_rule_requests import (
     CreateDiscountRuleRequest,
     GetDiscountRuleListRequest,
     GetDiscountRuleProductsRequest,
+    UpdateDiscountRuleRequest,
     UpdateDiscountRuleStatusRequest,
 )
 from app.schemas.discount_rule_responses import (
@@ -31,6 +32,7 @@ from app.services.discount_rule import (
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
+    update_discount_rule_service,
     update_discount_rule_status_service,
 )
 
@@ -253,6 +255,36 @@ async def get_discount_rule_detail(
 # endregion
 
 
+# region 修改折扣规则资料
+@discount_rules_router.patch(
+    "/{discount_rule_id}",
+    response_model=ResponseModel[DiscountRuleListItemResponse],
+    summary="修改折扣规则",
+    description="修改折扣规则名称、折扣方式、折扣力度或执行时间，不修改所属部门、启停状态和关联商品。",
+)
+async def update_discount_rule(
+    request: UpdateDiscountRuleRequest,
+    discount_rule_id: int = Path(..., ge=1, description="需要修改的折扣规则ID"),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DiscountRuleListItemResponse]:
+    """接收规则ID和可选修改字段，返回修改后的完整折扣规则。"""
+
+    rule = await update_discount_rule_service(
+        discount_rule_id=discount_rule_id,
+        request=request,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DiscountRuleListItemResponse](
+        message="修改折扣规则成功",
+        data=rule,
+    )
+
+
+# endregion
+
+
 # region 开启或关闭折扣规则
 @discount_rules_router.patch(
     "/{discount_rule_id}/status",
@@ -334,11 +366,6 @@ async def clear_discount_rules(
     )
 
 
-# endregion
-
-
-# region 其他折扣规则接口
-# 后续添加：修改折扣规则资料接口。
 # endregion
 
 

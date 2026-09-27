@@ -28,6 +28,7 @@ from app.schemas.discount_rule_requests import (
     CreateDiscountRuleRequest,
     GetDiscountRuleListRequest,
     GetDiscountRuleProductsRequest,
+    UpdateDiscountRuleRequest,
     UpdateDiscountRuleStatusRequest,
 )
 from app.services.discount_rule import (
@@ -41,6 +42,7 @@ from app.services.discount_rule import (
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
+    update_discount_rule_service,
     update_discount_rule_status_service,
 )
 
@@ -922,3 +924,120 @@ async def test_same_discount_status_does_not_update_or_audit(monkeypatch) -> Non
     update_status.assert_not_awaited()
     audit_log.assert_not_awaited()
     db.commit.assert_not_awaited()
+
+
+async def test_manager_can_update_discount_rule_and_change_schedule(monkeypatch) -> None:
+    """店长可以把单次规则改成每日规则，并自动清理单次活动时间。"""
+
+    employee = build_employee()
+    original_rule = build_once_rule(datetime.now())
+    updated_rule = build_once_rule(datetime.now())
+    updated_rule.name = "每日晚间折扣"
+    updated_rule.schedule_type = DiscountScheduleType.DAILY
+    updated_rule.starts_at = None
+    updated_rule.ends_at = None
+    updated_rule.daily_start_time = time(18, 0)
+    updated_rule.daily_end_time = time(21, 0)
+    updated_rule.weekdays = None
+
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(side_effect=[original_rule, updated_rule]),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_name",
+        AsyncMock(return_value=None),
+    )
+    update_rule = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.update_discount_rule",
+        update_rule,
+    )
+    audit_log = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_log,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    request = UpdateDiscountRuleRequest(
+        name="每日晚间折扣",
+        schedule_type=DiscountScheduleType.DAILY,
+        daily_start_time=time(18, 0),
+        daily_end_time=time(21, 0),
+        reason="改为每天执行",
+    )
+    result = await update_discount_rule_service(
+        discount_rule_id=original_rule.id,
+        request=request,
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.name == "每日晚间折扣"
+    assert result.schedule_type == DiscountScheduleType.DAILY
+    update_rule.assert_awaited_once()
+    saved_data = update_rule.await_args.kwargs["update_data"]
+    assert saved_data["starts_at"] is None
+    assert saved_data["ends_at"] is None
+    assert saved_data["daily_start_time"] == time(18, 0)
+    assert saved_data["daily_end_time"] == time(21, 0)
+    audit_log.assert_awaited_once()
+    assert audit_log.await_args.kwargs["reason"] == "改为每天执行"
+    db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_cannot_update_other_department_rule(monkeypatch) -> None:
+    """正式员工不能修改其他部门的折扣规则。"""
+
+    employee = build_regular_employee(department_id=1)
+    rule = build_once_rule(datetime.now())
+    rule.department_id = 2
+    rule.department = build_department(department_id=2)
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await update_discount_rule_service(
+            discount_rule_id=rule.id,
+            request=UpdateDiscountRuleRequest(name="不能修改的规则"),
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 403
+
+
+async def test_update_discount_rule_without_fields_is_rejected(monkeypatch) -> None:
+    """未提交任何资料字段时返回400，避免执行无意义的数据库更新。"""
+
+    employee = build_employee()
+    rule = build_once_rule(datetime.now())
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await update_discount_rule_service(
+            discount_rule_id=rule.id,
+            request=UpdateDiscountRuleRequest(),
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 400

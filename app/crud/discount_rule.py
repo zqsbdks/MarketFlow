@@ -478,6 +478,24 @@ async def update_discount_rule_status(
 # endregion
 
 
+# region 修改折扣规则资料
+async def update_discount_rule(
+    discount_rule_id: int,
+    update_data: dict[str, object],
+    db: AsyncSession,
+) -> None:
+    """修改折扣规则资料；事务提交由Service统一负责。"""
+
+    statement = (
+        update(DiscountRule).where(DiscountRule.id == discount_rule_id).values(**update_data)
+    )
+    await db.execute(statement)
+    await db.flush()
+
+
+# endregion
+
+
 __all__ = [
     "create_discount_rule",
     "create_discount_rule_product_scopes",
@@ -493,4 +511,5 @@ __all__ = [
     "get_discount_rules_list",
     "get_discount_rules_for_delete",
     "update_discount_rule_status",
+    "update_discount_rule",
 ]
