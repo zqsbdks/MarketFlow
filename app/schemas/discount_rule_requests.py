@@ -129,6 +129,24 @@ class GetDiscountRuleProductsRequest(BaseModel):
 # endregion
 
 
+# region 修改折扣规则状态请求模型
+class UpdateDiscountRuleStatusRequest(BaseModel):
+    """开启或关闭折扣规则时提交的数据。"""
+
+    is_active: bool = Field(..., description="true表示开启，false表示关闭")
+    reason: str | None = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="可选的状态修改理由",
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+# endregion
+
+
 # region 后续折扣规则请求模型
 # 后续添加：启停和资料修改请求模型。
 # endregion
@@ -143,4 +161,5 @@ __all__ = [
     "CreateDiscountRuleRequest",
     "GetDiscountRuleListRequest",
     "GetDiscountRuleProductsRequest",
+    "UpdateDiscountRuleStatusRequest",
 ]

@@ -23,6 +23,7 @@ from app.crud.discount_rule import (
     get_discount_rules_for_delete,
     get_discount_rules_list,
     get_existing_discount_product_ids,
+    update_discount_rule_status,
 )
 from app.crud.employees import get_department_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
@@ -37,6 +38,7 @@ from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
     CreateDiscountRuleRequest,
     GetDiscountRuleProductsRequest,
+    UpdateDiscountRuleStatusRequest,
 )
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
@@ -933,6 +935,99 @@ async def delete_all_discount_rule_products_service(
 # endregion
 
 
+# region 修改折扣规则状态
+async def update_discount_rule_status_service(
+    discount_rule_id: int,
+    request: UpdateDiscountRuleStatusRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DiscountRuleListItemResponse:
+    """验证账号和部门权限，并开启或关闭折扣规则。"""
+
+    # 第一步：验证当前登录员工和账号状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以开启或关闭折扣规则",
+        )
+
+    # 第二步：查询规则并检查正式员工的部门权限。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if rule.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能修改自己所属部门的折扣规则",
+            )
+
+    # 请求状态与数据库相同时不执行更新，也不生成没有实际变化的审计记录。
+    if rule.is_active == request.is_active:
+        return _build_discount_rule_list_item(rule, datetime.now())
+
+    # 第三步：修改状态并记录修改前后的值，然后统一提交事务。
+    try:
+        await update_discount_rule_status(
+            discount_rule_id=discount_rule_id,
+            is_active=request.is_active,
+            db=db,
+        )
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="discount",
+            action="update_status",
+            target_type="discount_rule",
+            target_id=discount_rule_id,
+            before_data={"is_active": rule.is_active},
+            after_data={"is_active": request.is_active},
+            reason=request.reason,
+            db=db,
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="折扣规则状态修改失败，请稍后重试",
+        ) from exc
+
+    # 第四步：重新查询，取得数据库中的最新状态和更新时间。
+    updated_rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if updated_rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="修改后的折扣规则不存在",
+        )
+    return _build_discount_rule_list_item(updated_rule, datetime.now())
+
+
+# endregion
+
+
 # region 删除单个折扣规则
 async def delete_discount_rule_service(
     discount_rule_id: int,
@@ -1129,4 +1224,5 @@ __all__ = [
     "get_discount_rule_detail_service",
     "get_discount_rule_list_service",
     "get_discount_rule_products_service",
+    "update_discount_rule_status_service",
 ]

@@ -3,7 +3,7 @@
 from datetime import datetime, time
 from decimal import Decimal
 
-from sqlalchemy import and_, delete, func, not_, or_, select
+from sqlalchemy import and_, delete, func, not_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
@@ -460,6 +460,24 @@ async def delete_discount_rules(
 # endregion
 
 
+# region 修改折扣规则状态
+async def update_discount_rule_status(
+    discount_rule_id: int,
+    is_active: bool,
+    db: AsyncSession,
+) -> None:
+    """修改折扣规则的人工启停状态；事务提交由Service统一负责。"""
+
+    statement = (
+        update(DiscountRule).where(DiscountRule.id == discount_rule_id).values(is_active=is_active)
+    )
+    await db.execute(statement)
+    await db.flush()
+
+
+# endregion
+
+
 __all__ = [
     "create_discount_rule",
     "create_discount_rule_product_scopes",
@@ -474,4 +492,5 @@ __all__ = [
     "get_discount_rule_by_name",
     "get_discount_rules_list",
     "get_discount_rules_for_delete",
+    "update_discount_rule_status",
 ]

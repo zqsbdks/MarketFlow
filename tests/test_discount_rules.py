@@ -28,6 +28,7 @@ from app.schemas.discount_rule_requests import (
     CreateDiscountRuleRequest,
     GetDiscountRuleListRequest,
     GetDiscountRuleProductsRequest,
+    UpdateDiscountRuleStatusRequest,
 )
 from app.services.discount_rule import (
     add_discount_rule_products_service,
@@ -40,6 +41,7 @@ from app.services.discount_rule import (
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
+    update_discount_rule_status_service,
 )
 
 
@@ -834,3 +836,89 @@ async def test_regular_employee_clears_rules_in_own_department(monkeypatch) -> N
     delete_rules.assert_awaited_once_with(rule_ids=[1, 2], db=db)
     assert audit_log.await_count == 2
     db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_can_close_own_department_rule(monkeypatch) -> None:
+    """正式员工可以关闭自己部门的规则，并记录状态变化和原因。"""
+
+    employee = build_regular_employee(department_id=1)
+    rule = build_once_rule(datetime.now())
+    updated_rule = build_once_rule(datetime.now(), is_active=False)
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(side_effect=[rule, updated_rule]),
+    )
+    update_status = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.update_discount_rule_status",
+        update_status,
+    )
+    audit_log = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_log,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await update_discount_rule_status_service(
+        discount_rule_id=rule.id,
+        request=UpdateDiscountRuleStatusRequest(
+            is_active=False,
+            reason="本周暂停活动",
+        ),
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.is_active is False
+    assert result.computed_status == DiscountComputedStatus.DISABLED
+    update_status.assert_awaited_once_with(
+        discount_rule_id=rule.id,
+        is_active=False,
+        db=db,
+    )
+    audit_log.assert_awaited_once()
+    assert audit_log.await_args.kwargs["reason"] == "本周暂停活动"
+    db.commit.assert_awaited_once()
+
+
+async def test_same_discount_status_does_not_update_or_audit(monkeypatch) -> None:
+    """目标状态与当前状态相同时，直接返回且不更新数据库或写审计。"""
+
+    employee = build_employee()
+    rule = build_once_rule(datetime.now(), is_active=True)
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    update_status = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.update_discount_rule_status",
+        update_status,
+    )
+    audit_log = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_log,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await update_discount_rule_status_service(
+        discount_rule_id=rule.id,
+        request=UpdateDiscountRuleStatusRequest(is_active=True),
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.is_active is True
+    update_status.assert_not_awaited()
+    audit_log.assert_not_awaited()
+    db.commit.assert_not_awaited()
