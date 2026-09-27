@@ -178,6 +178,7 @@ EXPECTED_COLUMNS = {
     "discount_rule": {
         "id",
         "name",
+        "department_id",
         "discount_type",
         "discount_value",
         "schedule_type",
@@ -375,10 +376,10 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """删除折扣库存阈值的迁移是当前唯一的 Alembic 版本头。"""
+    """增加折扣规则所属部门的迁移是当前唯一的 Alembic 版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260927_0016"]
+    assert script.get_heads() == ["20260927_0017"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

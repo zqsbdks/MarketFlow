@@ -62,6 +62,17 @@ def build_product(*, product_id: int = 1, department_id: int = 1) -> Product:
     return Product(id=product_id, department_id=department_id)
 
 
+def build_department(*, department_id: int = 1) -> Department:
+    """构造折扣规则所属的启用部门。"""
+
+    return Department(
+        id=department_id,
+        code=f"D{department_id:02d}",
+        name=f"测试部门{department_id}",
+        is_active=True,
+    )
+
+
 def build_regular_employee(*, department_id: int | None = 1) -> Employee:
     """构造已启用的正式员工，可通过department_id模拟是否已分配部门。"""
 
@@ -82,6 +93,7 @@ def build_once_rule(now: datetime, *, is_active: bool = True) -> DiscountRule:
 
     rule = DiscountRule(
         id=1,
+        department_id=1,
         name="测试单次折扣",
         discount_type=DiscountType.PERCENTAGE,
         discount_value=Decimal("0.8000"),
@@ -94,6 +106,7 @@ def build_once_rule(now: datetime, *, is_active: bool = True) -> DiscountRule:
         updated_at=now,
     )
     rule.creator = build_employee()
+    rule.department = build_department()
     return rule
 
 
@@ -163,6 +176,7 @@ async def test_get_discount_rule_list_service_builds_pagination(monkeypatch) -> 
         page=1,
         page_size=10,
         keyword=None,
+        department_id=None,
         discount_type=None,
         schedule_type=None,
         is_active=None,
@@ -246,6 +260,10 @@ async def test_manager_can_create_daily_discount_rule(monkeypatch) -> None:
         AsyncMock(return_value=employee),
     )
     monkeypatch.setattr(
+        "app.services.discount_rule.get_department_by_id",
+        AsyncMock(return_value=build_department()),
+    )
+    monkeypatch.setattr(
         "app.services.discount_rule.get_discount_rule_by_name",
         AsyncMock(return_value=None),
     )
@@ -265,6 +283,7 @@ async def test_manager_can_create_daily_discount_rule(monkeypatch) -> None:
     db = AsyncMock(spec=AsyncSession)
     result = await create_discount_rule_service(
         request=CreateDiscountRuleRequest(
+            department_id=1,
             name="晚间生鲜八折",
             discount_type=DiscountType.PERCENTAGE,
             discount_value=Decimal("0.8000"),
@@ -301,6 +320,10 @@ async def test_regular_employee_with_department_can_create_discount_rule(monkeyp
         AsyncMock(return_value=employee),
     )
     monkeypatch.setattr(
+        "app.services.discount_rule.get_department_by_id",
+        AsyncMock(return_value=build_department()),
+    )
+    monkeypatch.setattr(
         "app.services.discount_rule.get_discount_rule_by_name",
         AsyncMock(return_value=None),
     )
@@ -321,6 +344,7 @@ async def test_regular_employee_with_department_can_create_discount_rule(monkeyp
     db = AsyncMock(spec=AsyncSession)
     result = await create_discount_rule_service(
         request=CreateDiscountRuleRequest(
+            department_id=1,
             name="本部门晚间折扣",
             discount_type=DiscountType.PERCENTAGE,
             discount_value=Decimal("0.8000"),
@@ -351,6 +375,7 @@ async def test_regular_employee_without_department_cannot_create_discount_rule(
     with pytest.raises(HTTPException) as exception_info:
         await create_discount_rule_service(
             request=CreateDiscountRuleRequest(
+                department_id=1,
                 name="无所属部门折扣",
                 discount_type=DiscountType.PERCENTAGE,
                 discount_value=Decimal("0.8000"),
@@ -375,6 +400,10 @@ async def test_create_discount_rule_rejects_invalid_percentage(monkeypatch) -> N
         AsyncMock(return_value=employee),
     )
     monkeypatch.setattr(
+        "app.services.discount_rule.get_department_by_id",
+        AsyncMock(return_value=build_department()),
+    )
+    monkeypatch.setattr(
         "app.services.discount_rule.get_discount_rule_by_name",
         AsyncMock(return_value=None),
     )
@@ -382,6 +411,7 @@ async def test_create_discount_rule_rejects_invalid_percentage(monkeypatch) -> N
     with pytest.raises(HTTPException) as exception_info:
         await create_discount_rule_service(
             request=CreateDiscountRuleRequest(
+                department_id=1,
                 name="无效比例折扣",
                 discount_type=DiscountType.PERCENTAGE,
                 discount_value=Decimal("1.0000"),
@@ -396,14 +426,14 @@ async def test_create_discount_rule_rejects_invalid_percentage(monkeypatch) -> N
     assert exception_info.value.status_code == 400
 
 
-async def test_manager_can_add_products_from_any_department(monkeypatch) -> None:
-    """店长可以把不同部门的商品添加到现有折扣规则。"""
+async def test_manager_can_add_products_from_rule_department(monkeypatch) -> None:
+    """店长可以把规则所属部门的多个商品加入折扣。"""
 
     employee = build_employee()
     rule = build_once_rule(datetime.now())
     products = [
         build_product(product_id=1, department_id=1),
-        build_product(product_id=2, department_id=2),
+        build_product(product_id=2, department_id=1),
     ]
     monkeypatch.setattr(
         "app.services.discount_rule.get_employee_by_id",
@@ -449,8 +479,8 @@ async def test_manager_can_add_products_from_any_department(monkeypatch) -> None
     db.commit.assert_awaited_once()
 
 
-async def test_regular_employee_cannot_add_other_department_product(monkeypatch) -> None:
-    """正式员工把其他部门商品加入折扣时，应在写入关联前返回403。"""
+async def test_cannot_add_product_from_other_department(monkeypatch) -> None:
+    """任何员工把其他部门商品加入规则时，都应在写入关联前返回400。"""
 
     employee = build_regular_employee(department_id=1)
     rule = build_once_rule(datetime.now())
@@ -475,8 +505,8 @@ async def test_regular_employee_cannot_add_other_department_product(monkeypatch)
             db=AsyncMock(spec=AsyncSession),
         )
 
-    assert exception_info.value.status_code == 403
-    assert exception_info.value.detail == "正式员工只能添加自己所属部门的商品：8"
+    assert exception_info.value.status_code == 400
+    assert exception_info.value.detail == "折扣商品必须属于规则指定的部门：8"
 
 
 async def test_get_discount_rule_products_service_builds_page_and_price(monkeypatch) -> None:
@@ -531,7 +561,6 @@ async def test_get_discount_rule_products_service_builds_page_and_price(monkeypa
             page=1,
             page_size=10,
             keyword="猪肉",
-            department_id=1,
             category_id=1,
         ),
         current_employee_id=employee.id,
@@ -549,7 +578,6 @@ async def test_get_discount_rule_products_service_builds_page_and_price(monkeypa
         offset=0,
         page_size=10,
         keyword="猪肉",
-        department_id=1,
         category_id=1,
         db=db,
     )

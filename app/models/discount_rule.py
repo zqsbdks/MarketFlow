@@ -27,6 +27,7 @@ from app.models.base import Base, TimestampMixin
 from app.models.enums import DiscountScheduleType, DiscountType
 
 if TYPE_CHECKING:
+    from app.models.department import Department
     from app.models.discount_rule_scope import DiscountRuleScope
     from app.models.employee import Employee
 
@@ -76,6 +77,13 @@ class DiscountRule(TimestampMixin, Base):
         comment="折扣规则主键",
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False, comment="折扣规则名称")
+    department_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("department.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+        comment="折扣规则所属部门ID",
+    )
     discount_type: Mapped[DiscountType] = mapped_column(
         Enum(
             DiscountType,
@@ -150,6 +158,7 @@ class DiscountRule(TimestampMixin, Base):
     )
 
     creator: Mapped[Employee] = relationship(back_populates="created_discount_rules")
+    department: Mapped[Department] = relationship(back_populates="discount_rules")
     scopes: Mapped[list[DiscountRuleScope]] = relationship(
         back_populates="rule",
         cascade="all, delete-orphan",

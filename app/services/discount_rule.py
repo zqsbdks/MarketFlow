@@ -22,6 +22,7 @@ from app.crud.discount_rule import (
     get_discount_rules_list,
     get_existing_discount_product_ids,
 )
+from app.crud.employees import get_department_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.discount_rule import DiscountRule
 from app.models.enums import (
@@ -103,6 +104,8 @@ def _build_discount_rule_list_item(
     return DiscountRuleListItemResponse(
         id=rule.id,
         name=rule.name,
+        department_id=rule.department_id,
+        department_name=rule.department.name,
         discount_type=rule.discount_type,
         discount_value=rule.discount_value,
         schedule_type=rule.schedule_type,
@@ -150,6 +153,7 @@ async def get_discount_rule_list_service(
     page: int,
     page_size: int,
     keyword: str | None,
+    department_id: int | None,
     discount_type: DiscountType | None,
     schedule_type: DiscountScheduleType | None,
     is_active: bool | None,
@@ -185,6 +189,7 @@ async def get_discount_rule_list_service(
         offset=offset,
         page_size=page_size,
         keyword=keyword,
+        department_id=department_id,
         discount_type=discount_type,
         schedule_type=schedule_type,
         is_active=is_active,
@@ -291,7 +296,6 @@ async def get_discount_rule_products_service(
         offset=offset,
         page_size=request.page_size,
         keyword=request.keyword,
-        department_id=request.department_id,
         category_id=request.category_id,
         db=db,
     )
@@ -382,7 +386,28 @@ async def create_discount_rule_service(
             detail="只有店长或正式员工可以创建折扣规则",
         )
 
-    # 第二步：提前检查名称重复，向前端返回明确的业务错误。
+    # 第二步：确认规则所属部门存在并且处于启用状态。
+    department = await get_department_by_id(department_id=request.department_id, db=db)
+    if department is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="所属部门不存在",
+        )
+    if not department.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="所属部门已停用",
+        )
+
+    # 正式员工只能为自己的所属部门创建规则；店长可以选择任意启用部门。
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if request.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能为自己所属部门创建折扣规则",
+            )
+
+    # 第三步：提前检查名称重复，向前端返回明确的业务错误。
     same_name_rule = await get_discount_rule_by_name(name=request.name, db=db)
     if same_name_rule is not None:
         raise HTTPException(
@@ -390,14 +415,14 @@ async def create_discount_rule_service(
             detail="折扣规则名称已存在",
         )
 
-    # 第三步：按折扣方式检查数值。percentage使用0到1之间的小数表示折扣比例。
+    # 第四步：按折扣方式检查数值。percentage使用0到1之间的小数表示折扣比例。
     if request.discount_type == DiscountType.PERCENTAGE and request.discount_value >= 1:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail="比例折扣必须大于0且小于1，例如0.8表示八折",
         )
 
-    # 第四步：根据执行周期检查需要填写的时间字段，并清理每周执行日。
+    # 第五步：根据执行周期检查需要填写的时间字段，并清理每周执行日。
     weekdays: list[int] | None = None
     now = datetime.now()
     if request.schedule_type == DiscountScheduleType.ONCE:
@@ -462,9 +487,10 @@ async def create_discount_rule_service(
             # 去除重复星期并按周一至周日排序，保证数据库数据格式统一。
             weekdays = sorted(set(request.weekdays))
 
-    # 第五步：折扣规则和审计记录在同一个事务中写入。
+    # 第六步：折扣规则和审计记录在同一个事务中写入。
     try:
         created_rule = await create_discount_rule(
+            department_id=request.department_id,
             name=request.name,
             discount_type=request.discount_type,
             discount_value=request.discount_value,
@@ -486,6 +512,7 @@ async def create_discount_rule_service(
             target_id=created_rule.id,
             before_data=None,
             after_data={
+                "department_id": created_rule.department_id,
                 "name": created_rule.name,
                 "discount_type": created_rule.discount_type,
                 "discount_value": created_rule.discount_value,
@@ -508,7 +535,7 @@ async def create_discount_rule_service(
             detail="折扣规则名称已存在",
         ) from exc
 
-    # 第六步：重新查询以加载创建员工关系，并返回数据库中的最终数据。
+    # 第七步：重新查询以加载创建员工和所属部门关系，并返回最终数据。
     saved_rule = await get_discount_rule_by_id(discount_rule_id=created_rule.id, db=db)
     if saved_rule is None:
         raise HTTPException(
@@ -573,6 +600,14 @@ async def add_discount_rule_products_service(
             detail="折扣规则不存在",
         )
 
+    # 正式员工只能管理自己部门的折扣规则。
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if rule.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能管理自己所属部门的折扣规则",
+            )
+
     # 第三步：使用普通循环去除重复ID，避免为同一个商品创建两条关联。
     product_ids: list[int] = []
     for product_id in request.product_ids:
@@ -602,22 +637,21 @@ async def add_discount_rule_products_service(
             detail=f"以下商品不存在：{missing_text}",
         )
 
-    # 第四步：正式员工只能把自己所属部门的商品加入折扣；店长不受部门限制。
-    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
-        other_department_product_ids: list[int] = []
-        for product in products:
-            if product.department_id != current_employee.department_id:
-                other_department_product_ids.append(product.id)
+    # 第四步：无论操作者是不是店长，商品都必须属于规则指定的部门。
+    other_department_product_ids: list[int] = []
+    for product in products:
+        if product.department_id != rule.department_id:
+            other_department_product_ids.append(product.id)
 
-        if other_department_product_ids:
-            product_id_texts: list[str] = []
-            for product_id in other_department_product_ids:
-                product_id_texts.append(str(product_id))
-            product_text = "、".join(product_id_texts)
-            raise HTTPException(
-                status_code=http_status.HTTP_403_FORBIDDEN,
-                detail=f"正式员工只能添加自己所属部门的商品：{product_text}",
-            )
+    if other_department_product_ids:
+        product_id_texts: list[str] = []
+        for product_id in other_department_product_ids:
+            product_id_texts.append(str(product_id))
+        product_text = "、".join(product_id_texts)
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"折扣商品必须属于规则指定的部门：{product_text}",
+        )
 
     # 第五步：已经关联的商品不允许再次添加，避免唯一约束错误难以理解。
     existing_product_ids = await get_existing_discount_product_ids(
@@ -713,6 +747,14 @@ async def delete_discount_rule_product_service(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="折扣规则不存在",
         )
+
+    # 正式员工只能删除自己部门规则中的商品关联。
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if rule.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能管理自己所属部门的折扣规则",
+            )
 
     # 第三步：查询这条规则和商品之间的关联。
     scope = await get_discount_rule_product_scope(
@@ -817,6 +859,14 @@ async def delete_all_discount_rule_products_service(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="折扣规则不存在",
         )
+
+    # 正式员工只能清空自己部门的折扣规则。
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if rule.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能管理自己所属部门的折扣规则",
+            )
 
     # 第三步：店长查询全部商品；正式员工只查询自己部门的商品。
     department_id: int | None = None

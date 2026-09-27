@@ -19,6 +19,8 @@ class DiscountRuleListItemResponse(BaseModel):
 
     id: int = Field(..., ge=1, description="折扣规则ID")
     name: str = Field(..., min_length=1, max_length=100, description="折扣规则名称")
+    department_id: int = Field(..., ge=1, description="所属部门ID")
+    department_name: str = Field(..., min_length=1, max_length=50, description="所属部门名称")
     discount_type: DiscountType = Field(..., description="折扣计算方式")
     discount_value: Decimal = Field(..., gt=0, decimal_places=4, description="折扣数值")
     schedule_type: DiscountScheduleType = Field(..., description="折扣执行周期")

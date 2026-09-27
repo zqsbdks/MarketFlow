@@ -100,6 +100,7 @@ async def get_discount_rules_list(
     offset: int,
     page_size: int,
     keyword: str | None,
+    department_id: int | None,
     discount_type: DiscountType | None,
     schedule_type: DiscountScheduleType | None,
     is_active: bool | None,
@@ -114,6 +115,8 @@ async def get_discount_rules_list(
     # 每个参数都允许不传；只有前端实际传入时，才添加对应查询条件。
     if keyword is not None:
         conditions.append(DiscountRule.name.ilike(f"%{keyword}%"))
+    if department_id is not None:
+        conditions.append(DiscountRule.department_id == department_id)
     if discount_type is not None:
         conditions.append(DiscountRule.discount_type == discount_type)
     if schedule_type is not None:
@@ -123,10 +126,13 @@ async def get_discount_rules_list(
     if computed_status is not None:
         conditions.append(_get_computed_status_condition(computed_status, now))
 
-    # selectinload提前加载创建员工，Service读取员工姓名时不会再次访问数据库。
+    # 提前加载创建员工和所属部门，Service组装响应时不会再次访问数据库。
     list_statement = (
         select(DiscountRule)
-        .options(selectinload(DiscountRule.creator))
+        .options(
+            selectinload(DiscountRule.creator),
+            selectinload(DiscountRule.department),
+        )
         .where(*conditions)
         .order_by(DiscountRule.id.desc())
         .offset(offset)
@@ -149,10 +155,13 @@ async def get_discount_rule_by_id(
 ) -> DiscountRule | None:
     """根据规则ID查询一条折扣规则，并提前加载创建员工。"""
 
-    # 详情响应需要显示创建员工姓名，所以查询规则时一并加载creator关系。
+    # 详情响应需要显示创建员工和所属部门，所以查询规则时一并加载两个关系。
     statement = (
         select(DiscountRule)
-        .options(selectinload(DiscountRule.creator))
+        .options(
+            selectinload(DiscountRule.creator),
+            selectinload(DiscountRule.department),
+        )
         .where(DiscountRule.id == discount_rule_id)
         # 如果会话中已经存在该对象，仍使用数据库最新值覆盖旧的会话缓存。
         .execution_options(populate_existing=True)
@@ -184,6 +193,7 @@ async def get_discount_rule_by_name(
 
 # region 创建折扣规则
 async def create_discount_rule(
+    department_id: int,
     name: str,
     discount_type: DiscountType,
     discount_value: Decimal,
@@ -200,6 +210,7 @@ async def create_discount_rule(
     """创建折扣规则并取得自增ID；事务提交由Service统一负责。"""
 
     rule = DiscountRule(
+        department_id=department_id,
         name=name,
         discount_type=discount_type,
         discount_value=discount_value,
@@ -295,7 +306,6 @@ async def get_discount_rule_products_list(
     offset: int,
     page_size: int,
     keyword: str | None,
-    department_id: int | None,
     category_id: int | None,
     db: AsyncSession,
 ) -> tuple[list[DiscountRuleScope], int]:
@@ -314,8 +324,6 @@ async def get_discount_rule_products_list(
                 Product.name.ilike(fuzzy_keyword),
             )
         )
-    if department_id is not None:
-        conditions.append(Product.department_id == department_id)
     if category_id is not None:
         conditions.append(Product.category_id == category_id)
 

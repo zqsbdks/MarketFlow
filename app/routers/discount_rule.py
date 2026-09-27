@@ -57,6 +57,7 @@ async def get_discount_rule_list(
         page=request.page,
         page_size=request.page_size,
         keyword=request.keyword,
+        department_id=request.department_id,
         discount_type=request.discount_type,
         schedule_type=request.schedule_type,
         is_active=request.is_active,

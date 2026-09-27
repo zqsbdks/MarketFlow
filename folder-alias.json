@@ -682,5 +682,8 @@
     },
     "alembic/versions/20260927_0016_remove_discount_stock_thresholds.py": {
         "description": "删除折扣规则开始与停止库存阈值字段迁移"
+    },
+    "alembic/versions/20260927_0017_add_discount_rule_department.py": {
+        "description": "为折扣规则增加必填所属部门字段迁移"
     }
 }

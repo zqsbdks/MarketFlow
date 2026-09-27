@@ -27,6 +27,9 @@ class GetDiscountRuleListRequest(BaseModel):
         description="折扣规则名称关键字",
     )
 
+    # department_id用于只查询某个部门创建的折扣规则。
+    department_id: int | None = Field(None, ge=1, description="所属部门ID")
+
     # discount_type用于只查询某一种计价方式，例如percentage表示按比例打折。
     discount_type: DiscountType | None = Field(None, description="折扣计算方式")
 
@@ -49,6 +52,9 @@ class GetDiscountRuleListRequest(BaseModel):
 # region 创建折扣规则请求模型
 class CreateDiscountRuleRequest(BaseModel):
     """创建一条折扣规则时提交的完整规则配置。"""
+
+    # 每条规则必须明确属于一个部门，后续只能添加该部门的商品。
+    department_id: int = Field(..., ge=1, description="折扣规则所属部门ID")
 
     # 名称用于前端识别规则，并由Service检查是否与现有规则重名。
     name: str = Field(..., min_length=1, max_length=100, description="折扣规则名称")
@@ -114,7 +120,6 @@ class GetDiscountRuleProductsRequest(BaseModel):
         max_length=100,
         description="商品编号或商品名称关键字",
     )
-    department_id: int | None = Field(None, ge=1, description="所属部门ID")
     category_id: int | None = Field(None, ge=1, description="所属分类ID")
 
     # 去掉搜索关键字首尾空格，避免空格影响商品编号或名称匹配。
