@@ -32,9 +32,11 @@ from app.schemas.discount_rule_requests import (
 from app.services.discount_rule import (
     add_discount_rule_products_service,
     calculate_discount_rule_status,
+    clear_discount_rules_service,
     create_discount_rule_service,
     delete_all_discount_rule_products_service,
     delete_discount_rule_product_service,
+    delete_discount_rule_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
@@ -724,4 +726,111 @@ async def test_regular_employee_deletes_all_products_in_own_department(monkeypat
         department_id=1,
         db=db,
     )
+    db.commit.assert_awaited_once()
+
+
+async def test_manager_can_delete_one_discount_rule(monkeypatch) -> None:
+    """店长删除单条规则时，应记录审计并调用规则删除函数。"""
+
+    employee = build_employee()
+    rule = build_once_rule(datetime.now())
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    delete_rules = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.delete_discount_rules",
+        delete_rules,
+    )
+    audit_log = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_log,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await delete_discount_rule_service(
+        discount_rule_id=rule.id,
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.deleted_count == 1
+    assert result.deleted_rule_ids == [rule.id]
+    delete_rules.assert_awaited_once_with(rule_ids=[rule.id], db=db)
+    audit_log.assert_awaited_once()
+    db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_cannot_delete_other_department_rule(monkeypatch) -> None:
+    """正式员工删除其他部门的折扣规则时返回403。"""
+
+    employee = build_regular_employee(department_id=1)
+    rule = build_once_rule(datetime.now())
+    rule.department_id = 2
+    rule.department = build_department(department_id=2)
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await delete_discount_rule_service(
+            discount_rule_id=rule.id,
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 403
+
+
+async def test_regular_employee_clears_rules_in_own_department(monkeypatch) -> None:
+    """正式员工一键清空时，只查询和删除自己部门的折扣规则。"""
+
+    employee = build_regular_employee(department_id=1)
+    first_rule = build_once_rule(datetime.now())
+    second_rule = build_once_rule(datetime.now())
+    second_rule.id = 2
+    second_rule.name = "第二条测试规则"
+    rules = [first_rule, second_rule]
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    get_rules = AsyncMock(return_value=rules)
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rules_for_delete",
+        get_rules,
+    )
+    delete_rules = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.delete_discount_rules",
+        delete_rules,
+    )
+    audit_log = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_log,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await clear_discount_rules_service(
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.deleted_count == 2
+    assert result.deleted_rule_ids == [1, 2]
+    get_rules.assert_awaited_once_with(department_id=1, db=db)
+    delete_rules.assert_awaited_once_with(rule_ids=[1, 2], db=db)
+    assert audit_log.await_count == 2
     db.commit.assert_awaited_once()

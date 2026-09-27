@@ -13,12 +13,14 @@ from app.crud.discount_rule import (
     create_discount_rule,
     create_discount_rule_product_scopes,
     delete_discount_rule_product_scopes,
+    delete_discount_rules,
     get_discount_products_by_ids,
     get_discount_rule_by_id,
     get_discount_rule_by_name,
     get_discount_rule_product_scope,
     get_discount_rule_product_scopes_for_delete,
     get_discount_rule_products_list,
+    get_discount_rules_for_delete,
     get_discount_rules_list,
     get_existing_discount_product_ids,
 )
@@ -39,6 +41,7 @@ from app.schemas.discount_rule_requests import (
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
     DeleteDiscountRuleProductsResponse,
+    DeleteDiscountRulesResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
     DiscountRuleProductItemResponse,
@@ -930,12 +933,199 @@ async def delete_all_discount_rule_products_service(
 # endregion
 
 
+# region 删除单个折扣规则
+async def delete_discount_rule_service(
+    discount_rule_id: int,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DeleteDiscountRulesResponse:
+    """验证账号和部门权限，并删除指定折扣规则。"""
+
+    # 第一步：验证当前登录员工和账号状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以删除折扣规则",
+        )
+
+    # 第二步：查询规则并检查正式员工的部门权限。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if rule.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能删除自己所属部门的折扣规则",
+            )
+
+    # 第三步：记录删除前的数据，删除规则，并统一提交事务。
+    try:
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="discount",
+            action="delete",
+            target_type="discount_rule",
+            target_id=rule.id,
+            before_data={
+                "department_id": rule.department_id,
+                "name": rule.name,
+                "discount_type": rule.discount_type,
+                "discount_value": rule.discount_value,
+                "schedule_type": rule.schedule_type,
+                "is_active": rule.is_active,
+            },
+            after_data=None,
+            reason=None,
+            db=db,
+        )
+        await delete_discount_rules(rule_ids=[rule.id], db=db)
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="折扣规则删除失败，请稍后重试",
+        ) from exc
+
+    return DeleteDiscountRulesResponse(
+        deleted_count=1,
+        deleted_rule_ids=[rule.id],
+    )
+
+
+# endregion
+
+
+# region 一键清空折扣规则
+async def clear_discount_rules_service(
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DeleteDiscountRulesResponse:
+    """清空当前员工权限范围内的折扣规则。"""
+
+    # 第一步：验证当前登录员工和账号状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以清空折扣规则",
+        )
+
+    # 第二步：店长查询全部规则，正式员工只查询自己部门的规则。
+    department_id: int | None = None
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if current_employee.department_id is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工未分配所属部门，不能清空折扣规则",
+            )
+        department_id = current_employee.department_id
+
+    rules = await get_discount_rules_for_delete(department_id=department_id, db=db)
+
+    # 当前权限范围内没有规则时直接返回0，使重复点击清空保持安全。
+    if not rules:
+        return DeleteDiscountRulesResponse(
+            deleted_count=0,
+            deleted_rule_ids=[],
+        )
+
+    # 使用普通循环收集规则ID，避免使用不易理解的列表推导式。
+    deleted_rule_ids: list[int] = []
+    for rule in rules:
+        deleted_rule_ids.append(rule.id)
+
+    # 第三步：每条规则分别记录审计，然后一次性删除并提交。
+    try:
+        for rule in rules:
+            await create_operation_audit_log(
+                employee_id=current_employee_id,
+                module="discount",
+                action="delete",
+                target_type="discount_rule",
+                target_id=rule.id,
+                before_data={
+                    "department_id": rule.department_id,
+                    "name": rule.name,
+                    "discount_type": rule.discount_type,
+                    "discount_value": rule.discount_value,
+                    "schedule_type": rule.schedule_type,
+                    "is_active": rule.is_active,
+                },
+                after_data=None,
+                reason=None,
+                db=db,
+            )
+
+        await delete_discount_rules(rule_ids=deleted_rule_ids, db=db)
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="折扣规则清空失败，请稍后重试",
+        ) from exc
+
+    return DeleteDiscountRulesResponse(
+        deleted_count=len(deleted_rule_ids),
+        deleted_rule_ids=deleted_rule_ids,
+    )
+
+
+# endregion
+
+
 __all__ = [
     "calculate_discount_rule_status",
     "add_discount_rule_products_service",
+    "clear_discount_rules_service",
     "create_discount_rule_service",
     "delete_all_discount_rule_products_service",
     "delete_discount_rule_product_service",
+    "delete_discount_rule_service",
     "get_discount_rule_detail_service",
     "get_discount_rule_list_service",
     "get_discount_rule_products_service",

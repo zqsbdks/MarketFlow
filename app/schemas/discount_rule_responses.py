@@ -77,6 +77,17 @@ class DeleteDiscountRuleProductsResponse(BaseModel):
 # endregion
 
 
+# region 删除折扣规则响应模型
+class DeleteDiscountRulesResponse(BaseModel):
+    """删除单条规则或一键清空规则后的统一响应。"""
+
+    deleted_count: int = Field(..., ge=0, description="本次删除的折扣规则数量")
+    deleted_rule_ids: list[int] = Field(..., description="本次删除的折扣规则ID列表")
+
+
+# endregion
+
+
 # region 折扣商品列表项响应模型
 class DiscountRuleProductItemResponse(BaseModel):
     """折扣规则中的一条商品关联及价格信息。"""
@@ -123,6 +134,7 @@ class DiscountRuleProductListResponse(BaseModel):
 __all__ = [
     "AddDiscountRuleProductsResponse",
     "DeleteDiscountRuleProductsResponse",
+    "DeleteDiscountRulesResponse",
     "DiscountRuleListItemResponse",
     "DiscountRuleListResponse",
     "DiscountRuleProductItemResponse",

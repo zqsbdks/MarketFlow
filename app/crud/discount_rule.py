@@ -3,7 +3,7 @@
 from datetime import datetime, time
 from decimal import Decimal
 
-from sqlalchemy import and_, func, not_, or_, select
+from sqlalchemy import and_, delete, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
@@ -424,10 +424,47 @@ async def delete_discount_rule_product_scopes(
 # endregion
 
 
+# region 获取准备一键清空的折扣规则
+async def get_discount_rules_for_delete(
+    department_id: int | None,
+    db: AsyncSession,
+) -> list[DiscountRule]:
+    """查询当前员工权限范围内准备一键删除的折扣规则。"""
+
+    statement = select(DiscountRule)
+
+    # 店长传入None时查询全部规则；正式员工只查询自己部门的规则。
+    if department_id is not None:
+        statement = statement.where(DiscountRule.department_id == department_id)
+
+    statement = statement.order_by(DiscountRule.id.asc())
+    result = await db.scalars(statement)
+    return list(result.all())
+
+
+# endregion
+
+
+# region 删除折扣规则
+async def delete_discount_rules(
+    rule_ids: list[int],
+    db: AsyncSession,
+) -> None:
+    """根据ID删除折扣规则；商品关联由数据库外键自动级联删除。"""
+
+    statement = delete(DiscountRule).where(DiscountRule.id.in_(rule_ids))
+    await db.execute(statement)
+    await db.flush()
+
+
+# endregion
+
+
 __all__ = [
     "create_discount_rule",
     "create_discount_rule_product_scopes",
     "delete_discount_rule_product_scopes",
+    "delete_discount_rules",
     "get_discount_products_by_ids",
     "get_discount_rule_products_list",
     "get_discount_rule_product_scope",
@@ -436,4 +473,5 @@ __all__ = [
     "get_discount_rule_by_id",
     "get_discount_rule_by_name",
     "get_discount_rules_list",
+    "get_discount_rules_for_delete",
 ]

@@ -15,15 +15,18 @@ from app.schemas.discount_rule_requests import (
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
     DeleteDiscountRuleProductsResponse,
+    DeleteDiscountRulesResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
     DiscountRuleProductListResponse,
 )
 from app.services.discount_rule import (
     add_discount_rule_products_service,
+    clear_discount_rules_service,
     create_discount_rule_service,
     delete_all_discount_rule_products_service,
     delete_discount_rule_product_service,
+    delete_discount_rule_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
@@ -248,8 +251,62 @@ async def get_discount_rule_detail(
 # endregion
 
 
+# region 删除单个折扣规则
+@discount_rules_router.delete(
+    "/{discount_rule_id}",
+    response_model=ResponseModel[DeleteDiscountRulesResponse],
+    summary="删除单个折扣规则",
+    description="删除指定规则及其商品关联，不删除正式商品。",
+)
+async def delete_discount_rule(
+    discount_rule_id: int = Path(..., ge=1, description="需要删除的折扣规则ID"),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DeleteDiscountRulesResponse]:
+    """接收规则ID，删除一条权限范围内的折扣规则。"""
+
+    result = await delete_discount_rule_service(
+        discount_rule_id=discount_rule_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DeleteDiscountRulesResponse](
+        message="删除折扣规则成功",
+        data=result,
+    )
+
+
+# endregion
+
+
+# region 一键清空折扣规则
+@discount_rules_router.delete(
+    "",
+    response_model=ResponseModel[DeleteDiscountRulesResponse],
+    summary="一键清空折扣规则",
+    description="店长清空全部规则；正式员工只清空自己所属部门的规则。",
+)
+async def clear_discount_rules(
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DeleteDiscountRulesResponse]:
+    """一键删除当前员工权限范围内的全部折扣规则。"""
+
+    result = await clear_discount_rules_service(
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DeleteDiscountRulesResponse](
+        message="清空折扣规则成功",
+        data=result,
+    )
+
+
+# endregion
+
+
 # region 其他折扣规则接口
-# 后续添加：启停、修改和删除接口。
+# 后续添加：启停和修改接口。
 # endregion
 
 
