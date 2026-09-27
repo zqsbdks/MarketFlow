@@ -251,7 +251,12 @@ async def get_existing_discount_product_ids(
         DiscountRuleScope.product_id.in_(product_ids),
     )
     result = await db.scalars(statement)
-    return {product_id for product_id in result.all() if product_id is not None}
+
+    existing_product_ids: set[int] = set()
+    for product_id in result.all():
+        if product_id is not None:
+            existing_product_ids.add(product_id)
+    return existing_product_ids
 
 
 # endregion
@@ -265,16 +270,17 @@ async def create_discount_rule_product_scopes(
 ) -> list[DiscountRuleScope]:
     """批量创建商品类型的折扣适用范围；事务提交由Service统一负责。"""
 
-    scopes = [
-        DiscountRuleScope(
+    scopes: list[DiscountRuleScope] = []
+    for product_id in product_ids:
+        scope = DiscountRuleScope(
             discount_rule_id=discount_rule_id,
             scope_type=DiscountScopeType.PRODUCT,
             product_id=product_id,
             category_id=None,
             department_id=None,
         )
-        for product_id in product_ids
-    ]
+        scopes.append(scope)
+
     db.add_all(scopes)
     await db.flush()
     return scopes
@@ -340,11 +346,84 @@ async def get_discount_rule_products_list(
 # endregion
 
 
+# region 获取单个折扣商品关联
+async def get_discount_rule_product_scope(
+    discount_rule_id: int,
+    product_id: int,
+    db: AsyncSession,
+) -> DiscountRuleScope | None:
+    """根据规则ID和商品ID查询一条商品关联，并提前加载商品资料。"""
+
+    statement = (
+        select(DiscountRuleScope)
+        .options(selectinload(DiscountRuleScope.product))
+        .where(
+            DiscountRuleScope.discount_rule_id == discount_rule_id,
+            DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
+            DiscountRuleScope.product_id == product_id,
+        )
+    )
+    result = await db.execute(statement)
+    return result.scalar_one_or_none()
+
+
+# endregion
+
+
+# region 获取准备全部删除的折扣商品关联
+async def get_discount_rule_product_scopes_for_delete(
+    discount_rule_id: int,
+    department_id: int | None,
+    db: AsyncSession,
+) -> list[DiscountRuleScope]:
+    """查询规则下可由当前员工删除的商品关联。"""
+
+    conditions: list[ColumnElement[bool]] = [
+        DiscountRuleScope.discount_rule_id == discount_rule_id,
+        DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
+    ]
+
+    # 店长传入None时查询全部；正式员工传入自己的部门ID时只查询本部门商品。
+    if department_id is not None:
+        conditions.append(Product.department_id == department_id)
+
+    statement = (
+        select(DiscountRuleScope)
+        .join(Product, Product.id == DiscountRuleScope.product_id)
+        .options(selectinload(DiscountRuleScope.product))
+        .where(*conditions)
+        .order_by(DiscountRuleScope.id.asc())
+    )
+    result = await db.scalars(statement)
+    return list(result.all())
+
+
+# endregion
+
+
+# region 删除折扣商品关联
+async def delete_discount_rule_product_scopes(
+    scopes: list[DiscountRuleScope],
+    db: AsyncSession,
+) -> None:
+    """逐条删除折扣商品关联；事务提交由Service统一负责。"""
+
+    for scope in scopes:
+        await db.delete(scope)
+    await db.flush()
+
+
+# endregion
+
+
 __all__ = [
     "create_discount_rule",
     "create_discount_rule_product_scopes",
+    "delete_discount_rule_product_scopes",
     "get_discount_products_by_ids",
     "get_discount_rule_products_list",
+    "get_discount_rule_product_scope",
+    "get_discount_rule_product_scopes_for_delete",
     "get_existing_discount_product_ids",
     "get_discount_rule_by_id",
     "get_discount_rule_by_name",

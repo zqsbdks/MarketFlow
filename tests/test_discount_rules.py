@@ -33,6 +33,8 @@ from app.services.discount_rule import (
     add_discount_rule_products_service,
     calculate_discount_rule_status,
     create_discount_rule_service,
+    delete_all_discount_rule_products_service,
+    delete_discount_rule_product_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
@@ -551,3 +553,147 @@ async def test_get_discount_rule_products_service_builds_page_and_price(monkeypa
         category_id=1,
         db=db,
     )
+
+
+async def test_manager_can_delete_one_discount_product(monkeypatch) -> None:
+    """店长删除单件折扣商品时，只删除关联并写入审计记录。"""
+
+    employee = build_employee()
+    rule = build_once_rule(datetime.now())
+    product = build_product(product_id=3, department_id=2)
+    product.name = "测试商品"
+    scope = DiscountRuleScope(
+        id=20,
+        discount_rule_id=rule.id,
+        scope_type=DiscountScopeType.PRODUCT,
+        product_id=product.id,
+    )
+    scope.product = product
+
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_product_scope",
+        AsyncMock(return_value=scope),
+    )
+    delete_scopes = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.delete_discount_rule_product_scopes",
+        delete_scopes,
+    )
+    audit_log = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        audit_log,
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await delete_discount_rule_product_service(
+        discount_rule_id=rule.id,
+        product_id=product.id,
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.deleted_count == 1
+    assert result.deleted_product_ids == [3]
+    delete_scopes.assert_awaited_once_with(scopes=[scope], db=db)
+    audit_log.assert_awaited_once()
+    db.commit.assert_awaited_once()
+
+
+async def test_regular_employee_cannot_delete_other_department_discount_product(
+    monkeypatch,
+) -> None:
+    """正式员工删除其他部门的折扣商品时返回403。"""
+
+    employee = build_regular_employee(department_id=1)
+    rule = build_once_rule(datetime.now())
+    product = build_product(product_id=8, department_id=2)
+    scope = DiscountRuleScope(
+        id=21,
+        discount_rule_id=rule.id,
+        scope_type=DiscountScopeType.PRODUCT,
+        product_id=product.id,
+    )
+    scope.product = product
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_product_scope",
+        AsyncMock(return_value=scope),
+    )
+
+    with pytest.raises(HTTPException) as exception_info:
+        await delete_discount_rule_product_service(
+            discount_rule_id=rule.id,
+            product_id=product.id,
+            current_employee_id=employee.id,
+            db=AsyncMock(spec=AsyncSession),
+        )
+
+    assert exception_info.value.status_code == 403
+
+
+async def test_regular_employee_deletes_all_products_in_own_department(monkeypatch) -> None:
+    """正式员工批量删除时，CRUD只查询其所属部门的商品关联。"""
+
+    employee = build_regular_employee(department_id=1)
+    rule = build_once_rule(datetime.now())
+    product = build_product(product_id=5, department_id=1)
+    scope = DiscountRuleScope(
+        id=22,
+        discount_rule_id=rule.id,
+        scope_type=DiscountScopeType.PRODUCT,
+        product_id=product.id,
+    )
+    scope.product = product
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_by_id",
+        AsyncMock(return_value=rule),
+    )
+    get_scopes = AsyncMock(return_value=[scope])
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_rule_product_scopes_for_delete",
+        get_scopes,
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.delete_discount_rule_product_scopes",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.create_operation_audit_log",
+        AsyncMock(),
+    )
+
+    db = AsyncMock(spec=AsyncSession)
+    result = await delete_all_discount_rule_products_service(
+        discount_rule_id=rule.id,
+        current_employee_id=employee.id,
+        db=db,
+    )
+
+    assert result.deleted_count == 1
+    assert result.deleted_product_ids == [5]
+    get_scopes.assert_awaited_once_with(
+        discount_rule_id=rule.id,
+        department_id=1,
+        db=db,
+    )
+    db.commit.assert_awaited_once()

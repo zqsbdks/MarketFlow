@@ -12,9 +12,12 @@ from app.crud.auth import get_employee_by_id
 from app.crud.discount_rule import (
     create_discount_rule,
     create_discount_rule_product_scopes,
+    delete_discount_rule_product_scopes,
     get_discount_products_by_ids,
     get_discount_rule_by_id,
     get_discount_rule_by_name,
+    get_discount_rule_product_scope,
+    get_discount_rule_product_scopes_for_delete,
     get_discount_rule_products_list,
     get_discount_rules_list,
     get_existing_discount_product_ids,
@@ -34,6 +37,7 @@ from app.schemas.discount_rule_requests import (
 )
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
+    DeleteDiscountRuleProductsResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
     DiscountRuleProductItemResponse,
@@ -569,15 +573,30 @@ async def add_discount_rule_products_service(
             detail="折扣规则不存在",
         )
 
-    # 第三步：去除重复ID，并确认前端传入的每一个商品都能在数据库中找到。
-    product_ids = sorted(set(request.product_ids))
+    # 第三步：使用普通循环去除重复ID，避免为同一个商品创建两条关联。
+    product_ids: list[int] = []
+    for product_id in request.product_ids:
+        if product_id not in product_ids:
+            product_ids.append(product_id)
+    product_ids.sort()
+
+    # 查询商品后，把数据库实际找到的ID保存到集合中，便于逐个检查。
     products = await get_discount_products_by_ids(product_ids=product_ids, db=db)
-    found_product_ids = {product.id for product in products}
-    missing_product_ids = [
-        product_id for product_id in product_ids if product_id not in found_product_ids
-    ]
+    found_product_ids: set[int] = set()
+    for product in products:
+        found_product_ids.add(product.id)
+
+    # 保存数据库中不存在的商品ID。
+    missing_product_ids: list[int] = []
+    for product_id in product_ids:
+        if product_id not in found_product_ids:
+            missing_product_ids.append(product_id)
+
     if missing_product_ids:
-        missing_text = "、".join(str(product_id) for product_id in missing_product_ids)
+        missing_id_texts: list[str] = []
+        for product_id in missing_product_ids:
+            missing_id_texts.append(str(product_id))
+        missing_text = "、".join(missing_id_texts)
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"以下商品不存在：{missing_text}",
@@ -585,13 +604,16 @@ async def add_discount_rule_products_service(
 
     # 第四步：正式员工只能把自己所属部门的商品加入折扣；店长不受部门限制。
     if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
-        other_department_product_ids = [
-            product.id
-            for product in products
-            if product.department_id != current_employee.department_id
-        ]
+        other_department_product_ids: list[int] = []
+        for product in products:
+            if product.department_id != current_employee.department_id:
+                other_department_product_ids.append(product.id)
+
         if other_department_product_ids:
-            product_text = "、".join(str(product_id) for product_id in other_department_product_ids)
+            product_id_texts: list[str] = []
+            for product_id in other_department_product_ids:
+                product_id_texts.append(str(product_id))
+            product_text = "、".join(product_id_texts)
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
                 detail=f"正式员工只能添加自己所属部门的商品：{product_text}",
@@ -604,7 +626,10 @@ async def add_discount_rule_products_service(
         db=db,
     )
     if existing_product_ids:
-        existing_text = "、".join(str(product_id) for product_id in sorted(existing_product_ids))
+        existing_id_texts: list[str] = []
+        for product_id in sorted(existing_product_ids):
+            existing_id_texts.append(str(product_id))
+        existing_text = "、".join(existing_id_texts)
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
             detail=f"以下商品已经加入该折扣规则：{existing_text}",
@@ -645,10 +670,222 @@ async def add_discount_rule_products_service(
 # endregion
 
 
+# region 删除单个折扣商品
+async def delete_discount_rule_product_service(
+    discount_rule_id: int,
+    product_id: int,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DeleteDiscountRuleProductsResponse:
+    """验证账号和部门权限，并删除一条折扣商品关联。"""
+
+    # 第一步：验证当前登录员工和账号状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以删除折扣商品",
+        )
+
+    # 第二步：确认折扣规则存在。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+
+    # 第三步：查询这条规则和商品之间的关联。
+    scope = await get_discount_rule_product_scope(
+        discount_rule_id=discount_rule_id,
+        product_id=product_id,
+        db=db,
+    )
+    if scope is None or scope.product is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="该商品没有加入此折扣规则",
+        )
+
+    # 第四步：正式员工只能删除自己所属部门的折扣商品。
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if current_employee.department_id is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工未分配所属部门，不能删除折扣商品",
+            )
+        if scope.product.department_id != current_employee.department_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工只能删除自己所属部门的折扣商品",
+            )
+
+    # 第五步：删除关联并记录审计。商品表和折扣规则表都不会被删除。
+    try:
+        await delete_discount_rule_product_scopes(scopes=[scope], db=db)
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="discount",
+            action="delete_product",
+            target_type="discount_rule_scope",
+            target_id=scope.id,
+            before_data={
+                "discount_rule_id": discount_rule_id,
+                "product_id": product_id,
+                "product_name": scope.product.name,
+            },
+            after_data=None,
+            reason=None,
+            db=db,
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="折扣商品删除失败，请稍后重试",
+        ) from exc
+
+    return DeleteDiscountRuleProductsResponse(
+        discount_rule_id=discount_rule_id,
+        deleted_count=1,
+        deleted_product_ids=[product_id],
+    )
+
+
+# endregion
+
+
+# region 删除全部折扣商品
+async def delete_all_discount_rule_products_service(
+    discount_rule_id: int,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> DeleteDiscountRuleProductsResponse:
+    """删除规则下当前员工有权管理的全部商品关联。"""
+
+    # 第一步：验证当前登录员工和账号状态。
+    current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if current_employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_employee.is_active:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="当前账号已停用",
+        )
+    if current_employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    if current_employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.REGULAR_EMPLOYEE,
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="只有店长或正式员工可以删除折扣商品",
+        )
+
+    # 第二步：确认折扣规则存在。
+    rule = await get_discount_rule_by_id(discount_rule_id=discount_rule_id, db=db)
+    if rule is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="折扣规则不存在",
+        )
+
+    # 第三步：店长查询全部商品；正式员工只查询自己部门的商品。
+    department_id: int | None = None
+    if current_employee.role == EmployeeRole.REGULAR_EMPLOYEE:
+        if current_employee.department_id is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="正式员工未分配所属部门，不能删除折扣商品",
+            )
+        department_id = current_employee.department_id
+
+    scopes = await get_discount_rule_product_scopes_for_delete(
+        discount_rule_id=discount_rule_id,
+        department_id=department_id,
+        db=db,
+    )
+
+    # 没有符合权限范围的商品时直接返回0，重复点击删除也不会报错。
+    if not scopes:
+        return DeleteDiscountRuleProductsResponse(
+            discount_rule_id=discount_rule_id,
+            deleted_count=0,
+            deleted_product_ids=[],
+        )
+
+    # 使用普通循环收集商品ID，便于逐步理解每条关联的处理过程。
+    deleted_product_ids: list[int] = []
+    for scope in scopes:
+        if scope.product_id is not None:
+            deleted_product_ids.append(scope.product_id)
+
+    # 第四步：删除查询到的关联，并把本次删除的商品ID写入审计记录。
+    try:
+        await delete_discount_rule_product_scopes(scopes=scopes, db=db)
+        await create_operation_audit_log(
+            employee_id=current_employee_id,
+            module="discount",
+            action="delete_all_products",
+            target_type="discount_rule",
+            target_id=discount_rule_id,
+            before_data={"product_ids": deleted_product_ids},
+            after_data=None,
+            reason=None,
+            db=db,
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="折扣商品批量删除失败，请稍后重试",
+        ) from exc
+
+    return DeleteDiscountRuleProductsResponse(
+        discount_rule_id=discount_rule_id,
+        deleted_count=len(deleted_product_ids),
+        deleted_product_ids=deleted_product_ids,
+    )
+
+
+# endregion
+
+
 __all__ = [
     "calculate_discount_rule_status",
     "add_discount_rule_products_service",
     "create_discount_rule_service",
+    "delete_all_discount_rule_products_service",
+    "delete_discount_rule_product_service",
     "get_discount_rule_detail_service",
     "get_discount_rule_list_service",
     "get_discount_rule_products_service",

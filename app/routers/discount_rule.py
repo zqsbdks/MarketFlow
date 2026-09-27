@@ -14,6 +14,7 @@ from app.schemas.discount_rule_requests import (
 )
 from app.schemas.discount_rule_responses import (
     AddDiscountRuleProductsResponse,
+    DeleteDiscountRuleProductsResponse,
     DiscountRuleListItemResponse,
     DiscountRuleListResponse,
     DiscountRuleProductListResponse,
@@ -21,6 +22,8 @@ from app.schemas.discount_rule_responses import (
 from app.services.discount_rule import (
     add_discount_rule_products_service,
     create_discount_rule_service,
+    delete_all_discount_rule_products_service,
+    delete_discount_rule_product_service,
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
@@ -158,6 +161,64 @@ async def get_discount_rule_products(
 # endregion
 
 
+# region 删除单个折扣商品
+@discount_rules_router.delete(
+    "/{discount_rule_id}/products/{product_id}",
+    response_model=ResponseModel[DeleteDiscountRuleProductsResponse],
+    summary="删除单个折扣商品",
+    description="只删除折扣规则与指定商品的关联，不删除商品或折扣规则。",
+)
+async def delete_discount_rule_product(
+    discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
+    product_id: int = Path(..., ge=1, description="需要移出折扣规则的商品ID"),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DeleteDiscountRuleProductsResponse]:
+    """接收规则ID和商品ID，删除一条折扣商品关联。"""
+
+    result = await delete_discount_rule_product_service(
+        discount_rule_id=discount_rule_id,
+        product_id=product_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DeleteDiscountRuleProductsResponse](
+        message="删除折扣商品成功",
+        data=result,
+    )
+
+
+# endregion
+
+
+# region 删除全部折扣商品
+@discount_rules_router.delete(
+    "/{discount_rule_id}/products",
+    response_model=ResponseModel[DeleteDiscountRuleProductsResponse],
+    summary="删除全部折扣商品",
+    description="店长删除规则下全部商品；正式员工只删除自己所属部门的商品。",
+)
+async def delete_all_discount_rule_products(
+    discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DeleteDiscountRuleProductsResponse]:
+    """接收规则ID，删除当前员工权限范围内的全部折扣商品。"""
+
+    result = await delete_all_discount_rule_products_service(
+        discount_rule_id=discount_rule_id,
+        current_employee_id=current_employee_id,
+        db=db,
+    )
+    return ResponseModel[DeleteDiscountRuleProductsResponse](
+        message="删除全部折扣商品成功",
+        data=result,
+    )
+
+
+# endregion
+
+
 # region 获取折扣规则详情
 @discount_rules_router.get(
     "/{discount_rule_id}",
@@ -192,7 +253,7 @@ async def get_discount_rule_detail(
 
 
 # region 折扣适用范围接口
-# 后续添加：适用范围列表和删除接口。
+# 后续添加：分类或部门类型的适用范围接口。
 # endregion
 
 
