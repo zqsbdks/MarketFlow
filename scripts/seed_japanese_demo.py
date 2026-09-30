@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import random
 import sys
@@ -27,6 +28,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import async_engine, async_session_factory
 from app.core.redis import close_redis, get_redis_client
@@ -849,6 +851,7 @@ async def create_audit_logs(
     suppliers: list[Supplier],
     products: list[Product],
     purchases: list[Purchase],
+    ledgers: list[BatchLedger],
     sales: list[Sale],
     rules: dict[str, DiscountRule],
 ) -> None:
@@ -926,6 +929,33 @@ async def create_audit_logs(
                     created_at=purchase.arrived_at,
                 )
             )
+    # 每个到货批次都需要一条库存增加流水；页面会把 before_data 为空视为从 0 入库。
+    for ledger in ledgers:
+        batch = ledger.batch
+        audit_logs.append(
+            OperationAuditLog(
+                employee_id=None,
+                module="inventory",
+                action="create_batch",
+                target_type="inventory_batch",
+                target_id=batch.id,
+                before_data=None,
+                after_data={
+                    "batch_no": batch.batch_no,
+                    "product_id": batch.product_id,
+                    "purchase_item_id": batch.purchase_item_id,
+                    "remaining_quantity": batch.initial_quantity,
+                    "expiration_date": (
+                        batch.expiration_date.isoformat()
+                        if batch.expiration_date is not None
+                        else None
+                    ),
+                    "status": InventoryBatchStatus.AVAILABLE.value,
+                },
+                reason="入荷検収による在庫追加",
+                created_at=batch.arrived_at,
+            )
+        )
     for rule_index, rule in enumerate(rules.values()):
         audit_logs.append(
             OperationAuditLog(
@@ -956,6 +986,50 @@ async def create_audit_logs(
                 created_at=sale.sold_at,
             )
         )
+
+    # 按成交时间重放每一条销售明细，计算每个批次在扣减前后的准确剩余数量。
+    running_quantities = {ledger.batch.id: ledger.batch.initial_quantity for ledger in ledgers}
+    ledger_by_batch_id = {ledger.batch.id: ledger for ledger in ledgers}
+    for sale in sorted(sales, key=lambda item: (item.sold_at, item.id)):
+        for sale_item in sorted(sale.items, key=lambda item: item.id):
+            batch_id = sale_item.inventory_batch_id
+            if batch_id is None:
+                continue
+            ledger = ledger_by_batch_id[batch_id]
+            before_quantity = running_quantities[batch_id]
+            after_quantity = before_quantity - sale_item.quantity
+            if after_quantity < 0:
+                raise RuntimeError(f"批次 {ledger.batch.batch_no} 的演示销售数量超过库存")
+            running_quantities[batch_id] = after_quantity
+            after_status = (
+                InventoryBatchStatus.SOLD_OUT
+                if after_quantity == 0
+                else InventoryBatchStatus.AVAILABLE
+            )
+            audit_logs.append(
+                OperationAuditLog(
+                    employee_id=None,
+                    module="inventory",
+                    action="sale_deduction",
+                    target_type="inventory_batch",
+                    target_id=batch_id,
+                    before_data={"remaining_quantity": before_quantity},
+                    after_data={
+                        "remaining_quantity": after_quantity,
+                        "status": after_status.value,
+                        "deducted_quantity": sale_item.quantity,
+                        "sale_id": sale.id,
+                        "sale_item_id": sale_item.id,
+                    },
+                    reason="POSレジ販売による在庫減少",
+                    created_at=sale.sold_at,
+                )
+            )
+
+    # 重放销售得到的最终数量必须与库存批次表一致，否则整批演示数据回滚。
+    for ledger in ledgers:
+        if running_quantities[ledger.batch.id] != ledger.batch.remaining_quantity:
+            raise RuntimeError(f"批次 {ledger.batch.batch_no} 的库存流水与最终库存不一致")
     db.add_all(audit_logs)
     await db.flush()
 
@@ -1002,6 +1076,120 @@ async def clear_project_response_cache() -> int:
     if not cache_keys:
         return 0
     return int(await client.delete(*cache_keys))
+
+
+async def backfill_inventory_movement_logs() -> tuple[int, int]:
+    """为已经生成的演示批次和销售明细补充库存变动流水。"""
+
+    async with async_session_factory() as db:
+        existing_count = int(
+            await db.scalar(
+                select(func.count())
+                .select_from(OperationAuditLog)
+                .where(
+                    OperationAuditLog.module == "inventory",
+                    OperationAuditLog.action.in_(("create_batch", "sale_deduction")),
+                )
+            )
+            or 0
+        )
+        if existing_count > 0:
+            raise RuntimeError(
+                f"数据库中已经存在 {existing_count} 条进货或销售库存流水，已停止补写以避免重复"
+            )
+
+        batch_result = await db.scalars(
+            select(InventoryBatch)
+            .options(selectinload(InventoryBatch.product))
+            .order_by(InventoryBatch.arrived_at, InventoryBatch.id)
+        )
+        batches = list(batch_result.all())
+        sale_result = await db.scalars(
+            select(Sale).options(selectinload(Sale.items)).order_by(Sale.sold_at, Sale.id)
+        )
+        sales = list(sale_result.all())
+        if not batches:
+            raise RuntimeError("数据库中没有库存批次，无法补写库存流水")
+
+        ledgers = [
+            BatchLedger(batch=batch, product=batch.product, unit_cost=Decimal("0.00"))
+            for batch in batches
+        ]
+        running_quantities = {batch.id: batch.initial_quantity for batch in batches}
+        logs: list[OperationAuditLog] = []
+
+        for batch in batches:
+            logs.append(
+                OperationAuditLog(
+                    employee_id=None,
+                    module="inventory",
+                    action="create_batch",
+                    target_type="inventory_batch",
+                    target_id=batch.id,
+                    before_data=None,
+                    after_data={
+                        "batch_no": batch.batch_no,
+                        "product_id": batch.product_id,
+                        "purchase_item_id": batch.purchase_item_id,
+                        "remaining_quantity": batch.initial_quantity,
+                        "expiration_date": (
+                            batch.expiration_date.isoformat()
+                            if batch.expiration_date is not None
+                            else None
+                        ),
+                        "status": InventoryBatchStatus.AVAILABLE.value,
+                    },
+                    reason="入荷検収による在庫追加",
+                    created_at=batch.arrived_at,
+                )
+            )
+
+        sale_deduction_count = 0
+        for sale in sales:
+            for sale_item in sorted(sale.items, key=lambda item: item.id):
+                batch_id = sale_item.inventory_batch_id
+                if batch_id is None:
+                    continue
+                before_quantity = running_quantities[batch_id]
+                after_quantity = before_quantity - sale_item.quantity
+                if after_quantity < 0:
+                    raise RuntimeError(f"批次 ID {batch_id} 的销售数量超过初始库存")
+                running_quantities[batch_id] = after_quantity
+                after_status = (
+                    InventoryBatchStatus.SOLD_OUT
+                    if after_quantity == 0
+                    else InventoryBatchStatus.AVAILABLE
+                )
+                logs.append(
+                    OperationAuditLog(
+                        employee_id=None,
+                        module="inventory",
+                        action="sale_deduction",
+                        target_type="inventory_batch",
+                        target_id=batch_id,
+                        before_data={"remaining_quantity": before_quantity},
+                        after_data={
+                            "remaining_quantity": after_quantity,
+                            "status": after_status.value,
+                            "deducted_quantity": sale_item.quantity,
+                            "sale_id": sale.id,
+                            "sale_item_id": sale_item.id,
+                        },
+                        reason="POSレジ販売による在庫減少",
+                        created_at=sale.sold_at,
+                    )
+                )
+                sale_deduction_count += 1
+
+        batch_by_id = {batch.id: batch for batch in batches}
+        for ledger in ledgers:
+            batch = batch_by_id[ledger.batch.id]
+            if running_quantities[batch.id] != batch.remaining_quantity:
+                raise RuntimeError(f"批次 {batch.batch_no} 的重放库存与当前库存不一致")
+
+        db.add_all(logs)
+        await db.commit()
+        return len(batches), sale_deduction_count
 
 
 async def seed_japanese_demo_data() -> None:
@@ -1051,6 +1239,7 @@ async def seed_japanese_demo_data() -> None:
                 suppliers,
                 products,
                 purchases,
+                ledgers,
                 sales,
                 rules,
             )
@@ -1079,7 +1268,19 @@ async def main() -> None:
     """运行演示数据初始化并在结束后释放数据库连接池。"""
 
     try:
-        await seed_japanese_demo_data()
+        parser = argparse.ArgumentParser(description="生成或补充 MarketFlow 日语演示数据")
+        parser.add_argument(
+            "--backfill-inventory-movements",
+            action="store_true",
+            help="为已有演示批次和销售记录补充库存变动流水",
+        )
+        arguments = parser.parse_args()
+        if arguments.backfill_inventory_movements:
+            batch_count, deduction_count = await backfill_inventory_movement_logs()
+            print(f"已补充进货入库流水：{batch_count} 条")
+            print(f"已补充销售出库流水：{deduction_count} 条")
+        else:
+            await seed_japanese_demo_data()
     finally:
         await async_engine.dispose()
         await close_redis()

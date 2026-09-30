@@ -242,6 +242,14 @@ python -m alembic check
 库存批次、折扣、销售和操作审计记录。为保护真实数据，只要任意业务表已有记录，脚本
 就会停止并回滚，不会自动清空数据库。
 
+如果数据库已经由旧版脚本生成，只缺少进货入库和销售出库流水，可以只补写库存流水：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\seed_japanese_demo.py --backfill-inventory-movements
+```
+
+补写模式检测到已有同类流水时会停止，避免重复创建记录。
+
 演示员工编号为 `EMP00002` 至 `EMP00009`，统一密码为：
 
 ```text
