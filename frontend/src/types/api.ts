@@ -28,6 +28,7 @@ export interface EmployeeDetailUpdate {
   separation_reason: string | null
 }
 export type ProductStatus = 'on_sale' | 'stopped'
+export type DiscountType = 'percentage' | 'amount_off' | 'fixed_price'
 export type RankingGroupBy = 'product' | 'category'
 export type RankingSortBy = 'quantity' | 'amount'
 export type SortOrder = 'asc' | 'desc'
@@ -223,21 +224,40 @@ export interface InventoryMovement {
 export interface SaleListItem {
   sale_no: string
   sold_at: string
+  original_total_amount: string
+  discount_amount: string
   total_amount: string
   total_quantity: number
   item_count: number
 }
 
 export interface SaleDetailItem {
+  product_id: number
   product_name: string
   quantity: number
+  original_unit_price: string
   unit_price: string
+  original_subtotal: string
+  discount_amount: string
   subtotal: string
+  discount_rule_id: number | null
+  discount_rule_name: string | null
+  discount_type: DiscountType | null
+  discount_value: string | null
 }
 
 export interface SaleDetail {
   sale_no: string
   sold_at: string
+  original_total_amount: string
+  discount_amount: string
+  total_amount: string
+  items: SaleDetailItem[]
+}
+
+export interface SalePricePreview {
+  original_total_amount: string
+  discount_amount: string
   total_amount: string
   items: SaleDetailItem[]
 }

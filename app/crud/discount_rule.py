@@ -148,6 +148,63 @@ async def get_discount_rules_list(
 # endregion
 
 
+# region 获取指定商品当前生效的折扣规则
+async def get_active_discount_rules_for_products(
+    product_ids: list[int],
+    category_ids: list[int],
+    department_ids: list[int],
+    now: datetime,
+    db: AsyncSession,
+) -> list[DiscountRule]:
+    """查询当前时间内可以作用于指定商品、分类或部门的启用规则。"""
+
+    # 三种范围只要命中一种，就可能成为商品的候选折扣。
+    scope_conditions: list[ColumnElement[bool]] = []
+    if product_ids:
+        scope_conditions.append(
+            and_(
+                DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
+                DiscountRuleScope.product_id.in_(product_ids),
+            )
+        )
+    if category_ids:
+        scope_conditions.append(
+            and_(
+                DiscountRuleScope.scope_type == DiscountScopeType.CATEGORY,
+                DiscountRuleScope.category_id.in_(category_ids),
+            )
+        )
+    if department_ids:
+        scope_conditions.append(
+            and_(
+                DiscountRuleScope.scope_type == DiscountScopeType.DEPARTMENT,
+                DiscountRuleScope.department_id.in_(department_ids),
+            )
+        )
+
+    if not scope_conditions:
+        return []
+
+    statement = (
+        select(DiscountRule)
+        .join(DiscountRuleScope)
+        .options(selectinload(DiscountRule.scopes))
+        .where(
+            DiscountRule.is_active.is_(True),
+            _get_active_schedule_condition(now),
+            or_(*scope_conditions),
+        )
+        .distinct()
+        # 折后价相同时保留ID较小的规则，使每次计算结果保持稳定。
+        .order_by(DiscountRule.id.asc())
+    )
+    result = await db.scalars(statement)
+    return list(result.all())
+
+
+# endregion
+
+
 # region 获取折扣规则详情
 async def get_discount_rule_by_id(
     discount_rule_id: int,
@@ -502,6 +559,7 @@ __all__ = [
     "delete_discount_rule_product_scopes",
     "delete_discount_rules",
     "get_discount_products_by_ids",
+    "get_active_discount_rules_for_products",
     "get_discount_rule_products_list",
     "get_discount_rule_product_scope",
     "get_discount_rule_product_scopes_for_delete",

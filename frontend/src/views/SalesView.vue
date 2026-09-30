@@ -2,11 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { CalendarDays, Minus, Plus, ReceiptText, ScanLine, Search, ShoppingCart, Trash2 } from '@lucide/vue'
 
-import { createSale, getProducts, getSale, getSales } from '../api'
+import { createSale, getProducts, getSale, getSales, previewSalePrice } from '../api'
 import { getErrorMessage } from '../api/http'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
-import type { ProductListItem, SaleDetail, SaleListItem } from '../types/api'
+import type { ProductListItem, SaleDetail, SaleListItem, SalePricePreview } from '../types/api'
 import { apiDateTime, createDefaultRange, formatDateTime, formatMoney } from '../utils'
 
 const defaultRange = createDefaultRange()
@@ -26,11 +26,47 @@ const products = ref<ProductListItem[]>([])
 const selectedProductId = ref<number | ''>('')
 const cart = ref<Array<{ product: ProductListItem; quantity: number }>>([])
 const checkoutLoading = ref(false)
+const pricePreview = ref<SalePricePreview | null>(null)
+const previewLoading = ref(false)
+let latestPreviewRequest = 0
 
 const cartQuantity = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0))
 const cartAmount = computed(() =>
-  cart.value.reduce((sum, item) => sum + Number(item.product.sale_price) * item.quantity, 0),
+  pricePreview.value
+    ? Number(pricePreview.value.total_amount)
+    : cart.value.reduce((sum, item) => sum + Number(item.product.sale_price) * item.quantity, 0),
 )
+const previewItems = computed(() => {
+  const items = new Map<number, SaleDetail['items'][number]>()
+  if (pricePreview.value) {
+    for (const item of pricePreview.value.items) items.set(item.product_id, item)
+  }
+  return items
+})
+
+async function refreshPricePreview() {
+  const requestNumber = ++latestPreviewRequest
+  if (!cart.value.length) {
+    pricePreview.value = null
+    return
+  }
+
+  previewLoading.value = true
+  try {
+    const result = await previewSalePrice(
+      cart.value.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
+    )
+    // 只采用最后一次购物车变更对应的响应，避免较慢的旧请求覆盖新价格。
+    if (requestNumber === latestPreviewRequest) pricePreview.value = result
+  } catch (reason) {
+    if (requestNumber === latestPreviewRequest) {
+      pricePreview.value = null
+      error.value = getErrorMessage(reason)
+    }
+  } finally {
+    if (requestNumber === latestPreviewRequest) previewLoading.value = false
+  }
+}
 
 async function loadSaleProducts() {
   try {
@@ -117,6 +153,7 @@ function search() {
 }
 
 watch(page, loadSales)
+watch(cart, refreshPricePreview, { deep: true })
 onMounted(async () => {
   await Promise.all([loadSales(), loadSaleProducts()])
 })
@@ -164,7 +201,14 @@ onMounted(async () => {
               <div>
                 <strong>{{ item.product.name }}</strong>
                 <small>
-                  {{ item.product.product_no }} · {{ formatMoney(item.product.sale_price) }}
+                  {{ item.product.product_no }} ·
+                  <s v-if="previewItems.get(item.product.id)?.discount_rule_id">
+                    {{ formatMoney(item.product.sale_price) }}
+                  </s>
+                  {{ formatMoney(previewItems.get(item.product.id)?.unit_price ?? item.product.sale_price) }}
+                </small>
+                <small v-if="previewItems.get(item.product.id)?.discount_rule_name" class="discount-name">
+                  {{ previewItems.get(item.product.id)?.discount_rule_name }}
                 </small>
               </div>
             </div>
@@ -177,7 +221,7 @@ onMounted(async () => {
                 <Plus :size="15" />
               </button>
             </div>
-            <strong>{{ formatMoney(Number(item.product.sale_price) * item.quantity) }}</strong>
+            <strong>{{ formatMoney(previewItems.get(item.product.id)?.subtotal ?? Number(item.product.sale_price) * item.quantity) }}</strong>
             <button class="remove-button" title="移除" @click="removeProduct(item.product.id)">
               <Trash2 :size="17" />
             </button>
@@ -192,8 +236,10 @@ onMounted(async () => {
         <dl>
           <div><dt>商品种类</dt><dd>{{ cart.length }} 种</dd></div>
           <div><dt>商品数量</dt><dd>{{ cartQuantity }} 件</dd></div>
+          <div><dt>原价合计</dt><dd>{{ formatMoney(pricePreview?.original_total_amount ?? cartAmount) }}</dd></div>
+          <div><dt>优惠金额</dt><dd class="discount-value">-{{ formatMoney(pricePreview?.discount_amount ?? 0) }}</dd></div>
         </dl>
-        <div class="amount-due"><span>应收金额</span><strong>{{ formatMoney(cartAmount) }}</strong></div>
+        <div class="amount-due"><span>{{ previewLoading ? '正在计算折扣…' : '应收金额' }}</span><strong>{{ formatMoney(cartAmount) }}</strong></div>
         <button
           class="primary-button checkout-button"
           :disabled="!cart.length || checkoutLoading"
@@ -217,10 +263,10 @@ onMounted(async () => {
     <section class="panel table-panel">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>销售单号</th><th>发生时间</th><th>商品种类</th><th>商品总数</th><th>销售金额</th><th></th></tr></thead>
+          <thead><tr><th>销售单号</th><th>发生时间</th><th>商品种类</th><th>商品总数</th><th>优惠金额</th><th>实收金额</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="item in sales" :key="item.sale_no"><td><strong class="mono">{{ item.sale_no }}</strong></td><td>{{ formatDateTime(item.sold_at) }}</td><td>{{ item.item_count }} 种</td><td>{{ item.total_quantity }} 件</td><td><strong>{{ formatMoney(item.total_amount) }}</strong></td><td><button class="text-button" @click="openSale(item.sale_no)">查看明细</button></td></tr>
-            <tr v-if="!loading && !sales.length"><td colspan="6" class="empty-cell">所选范围内没有销售记录</td></tr>
+            <tr v-for="item in sales" :key="item.sale_no"><td><strong class="mono">{{ item.sale_no }}</strong></td><td>{{ formatDateTime(item.sold_at) }}</td><td>{{ item.item_count }} 种</td><td>{{ item.total_quantity }} 件</td><td>{{ formatMoney(item.discount_amount) }}</td><td><strong>{{ formatMoney(item.total_amount) }}</strong></td><td><button class="text-button" @click="openSale(item.sale_no)">查看明细</button></td></tr>
+            <tr v-if="!loading && !sales.length"><td colspan="7" class="empty-cell">所选范围内没有销售记录</td></tr>
           </tbody>
         </table>
       </div>
@@ -230,8 +276,10 @@ onMounted(async () => {
     <ModalPanel title="销售单详情" :open="detailOpen" @close="detailOpen = false">
       <div v-if="detail" class="receipt-sheet">
         <div class="receipt-head"><div><p>销售单号</p><strong>{{ detail.sale_no }}</strong></div><div><p>销售时间</p><strong>{{ formatDateTime(detail.sold_at) }}</strong></div></div>
-        <div class="receipt-lines"><div v-for="item in detail.items" :key="`${item.product_name}-${item.unit_price}`"><div><strong>{{ item.product_name }}</strong><span>{{ formatMoney(item.unit_price) }} × {{ item.quantity }}</span></div><b>{{ formatMoney(item.subtotal) }}</b></div></div>
-        <div class="receipt-total"><span>销售总金额</span><strong>{{ formatMoney(detail.total_amount) }}</strong></div>
+        <div class="receipt-lines"><div v-for="item in detail.items" :key="`${item.product_id}-${item.unit_price}-${item.discount_rule_id}`"><div><strong>{{ item.product_name }}</strong><span><s v-if="Number(item.discount_amount) > 0">{{ formatMoney(item.original_unit_price) }}</s> {{ formatMoney(item.unit_price) }} × {{ item.quantity }}</span><small v-if="item.discount_rule_name" class="discount-name">{{ item.discount_rule_name }}</small></div><b>{{ formatMoney(item.subtotal) }}</b></div></div>
+        <div class="receipt-total"><span>原价合计</span><strong>{{ formatMoney(detail.original_total_amount) }}</strong></div>
+        <div v-if="Number(detail.discount_amount) > 0" class="receipt-total"><span>优惠金额</span><strong class="discount-value">-{{ formatMoney(detail.discount_amount) }}</strong></div>
+        <div class="receipt-total"><span>实际支付</span><strong>{{ formatMoney(detail.total_amount) }}</strong></div>
       </div>
     </ModalPanel>
   </div>
@@ -257,6 +305,8 @@ onMounted(async () => {
 .cart-product { display: flex; align-items: center; gap: 12px; }
 .cart-product > span { display: grid; place-items: center; width: 38px; height: 38px; color: #d7ff8b; background: #29331f; border-radius: 8px; }
 .cart-product small { display: block; margin-top: 4px; color: #777d87; }
+.cart-product .discount-name, .receipt-lines .discount-name { color: #c8ff5a; }
+.discount-value { color: #ff907b; }
 .quantity-control { display: flex; align-items: center; gap: 9px; }
 .quantity-control button, .remove-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; color: #b8bdc5; background: #1c1f25; border: 1px solid #343840; border-radius: 7px; }
 .quantity-control b { min-width: 20px; text-align: center; }

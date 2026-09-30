@@ -42,6 +42,7 @@ from app.services.discount_rule import (
     get_discount_rule_detail_service,
     get_discount_rule_list_service,
     get_discount_rule_products_service,
+    get_product_discount_prices,
     update_discount_rule_service,
     update_discount_rule_status_service,
 )
@@ -1041,3 +1042,55 @@ async def test_update_discount_rule_without_fields_is_rejected(monkeypatch) -> N
         )
 
     assert exception_info.value.status_code == 400
+
+
+async def test_product_discount_price_uses_lowest_active_rule(monkeypatch) -> None:
+    """同一商品存在多条有效规则时，应选择折后价最低的一条且不叠加。"""
+
+    now = datetime.now()
+    product = build_product(product_id=1, department_id=1)
+    product.category_id = 1
+    product.name = "测试牛肉"
+    product.sale_price = Decimal("100.00")
+    product.status = ProductStatus.ON_SALE
+
+    ninety_percent_rule = build_once_rule(now)
+    ninety_percent_rule.id = 1
+    ninety_percent_rule.name = "九折"
+    ninety_percent_rule.discount_value = Decimal("0.9000")
+    ninety_percent_scope = DiscountRuleScope(
+        discount_rule_id=ninety_percent_rule.id,
+        scope_type=DiscountScopeType.PRODUCT,
+        product_id=product.id,
+    )
+    ninety_percent_rule.scopes = [ninety_percent_scope]
+
+    eighty_percent_rule = build_once_rule(now)
+    eighty_percent_rule.id = 2
+    eighty_percent_rule.name = "八折"
+    eighty_percent_rule.discount_value = Decimal("0.8000")
+    eighty_percent_scope = DiscountRuleScope(
+        discount_rule_id=eighty_percent_rule.id,
+        scope_type=DiscountScopeType.PRODUCT,
+        product_id=product.id,
+    )
+    eighty_percent_rule.scopes = [eighty_percent_scope]
+
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_discount_products_by_ids",
+        AsyncMock(return_value=[product]),
+    )
+    monkeypatch.setattr(
+        "app.services.discount_rule.get_active_discount_rules_for_products",
+        AsyncMock(return_value=[ninety_percent_rule, eighty_percent_rule]),
+    )
+
+    prices = await get_product_discount_prices(
+        product_ids=[product.id],
+        now=now,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert prices[product.id].original_unit_price == Decimal("100.00")
+    assert prices[product.id].final_unit_price == Decimal("80.00")
+    assert prices[product.id].discount_rule is eighty_percent_rule

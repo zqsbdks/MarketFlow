@@ -26,6 +26,7 @@ import type {
   RankingGroupBy,
   RankingSortBy,
   SaleDetail,
+  SalePricePreview,
   SaleListItem,
   SortOrder,
   Supplier,
@@ -204,6 +205,11 @@ export async function getSale(saleNo: string) {
 
 export async function createSale(items: CreateSaleItem[]) {
   const response = await http.post<ApiResponse<SaleDetail>>('/sales', { items })
+  return unwrap(response.data)
+}
+
+export async function previewSalePrice(items: CreateSaleItem[]) {
+  const response = await http.post<ApiResponse<SalePricePreview>>('/sales/preview', { items })
   return unwrap(response.data)
 }
 

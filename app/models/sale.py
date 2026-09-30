@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,7 +30,19 @@ class Sale(CreatedAtMixin, Base):
 
     __tablename__ = "sale"
     __table_args__ = (
+        CheckConstraint(
+            "original_total_amount >= 0",
+            name="ck_sale_original_total_amount_non_negative",
+        ),
+        CheckConstraint(
+            "discount_amount >= 0",
+            name="ck_sale_discount_amount_non_negative",
+        ),
         CheckConstraint("total_amount >= 0", name="ck_sale_total_amount_non_negative"),
+        CheckConstraint(
+            "original_total_amount = total_amount + discount_amount",
+            name="ck_sale_discount_amount_matches_totals",
+        ),
         CheckConstraint("total_cost >= 0", name="ck_sale_total_cost_non_negative"),
         CheckConstraint(
             "gross_profit = total_amount - total_cost",
@@ -57,6 +70,20 @@ class Sale(CreatedAtMixin, Base):
         Numeric(12, 2),
         nullable=False,
         comment="销售总金额",
+    )
+    original_total_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default=text("'0.00'"),
+        comment="折扣前商品原价总金额",
+    )
+    discount_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default=text("'0.00'"),
+        comment="整张销售单优惠总金额",
     )
     total_cost: Mapped[Decimal] = mapped_column(
         Numeric(12, 2),

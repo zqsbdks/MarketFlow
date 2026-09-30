@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Integer, Numeric, String
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Integer, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -23,11 +23,27 @@ class SaleItem(Base):
     __tablename__ = "sale_item"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_sale_item_quantity_positive"),
+        CheckConstraint(
+            "original_unit_price >= 0",
+            name="ck_sale_item_original_unit_price_non_negative",
+        ),
         CheckConstraint("unit_price >= 0", name="ck_sale_item_unit_price_non_negative"),
+        CheckConstraint(
+            "original_unit_price >= unit_price",
+            name="ck_sale_item_discount_does_not_raise_price",
+        ),
+        CheckConstraint(
+            "discount_amount >= 0",
+            name="ck_sale_item_discount_amount_non_negative",
+        ),
         CheckConstraint("unit_cost >= 0", name="ck_sale_item_unit_cost_non_negative"),
         CheckConstraint(
             "subtotal = unit_price * quantity",
             name="ck_sale_item_subtotal_matches",
+        ),
+        CheckConstraint(
+            "discount_amount = (original_unit_price - unit_price) * quantity",
+            name="ck_sale_item_discount_amount_matches",
         ),
         CheckConstraint(
             "cost_subtotal = unit_cost * quantity",
@@ -82,10 +98,46 @@ class SaleItem(Base):
         comment="成交时所属部门",
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, comment="销售数量")
+    original_unit_price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default=text("'0.00'"),
+        comment="成交前商品原销售单价",
+    )
     unit_price: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
         comment="成交单价",
+    )
+    discount_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default=text("'0.00'"),
+        comment="本条销售明细优惠总金额",
+    )
+    discount_rule_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("discount_rule.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="成交时使用的折扣规则ID",
+    )
+    discount_rule_name_snapshot: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="成交时折扣规则名称快照",
+    )
+    discount_type_snapshot: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="成交时折扣计算方式快照",
+    )
+    discount_value_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 4),
+        nullable=True,
+        comment="成交时折扣数值快照",
     )
     unit_cost: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),

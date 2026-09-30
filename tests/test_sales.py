@@ -12,13 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
+from app.models.discount_rule import DiscountRule
 from app.models.employee import Employee
-from app.models.enums import EmployeeRole, ProductStatus, SaleSource
+from app.models.enums import DiscountType, EmployeeRole, ProductStatus, SaleSource
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.schemas.sales_requests import CreateSaleItemRequest, CreateSaleRequest
 from app.schemas.sales_responses import SaleDetailResponse, SalesListResponse
-from app.services.sales import get_sales_detail_service, get_sales_list_service
+from app.services.discount_rule import ProductDiscountPrice
+from app.services.sales import (
+    get_sales_detail_service,
+    get_sales_list_service,
+    preview_sale_price_service,
+)
 
 
 def build_employee() -> Employee:
@@ -54,6 +61,8 @@ def build_sale() -> Sale:
         id=1,
         sale_no="S202609010001",
         sold_at=datetime(2026, 9, 1, 10, 20),
+        original_total_amount=Decimal("45.00"),
+        discount_amount=Decimal("0.00"),
         total_amount=Decimal("45.00"),
         total_cost=Decimal("30.00"),
         gross_profit=Decimal("15.00"),
@@ -69,7 +78,13 @@ def build_sale() -> Sale:
             product_name_snapshot="商品一",
             department_id=1,
             quantity=2,
+            original_unit_price=Decimal("15.00"),
             unit_price=Decimal("15.00"),
+            discount_amount=Decimal("0.00"),
+            discount_rule_id=None,
+            discount_rule_name_snapshot=None,
+            discount_type_snapshot=None,
+            discount_value_snapshot=None,
             unit_cost=Decimal("10.00"),
             subtotal=Decimal("30.00"),
             cost_subtotal=Decimal("20.00"),
@@ -83,7 +98,13 @@ def build_sale() -> Sale:
             product_name_snapshot="商品二",
             department_id=1,
             quantity=1,
+            original_unit_price=Decimal("15.00"),
             unit_price=Decimal("15.00"),
+            discount_amount=Decimal("0.00"),
+            discount_rule_id=None,
+            discount_rule_name_snapshot=None,
+            discount_type_snapshot=None,
+            discount_value_snapshot=None,
             unit_cost=Decimal("10.00"),
             subtotal=Decimal("15.00"),
             cost_subtotal=Decimal("10.00"),
@@ -234,6 +255,55 @@ async def test_sales_detail_service_returns_404_when_missing(monkeypatch) -> Non
     assert exc_info.value.detail == "销售单不存在"
 
 
+async def test_sale_price_preview_returns_discount_totals(monkeypatch) -> None:
+    """价格预览应返回原价、优惠、实付金额和被选中的折扣规则。"""
+
+    employee = build_employee()
+    product = Product(
+        id=1,
+        product_no="P00001",
+        name="测试商品",
+        department_id=1,
+        category_id=1,
+        purchase_price=Decimal("30.00"),
+        sale_price=Decimal("50.00"),
+        stock_quantity=10,
+        status=ProductStatus.ON_SALE,
+    )
+    rule = DiscountRule(
+        id=8,
+        name="晚间八折",
+        discount_type=DiscountType.PERCENTAGE,
+        discount_value=Decimal("0.8000"),
+    )
+    price = ProductDiscountPrice(
+        product=product,
+        original_unit_price=Decimal("50.00"),
+        final_unit_price=Decimal("40.00"),
+        discount_rule=rule,
+    )
+    monkeypatch.setattr(
+        "app.services.sales.get_employee_by_id",
+        AsyncMock(return_value=employee),
+    )
+    monkeypatch.setattr(
+        "app.services.sales.get_product_discount_prices",
+        AsyncMock(return_value={product.id: price}),
+    )
+
+    result = await preview_sale_price_service(
+        request=CreateSaleRequest(items=[CreateSaleItemRequest(product_id=product.id, quantity=2)]),
+        current_employee_id=employee.id,
+        db=AsyncMock(spec=AsyncSession),
+    )
+
+    assert result.original_total_amount == Decimal("100.00")
+    assert result.discount_amount == Decimal("20.00")
+    assert result.total_amount == Decimal("80.00")
+    assert result.items[0].discount_rule_id == rule.id
+    assert result.items[0].discount_rule_name == "晚间八折"
+
+
 # endregion
 
 
@@ -279,6 +349,8 @@ def test_sales_detail_route_returns_documented_response(monkeypatch) -> None:
         return SaleDetailResponse(
             sale_no="S202609010001",
             sold_at=datetime(2026, 9, 1, 10, 20),
+            original_total_amount=Decimal("45.00"),
+            discount_amount=Decimal("0.00"),
             total_amount=Decimal("45.00"),
             items=[],
         )
@@ -298,6 +370,8 @@ def test_sales_detail_route_returns_documented_response(monkeypatch) -> None:
         "data": {
             "sale_no": "S202609010001",
             "sold_at": "2026-09-01T10:20:00",
+            "original_total_amount": "45.00",
+            "discount_amount": "0.00",
             "total_amount": "45.00",
             "items": [],
         },

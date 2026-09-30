@@ -9,14 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.auth import get_employee_by_id
 from app.crud.sales import InsufficientStockError, create_sale, get_sales_detail, get_sales_list
+from app.models.discount_rule import DiscountRule
+from app.models.enums import DiscountType, ProductStatus
 from app.models.sale import Sale
 from app.schemas.sales_requests import CreateSaleRequest
 from app.schemas.sales_responses import (
     SaleDetailItemResponse,
     SaleDetailResponse,
+    SalePricePreviewResponse,
     SalesItemResponse,
     SalesListResponse,
 )
+from app.services.discount_rule import get_product_discount_prices
 
 BUSINESS_OPENING_TIME = time(9, 0)
 BUSINESS_CLOSING_TIME = time(21, 0)
@@ -26,27 +30,48 @@ BUSINESS_CLOSING_TIME = time(21, 0)
 def _build_sale_detail_response(sale: Sale) -> SaleDetailResponse:
     """把同一商品因跨批次产生的多条数据库明细合并成小票中的一行。"""
 
-    # key 同时包含商品ID、成交名称和成交单价，避免不同价格的明细被错误合并。
-    grouped_items: dict[tuple[int, str, Decimal], SaleDetailItemResponse] = {}
+    # key包含商品、原价、成交价和规则ID，防止不同折扣来源的明细被错误合并。
+    grouped_items: dict[tuple[int, str, Decimal, Decimal, int | None], SaleDetailItemResponse] = {}
     for item in sale.items:
-        key = (item.product_id, item.product_name_snapshot, item.unit_price)
+        key = (
+            item.product_id,
+            item.product_name_snapshot,
+            item.original_unit_price,
+            item.unit_price,
+            item.discount_rule_id,
+        )
         existing = grouped_items.get(key)
         if existing is None:
             # 第一次遇到该商品时，新建一行前端小票明细。
+            discount_type = None
+            if item.discount_type_snapshot is not None:
+                discount_type = DiscountType(item.discount_type_snapshot)
             grouped_items[key] = SaleDetailItemResponse(
+                product_id=item.product_id,
                 product_name=item.product_name_snapshot,
                 quantity=item.quantity,
+                original_unit_price=item.original_unit_price,
                 unit_price=item.unit_price,
+                original_subtotal=item.original_unit_price * item.quantity,
+                discount_amount=item.discount_amount,
                 subtotal=item.subtotal,
+                discount_rule_id=item.discount_rule_id,
+                discount_rule_name=item.discount_rule_name_snapshot,
+                discount_type=discount_type,
+                discount_value=item.discount_value_snapshot,
             )
         else:
-            # 同商品的其他批次只累加数量和销售小计，不向小票增加重复行。
+            # 同商品同折扣的其他批次只累加金额和数量，不增加重复小票行。
             existing.quantity += item.quantity
+            existing.original_subtotal += item.original_unit_price * item.quantity
+            existing.discount_amount += item.discount_amount
             existing.subtotal += item.subtotal
 
     return SaleDetailResponse(
         sale_no=sale.sale_no,
         sold_at=sale.sold_at,
+        original_total_amount=sale.original_total_amount,
+        discount_amount=sale.discount_amount,
         total_amount=sale.total_amount,
         items=list(grouped_items.values()),
     )
@@ -132,6 +157,8 @@ async def get_sales_list_service(
         sale_item = SalesItemResponse(
             sale_no=sale.sale_no,
             sold_at=sale.sold_at,
+            original_total_amount=sale.original_total_amount,
+            discount_amount=sale.discount_amount,
             total_amount=sale.total_amount,
             total_quantity=total_quantity,
             # 同一商品可能因为跨批次被拆成多条明细，种类数按商品ID去重。
@@ -147,6 +174,93 @@ async def get_sales_list_service(
         page_size=page_size,
         total=total,
         total_pages=total_pages,
+    )
+
+
+# endregion
+
+
+# region 预览销售价格
+async def preview_sale_price_service(
+    request: CreateSaleRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+) -> SalePricePreviewResponse:
+    """验证收银员工，并按当前生效规则计算价格但不扣库存、不创建销售单。"""
+
+    # 第一步：价格预览也属于内部收银功能，因此需要验证员工账号状态。
+    employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if employee is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not employee.is_active:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="账号已停用")
+    if employee.must_change_password:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+
+    # 第二步：合并重复扫码的商品数量。
+    requested_quantities: dict[int, int] = {}
+    for item in request.items:
+        old_quantity = requested_quantities.get(item.product_id, 0)
+        requested_quantities[item.product_id] = old_quantity + item.quantity
+
+    # 第三步：使用统一折扣函数取得每件商品当前最低成交价。
+    now = datetime.now()
+    product_ids = list(requested_quantities.keys())
+    prices = await get_product_discount_prices(product_ids=product_ids, now=now, db=db)
+
+    preview_items: list[SaleDetailItemResponse] = []
+    original_total_amount = Decimal("0.00")
+    total_amount = Decimal("0.00")
+    for product_id in product_ids:
+        price = prices.get(product_id)
+        if price is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"商品ID {product_id} 不存在",
+            )
+        if price.product.status != ProductStatus.ON_SALE:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"商品“{price.product.name}”当前已停售",
+            )
+
+        quantity = requested_quantities[product_id]
+        original_subtotal = price.original_unit_price * quantity
+        subtotal = price.final_unit_price * quantity
+        discount_amount = original_subtotal - subtotal
+        rule = price.discount_rule
+
+        preview_items.append(
+            SaleDetailItemResponse(
+                product_id=price.product.id,
+                product_name=price.product.name,
+                quantity=quantity,
+                original_unit_price=price.original_unit_price,
+                unit_price=price.final_unit_price,
+                original_subtotal=original_subtotal,
+                discount_amount=discount_amount,
+                subtotal=subtotal,
+                discount_rule_id=rule.id if rule is not None else None,
+                discount_rule_name=rule.name if rule is not None else None,
+                discount_type=rule.discount_type if rule is not None else None,
+                discount_value=rule.discount_value if rule is not None else None,
+            )
+        )
+        original_total_amount += original_subtotal
+        total_amount += subtotal
+
+    return SalePricePreviewResponse(
+        original_total_amount=original_total_amount,
+        discount_amount=original_total_amount - total_amount,
+        total_amount=total_amount,
+        items=preview_items,
     )
 
 
@@ -195,10 +309,27 @@ async def create_sale_service(
             requested_quantities.get(item.product_id, 0) + item.quantity
         )
 
-    # 第四步：扣库存、创建销售单和明细；成功后在 Service 层统一提交事务。
+    # 第四步：按照真正结账时间重新计算折扣，不能直接相信前端预览价格。
+    product_ids = list(requested_quantities.keys())
+    prices = await get_product_discount_prices(product_ids=product_ids, now=sold_at, db=db)
+    final_unit_prices: dict[int, Decimal] = {}
+    applied_discount_rules: dict[int, DiscountRule | None] = {}
+    for product_id in product_ids:
+        price = prices.get(product_id)
+        if price is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"商品ID {product_id} 不存在",
+            )
+        final_unit_prices[product_id] = price.final_unit_price
+        applied_discount_rules[product_id] = price.discount_rule
+
+    # 第五步：扣库存、创建销售单和明细；成功后在Service层统一提交事务。
     try:
         sale = await create_sale(
             requested_quantities=requested_quantities,
+            final_unit_prices=final_unit_prices,
+            applied_discount_rules=applied_discount_rules,
             sold_at=sold_at,
             employee_id=current_employee_id,
             db=db,
@@ -230,7 +361,7 @@ async def create_sale_service(
         await db.rollback()
         raise
 
-    # 第五步：重新查询已经提交的销售单，并按商品合并跨批次明细后返回小票。
+    # 第六步：重新查询已经提交的销售单，并按商品合并跨批次明细后返回小票。
     refreshed_sale = await get_sales_detail(sale_no=sale.sale_no, db=db)
     if refreshed_sale is None:
         raise RuntimeError("销售单创建后无法重新查询")
@@ -290,4 +421,5 @@ __all__ = [
     "create_sale_service",
     "get_sales_detail_service",
     "get_sales_list_service",
+    "preview_sale_price_service",
 ]

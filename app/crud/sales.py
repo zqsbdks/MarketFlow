@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.crud.operation_audit_logs import create_operation_audit_log
+from app.models.discount_rule import DiscountRule
 from app.models.enums import InventoryBatchStatus, ProductStatus, SaleSource
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
@@ -80,6 +81,10 @@ async def get_sales_list(
 async def create_sale(
     # requested_quantities：商品ID和购买总数量，例如 {1: 8, 3: 2}。
     requested_quantities: dict[int, int],
+    # final_unit_prices：折扣模块按照结账时间为每个商品计算出的实际成交单价。
+    final_unit_prices: dict[int, Decimal],
+    # applied_discount_rules：每个商品最终选中的折扣规则；没有折扣时值为None。
+    applied_discount_rules: dict[int, DiscountRule | None],
     # sold_at：本次结账时间，同时用于生成销售单号。
     sold_at: datetime,
     # employee_id：实际执行收银操作的员工 ID，用于审计记录。
@@ -89,7 +94,9 @@ async def create_sale(
 ) -> Sale:
     """按先到期先销售原则扣减批次库存，并创建销售单和批次级明细。"""
 
-    # 三个变量分别累计整张小票的销售额、成本和数据库销售明细。
+    # 分别累计整张小票的原价、优惠、实收、成本和数据库销售明细。
+    original_total_amount = Decimal("0.00")
+    total_discount_amount = Decimal("0.00")
     total_amount = Decimal("0.00")
     total_cost = Decimal("0.00")
     sale_items: list[SaleItem] = []
@@ -106,6 +113,13 @@ async def create_sale(
         if product.status != ProductStatus.ON_SALE:
             # 商品存在但已停售时不能继续创建销售明细。
             raise PermissionError(product.name)
+
+        # Service已经按当前时间计算价格；没有折扣时成交价就是商品原销售价。
+        original_unit_price = product.sale_price.quantize(Decimal("0.01"))
+        final_unit_price = final_unit_prices.get(product.id, original_unit_price)
+        if final_unit_price > original_unit_price:
+            final_unit_price = original_unit_price
+        applied_rule = applied_discount_rules.get(product.id)
 
         # 第二步：查询这个商品所有有库存且未过期的批次。
         # expiration_date >= 今天表示当天到期仍可销售；没有日期的历史批次排在最后。
@@ -158,7 +172,9 @@ async def create_sale(
 
             # 每个批次的进货成本可能不同，所以跨批次时分别生成 SaleItem。
             unit_cost = batch.purchase_item.unit_cost
-            subtotal = product.sale_price * deducted_quantity
+            original_subtotal = original_unit_price * deducted_quantity
+            subtotal = final_unit_price * deducted_quantity
+            discount_amount = original_subtotal - subtotal
             cost_subtotal = unit_cost * deducted_quantity
             sale_items.append(
                 SaleItem(
@@ -168,12 +184,26 @@ async def create_sale(
                     product_name_snapshot=product.name,
                     department_id=product.department_id,
                     quantity=deducted_quantity,
-                    unit_price=product.sale_price,
+                    original_unit_price=original_unit_price,
+                    unit_price=final_unit_price,
+                    discount_amount=discount_amount,
+                    discount_rule_id=applied_rule.id if applied_rule is not None else None,
+                    discount_rule_name_snapshot=(
+                        applied_rule.name if applied_rule is not None else None
+                    ),
+                    discount_type_snapshot=(
+                        applied_rule.discount_type.value if applied_rule is not None else None
+                    ),
+                    discount_value_snapshot=(
+                        applied_rule.discount_value if applied_rule is not None else None
+                    ),
                     unit_cost=unit_cost,
                     subtotal=subtotal,
                     cost_subtotal=cost_subtotal,
                 )
             )
+            original_total_amount += original_subtotal
+            total_discount_amount += discount_amount
             total_amount += subtotal
             total_cost += cost_subtotal
             quantity_left -= deducted_quantity
@@ -232,6 +262,8 @@ async def create_sale(
     sale = Sale(
         sale_no=f"{sale_no_prefix}{next_number:04d}",
         sold_at=sold_at,
+        original_total_amount=original_total_amount,
+        discount_amount=total_discount_amount,
         total_amount=total_amount,
         total_cost=total_cost,
         gross_profit=total_amount - total_cost,
@@ -250,6 +282,8 @@ async def create_sale(
         before_data=None,
         after_data={
             "sale_no": sale.sale_no,
+            "original_total_amount": sale.original_total_amount,
+            "discount_amount": sale.discount_amount,
             "total_amount": sale.total_amount,
             "total_cost": sale.total_cost,
             "gross_profit": sale.gross_profit,
@@ -261,6 +295,10 @@ async def create_sale(
                     "product_id": item.product_id,
                     "inventory_batch_id": item.inventory_batch_id,
                     "quantity": item.quantity,
+                    "original_unit_price": item.original_unit_price,
+                    "unit_price": item.unit_price,
+                    "discount_amount": item.discount_amount,
+                    "discount_rule_id": item.discount_rule_id,
                     "subtotal": item.subtotal,
                 }
                 for item in sale.items

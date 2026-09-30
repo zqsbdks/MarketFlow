@@ -1,5 +1,6 @@
 """折扣规则与适用范围业务逻辑。"""
 
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
@@ -14,6 +15,7 @@ from app.crud.discount_rule import (
     create_discount_rule_product_scopes,
     delete_discount_rule_product_scopes,
     delete_discount_rules,
+    get_active_discount_rules_for_products,
     get_discount_products_by_ids,
     get_discount_rule_by_id,
     get_discount_rule_by_name,
@@ -32,9 +34,11 @@ from app.models.discount_rule import DiscountRule
 from app.models.enums import (
     DiscountComputedStatus,
     DiscountScheduleType,
+    DiscountScopeType,
     DiscountType,
     EmployeeRole,
 )
+from app.models.product import Product
 from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
     CreateDiscountRuleRequest,
@@ -150,6 +154,104 @@ def _calculate_discounted_price(
         # fixed_price表示不再计算，直接把规则中的折扣数值作为成交单价。
         discounted_price = discount_value
     return discounted_price.quantize(Decimal("0.01"))
+
+
+# endregion
+
+
+# region 商品当前成交价格结果
+@dataclass(frozen=True)
+class ProductDiscountPrice:
+    """保存一件商品在指定时间计算出的原价、成交价和选中规则。"""
+
+    product: Product
+    original_unit_price: Decimal
+    final_unit_price: Decimal
+    discount_rule: DiscountRule | None
+
+
+# endregion
+
+
+# region 计算多个商品当前最优折扣
+async def get_product_discount_prices(
+    product_ids: list[int],
+    now: datetime,
+    db: AsyncSession,
+) -> dict[int, ProductDiscountPrice]:
+    """为多个商品选择当前折后价最低的规则；折扣之间不叠加。"""
+
+    # 第一步：去除重复商品ID，再一次性查询商品基础资料。
+    unique_product_ids: list[int] = []
+    for product_id in product_ids:
+        if product_id not in unique_product_ids:
+            unique_product_ids.append(product_id)
+
+    products = await get_discount_products_by_ids(product_ids=unique_product_ids, db=db)
+
+    # 第二步：整理商品、分类和部门ID，用一次查询取得所有候选规则。
+    category_ids: list[int] = []
+    department_ids: list[int] = []
+    for product in products:
+        if product.category_id not in category_ids:
+            category_ids.append(product.category_id)
+        if product.department_id not in department_ids:
+            department_ids.append(product.department_id)
+
+    rules = await get_active_discount_rules_for_products(
+        product_ids=unique_product_ids,
+        category_ids=category_ids,
+        department_ids=department_ids,
+        now=now,
+        db=db,
+    )
+
+    # 第三步：逐个商品检查候选规则，默认成交价等于商品原销售价。
+    prices: dict[int, ProductDiscountPrice] = {}
+    for product in products:
+        best_price = product.sale_price.quantize(Decimal("0.01"))
+        best_rule: DiscountRule | None = None
+
+        for rule in rules:
+            rule_applies = False
+            for scope in rule.scopes:
+                if scope.scope_type == DiscountScopeType.PRODUCT and scope.product_id == product.id:
+                    rule_applies = True
+                elif (
+                    scope.scope_type == DiscountScopeType.CATEGORY
+                    and scope.category_id == product.category_id
+                ):
+                    rule_applies = True
+                elif (
+                    scope.scope_type == DiscountScopeType.DEPARTMENT
+                    and scope.department_id == product.department_id
+                ):
+                    rule_applies = True
+
+                if rule_applies:
+                    break
+
+            if not rule_applies:
+                continue
+
+            candidate_price = _calculate_discounted_price(
+                original_price=product.sale_price,
+                discount_type=rule.discount_type,
+                discount_value=rule.discount_value,
+            )
+            # 名为折扣的规则不能提高售价；高于原价时按原价结算且不选中规则。
+            if candidate_price < best_price:
+                best_price = candidate_price
+                best_rule = rule
+
+        prices[product.id] = ProductDiscountPrice(
+            product=product,
+            original_unit_price=product.sale_price.quantize(Decimal("0.01")),
+            final_unit_price=best_price,
+            discount_rule=best_rule,
+        )
+
+    return prices
 
 
 # endregion
@@ -1482,6 +1584,8 @@ __all__ = [
     "get_discount_rule_detail_service",
     "get_discount_rule_list_service",
     "get_discount_rule_products_service",
+    "get_product_discount_prices",
+    "ProductDiscountPrice",
     "update_discount_rule_service",
     "update_discount_rule_status_service",
 ]

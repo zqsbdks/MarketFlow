@@ -77,6 +77,8 @@ EXPECTED_COLUMNS = {
         "id",
         "sale_no",
         "sold_at",
+        "original_total_amount",
+        "discount_amount",
         "total_amount",
         "total_cost",
         "gross_profit",
@@ -92,7 +94,13 @@ EXPECTED_COLUMNS = {
         "product_name_snapshot",
         "department_id",
         "quantity",
+        "original_unit_price",
         "unit_price",
+        "discount_amount",
+        "discount_rule_id",
+        "discount_rule_name_snapshot",
+        "discount_type_snapshot",
+        "discount_value_snapshot",
         "unit_cost",
         "subtotal",
         "cost_subtotal",
@@ -282,10 +290,15 @@ def test_money_columns_use_exact_decimal_types() -> None:
     expected_precision = {
         ("product", "purchase_price"): (10, 2),
         ("product", "sale_price"): (10, 2),
+        ("sale", "original_total_amount"): (12, 2),
+        ("sale", "discount_amount"): (12, 2),
         ("sale", "total_amount"): (12, 2),
         ("sale", "total_cost"): (12, 2),
         ("sale", "gross_profit"): (12, 2),
+        ("sale_item", "original_unit_price"): (10, 2),
         ("sale_item", "unit_price"): (10, 2),
+        ("sale_item", "discount_amount"): (12, 2),
+        ("sale_item", "discount_value_snapshot"): (12, 4),
         ("sale_item", "unit_cost"): (10, 2),
         ("sale_item", "subtotal"): (12, 2),
         ("sale_item", "cost_subtotal"): (12, 2),
@@ -376,10 +389,10 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """增加折扣规则所属部门的迁移是当前唯一的 Alembic 版本头。"""
+    """增加销售折扣快照字段的迁移是当前唯一的Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260927_0017"]
+    assert script.get_heads() == ["20260927_0018"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:
