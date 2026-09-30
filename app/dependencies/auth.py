@@ -9,8 +9,11 @@ from typing import Any
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.crud.auth import get_employee_by_id
+from app.dependencies.db import get_db
 
 # auto_error=False 让缺少请求头的情况进入自定义逻辑，返回项目约定的中文提示。
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -88,4 +91,42 @@ async def get_current_employee_id(
 
 # endregion
 
-__all__ = ["get_current_employee_id", "get_current_token_payload"]
+
+# region 获取已验证状态的当前员工ID
+async def get_verified_current_employee_id(
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> int:
+    """在解析JWT后，继续检查员工账号的最新可用状态。
+
+    缓存命中时路由函数本身不会再次执行，但 FastAPI 仍会先解析依赖。缓存接口使用
+    本依赖，可以避免已停用或尚未修改初始密码的员工读取已有缓存。
+    """
+
+    employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="当前登录员工不存在",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账号已停用",
+        )
+    if employee.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="请先修改初始密码",
+        )
+    return employee.id
+
+
+# endregion
+
+__all__ = [
+    "get_current_employee_id",
+    "get_current_token_payload",
+    "get_verified_current_employee_id",
+]

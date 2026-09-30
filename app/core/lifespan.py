@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi_cache import FastAPICache
+from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.backends.redis import RedisBackend
 
 from app.core.database import async_engine
@@ -26,6 +27,9 @@ async def lifespan(app: FastAPI):
     # 即使当前函数未直接使用 app，保留该参数以符合 FastAPI lifespan 协议。
     _ = app
 
+    # 测试或应用工厂重复启动时，先清除上一次生命周期留下的全局缓存配置。
+    FastAPICache.reset()
+
     # 未配置 APP_REDIS_URL 时返回 None，应用可以在无 Redis 环境下启动。
     client = get_redis_client()
     if client is not None:
@@ -34,10 +38,14 @@ async def lifespan(app: FastAPI):
             await client.ping()
             FastAPICache.init(RedisBackend(client), prefix="fastapi-cache")
         except Exception:
-            # Redis 在基础模板中属于可选服务，连接失败只记录日志，不阻止 API 启动。
+            # Redis 暂时不可用时退回单进程内存缓存，保证带缓存装饰器的接口仍可使用。
             import logging
 
             logging.getLogger(__name__).exception("Redis initialization failed")
+            FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
+    else:
+        # 本地未启用 Redis 时使用内存缓存；部署后配置 Redis 即可跨请求共享缓存。
+        FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
 
     # 后台任务使用独立数据库会话，每天12点签收进货单并刷新库存批次状态。
     scheduler_stop_event = asyncio.Event()
@@ -56,3 +64,4 @@ async def lifespan(app: FastAPI):
     # 先释放数据库连接，再关闭 Redis；两个操作均由客户端库保证幂等性。
     await async_engine.dispose()
     await close_redis()
+    FastAPICache.reset()

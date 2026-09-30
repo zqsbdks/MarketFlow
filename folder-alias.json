@@ -32,6 +32,9 @@
     "app/core/__init__.py": {
         "description": "核心模块公共导出入口"
     },
+    "app/core/cache.py": {
+        "description": "接口缓存时长、缓存键与主动失效公共工具"
+    },
     "app/core/config.py": {
         "description": "环境变量与.env配置模型"
     },
@@ -78,7 +81,7 @@
         "description": "数据库会话依赖的简短别名"
     },
     "app/dependencies/auth.py": {
-        "description": "Bearer JWT解析与员工ID转换认证依赖"
+        "description": "Bearer JWT解析、员工ID转换与缓存接口账号状态验证依赖"
     },
     "app/models": {
         "description": "SQLAlchemy ORM模型目录"
@@ -334,6 +337,9 @@
     },
     "tests/test_app.py": {
         "description": "根接口、健康检查和404响应测试"
+    },
+    "tests/test_cache.py": {
+        "description": "接口缓存命中、查询参数归一化与主动失效测试"
     },
     "tests/test_auth.py": {
         "description": "员工登录成功、失败、停用与密码验证测试"

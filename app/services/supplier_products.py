@@ -5,6 +5,10 @@ from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import (
+    SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
+    clear_cache_namespaces,
+)
 from app.crud.auth import get_employee_by_id
 from app.crud.categories import get_category_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
@@ -255,6 +259,9 @@ async def create_supplier_product_service(
     )
     if saved_product is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商商品不存在")
+
+    # 新商品会改变目录列表的总数和分页内容，提交成功后清除整个目录缓存组。
+    await clear_cache_namespaces(SUPPLIER_PRODUCTS_CACHE_NAMESPACE)
     return _build_supplier_product_response(saved_product)
 
 
@@ -338,6 +345,9 @@ async def update_supplier_product_status_service(
     )
     if updated_product is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商商品不存在")
+
+    # 状态修改会同时影响详情、启用状态筛选和所有相关分页缓存。
+    await clear_cache_namespaces(SUPPLIER_PRODUCTS_CACHE_NAMESPACE)
     return _build_supplier_product_response(updated_product)
 
 
@@ -469,6 +479,9 @@ async def update_supplier_product_service(
     )
     if updated_product is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商商品不存在")
+
+    # 名称、分类、价格和保质期都可能出现在列表中，因此统一清除目录缓存组。
+    await clear_cache_namespaces(SUPPLIER_PRODUCTS_CACHE_NAMESPACE)
     return _build_supplier_product_response(updated_product)
 
 

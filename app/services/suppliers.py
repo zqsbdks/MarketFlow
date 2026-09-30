@@ -5,6 +5,11 @@ from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import (
+    SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
+    SUPPLIERS_CACHE_NAMESPACE,
+    clear_cache_namespaces,
+)
 from app.crud.auth import get_employee_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.suppliers import (
@@ -178,6 +183,8 @@ async def update_supplier_status_service(
             detail="供应商不存在",
         )
 
+    # 数据库已经提交成功，清除列表和详情共用的供应商缓存。
+    await clear_cache_namespaces(SUPPLIERS_CACHE_NAMESPACE)
     return SupplierItemResponse.model_validate(updated_supplier)
 
 
@@ -280,6 +287,12 @@ async def update_supplier_service(
             detail="供应商不存在",
         )
 
+    # 供应商名称也显示在供应商商品响应中，因此两个命名空间都需要失效。
+    await clear_cache_namespaces(
+        SUPPLIERS_CACHE_NAMESPACE,
+        SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
+    )
+
     # 将SQLAlchemy对象转换为接口约定的Pydantic响应模型。
     return SupplierItemResponse.model_validate(updated_supplier)
 
@@ -366,6 +379,9 @@ async def create_supplier_service(
             status_code=http_status.HTTP_409_CONFLICT,
             detail="供应商编号或名称已存在，请重试",
         ) from exc
+
+    # 新供应商会影响供应商列表的总数和分页结果，提交成功后立即清除旧缓存。
+    await clear_cache_namespaces(SUPPLIERS_CACHE_NAMESPACE)
 
     # CRUD已经refresh过对象，这里可以直接转换成统一的响应模型。
     return SupplierItemResponse.model_validate(created_supplier)
