@@ -383,6 +383,9 @@
     "scripts/check_database.py": {
         "description": "检查MySQL连接和数据库基本可用性"
     },
+    "scripts/seed_japanese_demo.py": {
+        "description": "生成约两个月日语超市进货、库存、折扣与销售演示数据"
+    },
     "scripts/setup.py": {
         "description": "跨平台初始化环境、依赖与项目配置"
     },
