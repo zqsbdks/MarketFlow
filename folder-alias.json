@@ -549,7 +549,10 @@
         "description": "商品筛选、库存与价格查询页面"
     },
     "frontend/src/views/SalesView.vue": {
-        "description": "实时折扣试算、模拟收银台、销售单列表与小票详情页面"
+        "description": "销售单列表筛选、优惠金额与历史小票详情页面"
+    },
+    "frontend/src/views/ShoppingView.vue": {
+        "description": "商品模拟扫码、购物车、实时折扣试算与收银结账页面"
     },
     "tests/test_employee_detail.py": {
         "description": "员工详情查询与修改业务测试"

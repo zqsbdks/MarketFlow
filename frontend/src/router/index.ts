@@ -48,6 +48,12 @@ const router = createRouter({
           meta: { title: '商品查询' },
         },
         {
+          path: 'shopping',
+          name: 'shopping',
+          component: () => import('../views/ShoppingView.vue'),
+          meta: { title: '模拟购物' },
+        },
+        {
           path: 'sales',
           name: 'sales',
           component: () => import('../views/SalesView.vue'),
