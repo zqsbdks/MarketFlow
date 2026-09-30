@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   BarChart3,
   ChartNoAxesCombined,
+  BadgePercent,
   Boxes,
   Layers3,
   History,
@@ -32,6 +33,7 @@ const navItems = computed(() => {
     { to: '/departments/1', label: '部门经营', icon: BarChart3 },
     { to: '/analytics', label: '经营分析', icon: ChartNoAxesCombined },
     { to: '/products', label: '商品查询', icon: Boxes },
+    { to: '/discount-rules', label: '折扣管理', icon: BadgePercent },
     { to: '/shopping', label: '模拟购物', icon: ScanLine },
     { to: '/sales', label: '销售记录', icon: ReceiptText },
     { to: '/procurement', label: '进货管理', icon: Truck },

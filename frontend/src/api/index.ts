@@ -6,6 +6,12 @@ import type {
   CreatedEmployee,
   Department,
   DepartmentReport,
+  DiscountComputedStatus,
+  DiscountRule,
+  DiscountRulePayload,
+  DiscountRuleProduct,
+  DiscountScheduleType,
+  DiscountType,
   EmployeeIdentity,
   EmployeeDetail,
   EmployeeDetailUpdate,
@@ -212,6 +218,91 @@ export async function previewSalePrice(items: CreateSaleItem[]) {
   const response = await http.post<ApiResponse<SalePricePreview>>('/sales/preview', { items })
   return unwrap(response.data)
 }
+
+// region 折扣规则与适用商品
+export async function getDiscountRules(params: {
+  page?: number
+  page_size?: number
+  keyword?: string
+  department_id?: number
+  discount_type?: DiscountType
+  schedule_type?: DiscountScheduleType
+  is_active?: boolean
+  computed_status?: DiscountComputedStatus
+}) {
+  return unwrap(
+    (
+      await http.get<ApiResponse<PageResult<DiscountRule>>>('/discount-rules/list', {
+        params,
+      })
+    ).data,
+  )
+}
+
+export async function getDiscountRule(ruleId: number) {
+  return unwrap((await http.get<ApiResponse<DiscountRule>>(`/discount-rules/${ruleId}`)).data)
+}
+
+export async function createDiscountRule(payload: DiscountRulePayload) {
+  return unwrap((await http.post<ApiResponse<DiscountRule>>('/discount-rules', payload)).data)
+}
+
+export async function updateDiscountRule(ruleId: number, payload: DiscountRulePayload) {
+  return unwrap(
+    (await http.patch<ApiResponse<DiscountRule>>(`/discount-rules/${ruleId}`, payload)).data,
+  )
+}
+
+export async function updateDiscountRuleStatus(
+  ruleId: number,
+  isActive: boolean,
+  reason?: string,
+) {
+  return unwrap(
+    (
+      await http.patch<ApiResponse<DiscountRule>>(`/discount-rules/${ruleId}/status`, {
+        is_active: isActive,
+        reason: reason || undefined,
+      })
+    ).data,
+  )
+}
+
+export async function deleteDiscountRule(ruleId: number) {
+  await http.delete(`/discount-rules/${ruleId}`)
+}
+
+export async function clearDiscountRules() {
+  await http.delete('/discount-rules')
+}
+
+export async function getDiscountRuleProducts(
+  ruleId: number,
+  params: { page?: number; page_size?: number; keyword?: string; category_id?: number } = {},
+) {
+  return unwrap(
+    (
+      await http.get<ApiResponse<PageResult<DiscountRuleProduct>>>(
+        `/discount-rules/${ruleId}/products`,
+        { params },
+      )
+    ).data,
+  )
+}
+
+export async function addDiscountRuleProducts(ruleId: number, productIds: number[]) {
+  await http.post(`/discount-rules/${ruleId}/products`, { product_ids: productIds })
+}
+
+export async function deleteDiscountRuleProduct(ruleId: number, productId: number) {
+  await http.delete(`/discount-rules/${ruleId}/products/${productId}`)
+}
+
+export async function clearDiscountRuleProducts(ruleId: number) {
+  await http.delete(`/discount-rules/${ruleId}/products`)
+}
+
+// endregion
 
 export async function getEmployees(params: Record<string, unknown>) {
   const response = await http.get<ApiResponse<PageResult<EmployeeListItem>>>('/employees/list', {

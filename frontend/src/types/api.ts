@@ -29,6 +29,8 @@ export interface EmployeeDetailUpdate {
 }
 export type ProductStatus = 'on_sale' | 'stopped'
 export type DiscountType = 'percentage' | 'amount_off' | 'fixed_price'
+export type DiscountScheduleType = 'once' | 'daily' | 'weekly'
+export type DiscountComputedStatus = 'disabled' | 'scheduled' | 'active' | 'ended'
 export type RankingGroupBy = 'product' | 'category'
 export type RankingSortBy = 'quantity' | 'amount'
 export type SortOrder = 'asc' | 'desc'
@@ -175,6 +177,60 @@ export interface ProductDetail {
   expiry_warning_days?: number | null
   low_stock_threshold: number | null
   status: ProductStatus
+}
+
+export interface DiscountRule {
+  id: number
+  name: string
+  department_id: number
+  department_name: string
+  discount_type: DiscountType
+  discount_value: string
+  schedule_type: DiscountScheduleType
+  starts_at: string | null
+  ends_at: string | null
+  daily_start_time: string | null
+  daily_end_time: string | null
+  weekdays: number[] | null
+  is_active: boolean
+  computed_status: DiscountComputedStatus
+  created_by: number
+  created_by_name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DiscountRuleProduct {
+  scope_id: number
+  discount_rule_id: number
+  product_id: number
+  product_no: string
+  product_name: string
+  department_id: number
+  department_name: string
+  category_id: number
+  category_name: string
+  original_price: string
+  discount_type: DiscountType
+  discount_value: string
+  discounted_price: string
+  product_status: ProductStatus
+  created_at: string
+}
+
+export interface DiscountRulePayload {
+  department_id?: number
+  name: string
+  discount_type: DiscountType
+  discount_value: number
+  schedule_type: DiscountScheduleType
+  starts_at: string | null
+  ends_at: string | null
+  daily_start_time: string | null
+  daily_end_time: string | null
+  weekdays: number[] | null
+  is_active?: boolean
+  reason?: string
 }
 
 export type InventoryBatchStatus = 'available' | 'near_expiry' | 'expired' | 'sold_out'

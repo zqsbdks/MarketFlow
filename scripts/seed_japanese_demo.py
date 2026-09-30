@@ -383,6 +383,7 @@ async def create_discount_rules(
     db: AsyncSession,
     manager: Employee,
     departments: dict[str, Department],
+    products: list[Product],
     end_date: date,
 ) -> dict[str, DiscountRule]:
     """创建可展示四种动态状态的日语折扣规则。"""
@@ -471,7 +472,7 @@ async def create_discount_rules(
     db.add_all(rules.values())
     await db.flush()
 
-    # 每条规则先按部门建立适用范围，销售时保存实际使用规则的快照。
+    # 折扣规则属于一个部门，但实际生效范围由具体商品关联决定。
     for key, rule in rules.items():
         if key in departments:
             department = departments[key]
@@ -481,13 +482,16 @@ async def create_discount_rules(
             department = departments["MEAT"]
         else:
             department = departments["SEAFOOD"]
-        db.add(
-            DiscountRuleScope(
-                discount_rule_id=rule.id,
-                scope_type=DiscountScopeType.DEPARTMENT,
-                department_id=department.id,
+        for product in products:
+            if product.department_id != department.id:
+                continue
+            db.add(
+                DiscountRuleScope(
+                    discount_rule_id=rule.id,
+                    scope_type=DiscountScopeType.PRODUCT,
+                    product_id=product.id,
+                )
             )
-        )
     await db.flush()
     return rules
 
@@ -1210,7 +1214,7 @@ async def seed_japanese_demo_data() -> None:
                 suppliers,
                 products,
             ) = await create_master_data(db, rng, start_date)
-            rules = await create_discount_rules(db, manager, departments, end_date)
+            rules = await create_discount_rules(db, manager, departments, products, end_date)
             purchases, ledgers = await create_purchases_and_batches(
                 db,
                 rng,

@@ -539,6 +539,9 @@
     "frontend/src/views/DepartmentView.vue": {
         "description": "单个部门经营数据分析页面"
     },
+    "frontend/src/views/DiscountRulesView.vue": {
+        "description": "折扣规则筛选、配置、启停及适用商品管理页面"
+    },
     "frontend/src/views/EmployeesView.vue": {
         "description": "员工列表、创建与账号管理页面"
     },

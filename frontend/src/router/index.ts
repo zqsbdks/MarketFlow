@@ -54,6 +54,12 @@ const router = createRouter({
           meta: { title: '模拟购物' },
         },
         {
+          path: 'discount-rules',
+          name: 'discount-rules',
+          component: () => import('../views/DiscountRulesView.vue'),
+          meta: { title: '折扣管理' },
+        },
+        {
           path: 'sales',
           name: 'sales',
           component: () => import('../views/SalesView.vue'),
