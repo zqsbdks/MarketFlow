@@ -115,7 +115,10 @@ class RankingSortOrder(StrEnum):
 class ReportMetric(StrEnum):
     """营业分析接口支持按需返回的指标。"""
 
+    ORIGINAL_REVENUE = "original_revenue"  # 折扣前原价销售额。
     REVENUE = "revenue"  # 营业额。
+    DISCOUNT_AMOUNT = "discount_amount"  # 优惠金额。
+    DISCOUNT_RATE = "discount_rate"  # 优惠金额占原价销售额的百分比。
     SALES_COST = "sales_cost"  # 销售成本。
     GROSS_PROFIT = "gross_profit"  # 毛利润。
     SALES_QUANTITY = "sales_quantity"  # 销售商品数量。

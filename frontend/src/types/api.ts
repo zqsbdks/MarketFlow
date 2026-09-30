@@ -33,7 +33,10 @@ export type RankingGroupBy = 'product' | 'category'
 export type RankingSortBy = 'quantity' | 'amount'
 export type SortOrder = 'asc' | 'desc'
 export type ReportMetric =
+  | 'original_revenue'
   | 'revenue'
+  | 'discount_amount'
+  | 'discount_rate'
   | 'sales_cost'
   | 'gross_profit'
   | 'sales_quantity'
@@ -55,7 +58,10 @@ export interface DepartmentRevenueShare {
 export interface SalesTrendItem {
   start_time: string
   end_time: string
+  original_revenue: string
   revenue: string
+  discount_amount: string
+  discount_rate: string | null
   sales_cost: string
   gross_profit: string
   sales_quantity: number
@@ -64,7 +70,10 @@ export interface SalesTrendItem {
 }
 
 export interface ReportAnalytics {
+  original_revenue?: string | null
   revenue?: string | null
+  discount_amount?: string | null
+  discount_rate?: string | null
   sales_cost?: string | null
   gross_profit?: string | null
   sales_quantity?: number | null

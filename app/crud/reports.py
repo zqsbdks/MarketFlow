@@ -17,10 +17,20 @@ from app.models.sale_item import SaleItem
 ReportValues = tuple[Decimal, Decimal, Decimal, int, int]
 DepartmentReportValues = tuple[int, str, Decimal, Decimal, int]
 RankingValues = tuple[int, str, int, Decimal]
-AnalyticsTrendValues = tuple[datetime, Decimal, Decimal, Decimal, int, int]
+AnalyticsSummaryValues = tuple[Decimal, Decimal, Decimal, Decimal, Decimal, int, int]
+AnalyticsTrendValues = tuple[
+    datetime,
+    Decimal,
+    Decimal,
+    Decimal,
+    Decimal,
+    Decimal,
+    int,
+    int,
+]
 AnalyticsDepartmentValues = tuple[int, str, Decimal]
 AnalyticsValues = tuple[
-    ReportValues | None,
+    AnalyticsSummaryValues | None,
     list[AnalyticsDepartmentValues],
     list[AnalyticsTrendValues],
 ]
@@ -312,11 +322,14 @@ async def get_report_analytics(
     if department_id is not None:
         base_conditions.append(SaleItem.department_id == department_id)
 
-    summary: ReportValues | None = None
+    summary: AnalyticsSummaryValues | None = None
     if include_summary:
         summary_statement = (
             select(
+                # 原价销售额：折扣前单价乘以数量后再汇总。
+                func.coalesce(func.sum(SaleItem.original_unit_price * SaleItem.quantity), 0),
                 func.coalesce(func.sum(SaleItem.subtotal), 0),  # 营业额：销售小计之和。
+                func.coalesce(func.sum(SaleItem.discount_amount), 0),  # 优惠金额之和。
                 func.coalesce(func.sum(SaleItem.cost_subtotal), 0),  # 销售成本之和。
                 # 毛利润：每条明细的销售小计减去成本小计，再计算总和。
                 func.coalesce(func.sum(SaleItem.subtotal - SaleItem.cost_subtotal), 0),
@@ -328,9 +341,19 @@ async def get_report_analytics(
             .where(*base_conditions)
         )
         result = await db.execute(summary_statement)
-        revenue, sales_cost, gross_profit, sales_quantity, sale_count = result.one()
+        (
+            original_revenue,
+            revenue,
+            discount_amount,
+            sales_cost,
+            gross_profit,
+            sales_quantity,
+            sale_count,
+        ) = result.one()
         summary = (
+            Decimal(original_revenue),
             Decimal(revenue),
+            Decimal(discount_amount),
             Decimal(sales_cost),
             Decimal(gross_profit),
             int(sales_quantity),
@@ -385,7 +408,9 @@ async def get_report_analytics(
         trend_statement = (
             select(
                 bucket_expression.label("bucket"),
+                func.coalesce(func.sum(SaleItem.original_unit_price * SaleItem.quantity), 0),
                 func.coalesce(func.sum(SaleItem.subtotal), 0),
+                func.coalesce(func.sum(SaleItem.discount_amount), 0),
                 func.coalesce(func.sum(SaleItem.cost_subtotal), 0),
                 func.coalesce(func.sum(SaleItem.subtotal - SaleItem.cost_subtotal), 0),
                 func.coalesce(func.sum(SaleItem.quantity), 0),
@@ -401,7 +426,16 @@ async def get_report_analytics(
             .order_by(bucket_expression)
         )
         trend_result = await db.execute(trend_statement)
-        for bucket, revenue, sales_cost, gross_profit, quantity, sale_count in trend_result.all():
+        for (
+            bucket,
+            original_revenue,
+            revenue,
+            discount_amount,
+            sales_cost,
+            gross_profit,
+            quantity,
+            sale_count,
+        ) in trend_result.all():
             if isinstance(bucket, datetime):
                 bucket_time = bucket
             elif isinstance(bucket, date):
@@ -411,7 +445,9 @@ async def get_report_analytics(
             trend.append(
                 (
                     bucket_time,
+                    Decimal(original_revenue),
                     Decimal(revenue),
+                    Decimal(discount_amount),
                     Decimal(sales_cost),
                     Decimal(gross_profit),
                     int(quantity),
@@ -425,6 +461,7 @@ async def get_report_analytics(
 # endregion
 
 __all__ = [
+    "AnalyticsSummaryValues",
     "DepartmentReportValues",
     "RankingValues",
     "ReportValues",

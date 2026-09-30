@@ -335,7 +335,7 @@ def _percentage(numerator: Decimal, denominator: Decimal) -> Decimal | None:
 
 # region 组装营业趋势
 def _build_sales_trend(
-    raw_values: list[tuple[datetime, Decimal, Decimal, Decimal, int, int]],
+    raw_values: list[tuple[datetime, Decimal, Decimal, Decimal, Decimal, Decimal, int, int]],
     start_time: datetime,
     end_time: datetime,
     interval: Literal["hour", "day", "month", "year"],
@@ -344,7 +344,7 @@ def _build_sales_trend(
 
     Args:
         raw_values: CRUD查询出的原始分组数据。每一项依次包含时间段开始值、
-            营业额、销售成本、毛利润、销售商品数量和销售单数量。
+            原价销售额、营业额、优惠金额、销售成本、毛利润、销售商品数量和销售单数量。
         start_time: 用户选择的查询开始时间，用于裁剪第一个时间段。
         end_time: 用户选择的查询结束时间，用于裁剪最后一个时间段。
         interval: 时间分组粒度，支持按小时、日、月或年。
@@ -356,8 +356,17 @@ def _build_sales_trend(
     # 创建空列表；下面每处理一个有销售数据的时间段，就向列表添加一个字典。
     result: list[dict[str, Any]] = []
 
-    # 逐项拆开CRUD返回的数据：bucket_start是分组起点，后面五项是该组的汇总值。
-    for bucket_start, revenue, cost, profit, quantity, sale_count in raw_values:
+    # 逐项拆开CRUD返回的数据：bucket_start是分组起点，后面七项是该组的汇总值。
+    for (
+        bucket_start,
+        original_revenue,
+        revenue,
+        discount_amount,
+        cost,
+        profit,
+        quantity,
+        sale_count,
+    ) in raw_values:
         # 按小时查询时，一个时间段为一小时，例如09:00到10:00。
         if interval == "hour":
             # 当前分组起点增加一小时，得到这个小时分组的结束时间。
@@ -389,8 +398,14 @@ def _build_sales_trend(
                 "start_time": max(bucket_start, start_time),
                 # 最后一个分组可能超过用户选择的结束时间，因此取两个时间中较早的一个。
                 "end_time": min(next_bucket, end_time),
+                # 当前时间段按商品原销售单价计算的折扣前总额。
+                "original_revenue": original_revenue,
                 # 当前时间段内所有销售明细的销售小计之和，即营业额。
                 "revenue": revenue,
+                # 当前时间段原价销售额与实际营业额之间的差额。
+                "discount_amount": discount_amount,
+                # 优惠率＝优惠金额÷原价销售额×100；没有原价销售额时无法计算。
+                "discount_rate": _percentage(discount_amount, original_revenue),
                 # 当前时间段内所有销售明细的成本小计之和，即销售成本。
                 "sales_cost": cost,
                 # 当前时间段的毛利润，等于营业额减去销售成本。
@@ -476,7 +491,10 @@ async def get_report_analytics_service(
     # 转成集合后，判断某个指标是否被选择更直观，也会自动去除重复指标。
     requested = set(metrics)
     summary_metrics = {
+        ReportMetric.ORIGINAL_REVENUE,
         ReportMetric.REVENUE,
+        ReportMetric.DISCOUNT_AMOUNT,
+        ReportMetric.DISCOUNT_RATE,
         ReportMetric.SALES_COST,
         ReportMetric.GROSS_PROFIT,
         ReportMetric.SALES_QUANTITY,
@@ -505,10 +523,20 @@ async def get_report_analytics_service(
 
     response_values: dict[str, Any] = {}
     if current is not None:
-        # CRUD按固定顺序返回：营业额、成本、毛利润、商品数量、销售单数量。
-        revenue, cost, gross_profit, quantity, sale_count = current
+        # CRUD按固定顺序返回原价销售额、营业额、优惠额、成本、毛利、销量和单数。
+        original_revenue, revenue, discount_amount, cost, gross_profit, quantity, sale_count = (
+            current
+        )
+        if ReportMetric.ORIGINAL_REVENUE in requested:
+            response_values[ReportMetric.ORIGINAL_REVENUE.value] = original_revenue
         if ReportMetric.REVENUE in requested:
             response_values[ReportMetric.REVENUE.value] = revenue
+        if ReportMetric.DISCOUNT_AMOUNT in requested:
+            response_values[ReportMetric.DISCOUNT_AMOUNT.value] = discount_amount
+        if ReportMetric.DISCOUNT_RATE in requested:
+            response_values[ReportMetric.DISCOUNT_RATE.value] = _percentage(
+                discount_amount, original_revenue
+            )
         if ReportMetric.SALES_COST in requested:
             response_values[ReportMetric.SALES_COST.value] = cost
         if ReportMetric.GROSS_PROFIT in requested:
@@ -549,7 +577,15 @@ async def get_report_analytics_service(
                 include_trend=False,
             )
             if previous is not None:
-                previous_revenue, _previous_cost, previous_profit, _quantity, _sale_count = previous
+                (
+                    _previous_original_revenue,
+                    previous_revenue,
+                    _previous_discount_amount,
+                    _previous_cost,
+                    previous_profit,
+                    _quantity,
+                    _sale_count,
+                ) = previous
                 if ReportMetric.REVENUE_GROWTH_RATE in requested:
                     response_values[ReportMetric.REVENUE_GROWTH_RATE.value] = _percentage(
                         revenue - previous_revenue, previous_revenue

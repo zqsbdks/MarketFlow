@@ -72,7 +72,15 @@ class ReportAnalyticsResponse(BaseModel):
 
     # 所有单值指标直接放在这里；百分数30.00代表30%，不是0.30。
     # None表示分母为0等情况下无法计算，允许负毛利率和负增长率。
+    original_revenue: Decimal | None = Field(None, description="折扣前原价销售额", ge=0)
     revenue: Decimal | None = Field(None, description="营业额", ge=0)
+    discount_amount: Decimal | None = Field(None, description="优惠金额", ge=0)
+    discount_rate: Decimal | None = Field(
+        None,
+        description="优惠率（%）＝优惠金额÷折扣前原价销售额×100；原价销售额为0时为null",
+        ge=0,
+        le=100,
+    )
     sales_cost: Decimal | None = Field(None, description="销售成本", ge=0)
     gross_profit: Decimal | None = Field(None, description="毛利润")
     sales_quantity: int | None = Field(None, description="累计销售商品数量", ge=0)
@@ -109,17 +117,20 @@ class ReportAnalyticsResponse(BaseModel):
     )
 
     # 一个小时、日、月或年对应一个字典，按时间升序排列。
-    # 每项包含起止时间、营业额、销售成本、毛利润、销量、单数、毛利率。
+    # 每项包含起止时间、原价销售额、营业额、优惠金额、优惠率、成本、毛利润、销量、单数和毛利率。
     # 字典不再逐字段校验，Service需保证字段齐全、类型正确及计算口径一致。
     sales_trend: list[dict[str, Any]] | None = Field(
         None,
-        description="时间趋势列表：只返回有销售的时间段；每项包含start_time、end_time、revenue、sales_cost、gross_profit、sales_quantity、sale_count、gross_profit_margin",
+        description="时间趋势列表：只返回有销售的时间段；包含原价销售额、营业额、优惠金额、优惠率、销售成本、毛利润、销量、单数和毛利率",
         examples=[
             [
                 {
                     "start_time": "2026-09-06T09:00:00",
                     "end_time": "2026-09-06T10:00:00",
+                    "original_revenue": "1200.00",
                     "revenue": "1000.00",
+                    "discount_amount": "200.00",
+                    "discount_rate": "16.67",
                     "sales_cost": "700.00",
                     "gross_profit": "300.00",
                     "sales_quantity": 60,

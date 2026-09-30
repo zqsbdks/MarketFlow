@@ -206,7 +206,15 @@ async def test_analytics_service_only_sets_requested_metrics(monkeypatch) -> Non
 
     analytics_query = AsyncMock(
         return_value=(
-            (Decimal("120.00"), Decimal("70.00"), Decimal("50.00"), 9, 3),
+            (
+                Decimal("150.00"),
+                Decimal("120.00"),
+                Decimal("30.00"),
+                Decimal("70.00"),
+                Decimal("50.00"),
+                9,
+                3,
+            ),
             [],
             [],
         )
@@ -222,14 +230,20 @@ async def test_analytics_service_only_sets_requested_metrics(monkeypatch) -> Non
         department_id=None,
         interval="day",
         metrics=[
+            ReportMetric.ORIGINAL_REVENUE,
             ReportMetric.REVENUE,
+            ReportMetric.DISCOUNT_AMOUNT,
+            ReportMetric.DISCOUNT_RATE,
             ReportMetric.SALE_COUNT,
             ReportMetric.AVERAGE_SALE_AMOUNT,
         ],
     )
 
     assert result.model_dump(exclude_unset=True) == {
+        "original_revenue": Decimal("150.00"),
         "revenue": Decimal("120.00"),
+        "discount_amount": Decimal("30.00"),
+        "discount_rate": Decimal("20.00"),
         "sale_count": 3,
         "average_sale_amount": Decimal("40.00"),
     }

@@ -14,7 +14,10 @@ import { apiDateTime, createDefaultRange, formatDateTime, formatMoney } from '..
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
 const metricOptions: { value: ReportMetric; label: string }[] = [
-  { value: 'revenue', label: '营业额' },
+  { value: 'original_revenue', label: '原价销售额' },
+  { value: 'revenue', label: '营业额（实收）' },
+  { value: 'discount_amount', label: '优惠金额' },
+  { value: 'discount_rate', label: '优惠率' },
   { value: 'sales_cost', label: '销售成本' },
   { value: 'gross_profit', label: '毛利润' },
   { value: 'sales_quantity', label: '销售商品数量' },
@@ -44,12 +47,14 @@ const shareChartElement = ref<HTMLDivElement | null>(null)
 const trafficChartElement = ref<HTMLDivElement | null>(null)
 const efficiencyChartElement = ref<HTMLDivElement | null>(null)
 const marginChartElement = ref<HTMLDivElement | null>(null)
+const discountChartElement = ref<HTMLDivElement | null>(null)
 const growthChartElement = ref<HTMLDivElement | null>(null)
 let trendChart: EChartsType | null = null
 let shareChart: EChartsType | null = null
 let trafficChart: EChartsType | null = null
 let efficiencyChart: EChartsType | null = null
 let marginChart: EChartsType | null = null
+let discountChart: EChartsType | null = null
 let growthChart: EChartsType | null = null
 
 const showTables = computed(() => displayMode.value === 'table' || displayMode.value === 'both')
@@ -59,7 +64,10 @@ const summaryRows = computed(() => {
   const data = analytics.value
   if (!data) return []
   const rows: { label: string; value: string }[] = []
-  if (data.revenue !== undefined) rows.push({ label: '营业额', value: data.revenue == null ? '—' : formatMoney(data.revenue) })
+  if (data.original_revenue !== undefined) rows.push({ label: '原价销售额', value: data.original_revenue == null ? '—' : formatMoney(data.original_revenue) })
+  if (data.revenue !== undefined) rows.push({ label: '营业额（实收）', value: data.revenue == null ? '—' : formatMoney(data.revenue) })
+  if (data.discount_amount !== undefined) rows.push({ label: '优惠金额', value: data.discount_amount == null ? '—' : formatMoney(data.discount_amount) })
+  if (data.discount_rate !== undefined) rows.push({ label: '优惠率', value: formatPercent(data.discount_rate) })
   if (data.sales_cost !== undefined) rows.push({ label: '销售成本', value: data.sales_cost == null ? '—' : formatMoney(data.sales_cost) })
   if (data.gross_profit !== undefined) rows.push({ label: '毛利润', value: data.gross_profit == null ? '—' : formatMoney(data.gross_profit) })
   if (data.sales_quantity !== undefined) rows.push({ label: '销售商品数量', value: data.sales_quantity == null ? '—' : `${data.sales_quantity} 件` })
@@ -134,12 +142,14 @@ function renderCharts() {
     trafficChart?.dispose()
     efficiencyChart?.dispose()
     marginChart?.dispose()
+    discountChart?.dispose()
     growthChart?.dispose()
     trendChart = null
     shareChart = null
     trafficChart = null
     efficiencyChart = null
     marginChart = null
+    discountChart = null
     growthChart = null
     return
   }
@@ -234,6 +244,28 @@ function renderCharts() {
     marginChart = null
   }
 
+  if (discountChartElement.value && trend.length) {
+    discountChart ??= init(discountChartElement.value)
+    discountChart.setOption({
+      color: ['#ff8066', '#f8d66d'],
+      tooltip: { trigger: 'axis' },
+      legend: { top: 2, left: 'center', data: ['优惠金额', '优惠率'], textStyle: { color: '#a5aab4' } },
+      grid: { left: 12, right: 16, top: 62, bottom: 34, containLabel: true },
+      xAxis: { type: 'category', data: labels, axisLabel: { color: '#8d929c', hideOverlap: true, margin: 14 } },
+      yAxis: [
+        { type: 'value', name: '优惠金额（元）', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
+        { type: 'value', name: '优惠率', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c', formatter: '{value}%' }, splitLine: { show: false } },
+      ],
+      series: [
+        { name: '优惠金额', type: 'bar', data: trend.map((item) => Number(item.discount_amount)) },
+        { name: '优惠率', type: 'line', smooth: true, yAxisIndex: 1, data: trend.map((item) => Number(item.discount_rate ?? 0)) },
+      ],
+    })
+  } else {
+    discountChart?.dispose()
+    discountChart = null
+  }
+
   const growthValues = [analytics.value?.revenue_growth_rate, analytics.value?.gross_profit_growth_rate]
   if (growthChartElement.value && growthValues.some((item) => item !== undefined)) {
     growthChart ??= init(growthChartElement.value)
@@ -276,6 +308,7 @@ function resizeCharts() {
   trafficChart?.resize()
   efficiencyChart?.resize()
   marginChart?.resize()
+  discountChart?.resize()
   growthChart?.resize()
 }
 
@@ -300,6 +333,7 @@ onBeforeUnmount(() => {
   trafficChart?.dispose()
   efficiencyChart?.dispose()
   marginChart?.dispose()
+  discountChart?.dispose()
   growthChart?.dispose()
 })
 </script>
@@ -335,7 +369,10 @@ onBeforeUnmount(() => {
 
     <template v-if="analytics">
       <section v-if="showCharts" class="metric-results">
-        <div v-if="analytics.revenue !== undefined" class="result-card"><span>营业额</span><strong>{{ analytics.revenue == null ? '—' : formatMoney(analytics.revenue) }}</strong></div>
+        <div v-if="analytics.original_revenue !== undefined" class="result-card"><span>原价销售额</span><strong>{{ analytics.original_revenue == null ? '—' : formatMoney(analytics.original_revenue) }}</strong></div>
+        <div v-if="analytics.revenue !== undefined" class="result-card"><span>营业额（实收）</span><strong>{{ analytics.revenue == null ? '—' : formatMoney(analytics.revenue) }}</strong></div>
+        <div v-if="analytics.discount_amount !== undefined" class="result-card"><span>优惠金额</span><strong>{{ analytics.discount_amount == null ? '—' : formatMoney(analytics.discount_amount) }}</strong></div>
+        <div v-if="analytics.discount_rate !== undefined" class="result-card"><span>优惠率</span><strong>{{ formatPercent(analytics.discount_rate) }}</strong></div>
         <div v-if="analytics.sales_cost !== undefined" class="result-card"><span>销售成本</span><strong>{{ analytics.sales_cost == null ? '—' : formatMoney(analytics.sales_cost) }}</strong></div>
         <div v-if="analytics.gross_profit !== undefined" class="result-card"><span>毛利润</span><strong>{{ analytics.gross_profit == null ? '—' : formatMoney(analytics.gross_profit) }}</strong></div>
         <div v-if="analytics.sales_quantity !== undefined" class="result-card"><span>销售商品数量</span><strong>{{ analytics.sales_quantity ?? '—' }} 件</strong></div>
@@ -360,8 +397,8 @@ onBeforeUnmount(() => {
           <div class="panel-heading"><div><p class="eyebrow">TREND DATA</p><h2>营业趋势明细</h2></div></div>
           <div v-if="analytics.sales_trend.length" class="table-scroll">
             <table class="data-table trend-data-table">
-              <thead><tr><th>时间</th><th>营业额</th><th>销售成本</th><th>毛利润</th><th>销量</th><th>单数</th><th>毛利率</th></tr></thead>
-              <tbody><tr v-for="item in analytics.sales_trend" :key="item.start_time"><td>{{ formatTrendLabel(item.start_time) }}</td><td>{{ formatMoney(item.revenue) }}</td><td>{{ formatMoney(item.sales_cost) }}</td><td>{{ formatMoney(item.gross_profit) }}</td><td>{{ item.sales_quantity }} 件</td><td>{{ item.sale_count }} 单</td><td>{{ formatPercent(item.gross_profit_margin) }}</td></tr></tbody>
+              <thead><tr><th>时间</th><th>原价销售额</th><th>营业额（实收）</th><th>优惠金额</th><th>优惠率</th><th>销售成本</th><th>毛利润</th><th>销量</th><th>单数</th><th>毛利率</th></tr></thead>
+              <tbody><tr v-for="item in analytics.sales_trend" :key="item.start_time"><td>{{ formatTrendLabel(item.start_time) }}</td><td>{{ formatMoney(item.original_revenue) }}</td><td>{{ formatMoney(item.revenue) }}</td><td>{{ formatMoney(item.discount_amount) }}</td><td>{{ formatPercent(item.discount_rate) }}</td><td>{{ formatMoney(item.sales_cost) }}</td><td>{{ formatMoney(item.gross_profit) }}</td><td>{{ item.sales_quantity }} 件</td><td>{{ item.sale_count }} 单</td><td>{{ formatPercent(item.gross_profit_margin) }}</td></tr></tbody>
             </table>
           </div>
           <p v-else class="empty-row">所选时间内暂无销售数据</p>
@@ -400,6 +437,10 @@ onBeforeUnmount(() => {
           <div class="panel-heading"><div><p class="eyebrow">MARGIN TREND</p><h2>毛利率变化</h2></div></div>
           <div ref="marginChartElement" class="analysis-chart" />
         </article>
+        <article v-if="analytics.sales_trend?.length" class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">DISCOUNT TREND</p><h2>优惠金额与优惠率</h2></div></div>
+          <div ref="discountChartElement" class="analysis-chart" />
+        </article>
         <article v-if="analytics.revenue_growth_rate !== undefined || analytics.gross_profit_growth_rate !== undefined" class="panel">
           <div class="panel-heading"><div><p class="eyebrow">PERIOD GROWTH</p><h2>同期增长对比</h2></div></div>
           <div ref="growthChartElement" class="analysis-chart" />
@@ -430,7 +471,7 @@ onBeforeUnmount(() => {
 .data-table td { color: var(--ink); }
 .data-table tbody tr:last-child td { border-bottom: 0; }
 .data-table tbody tr:hover { background: rgba(255, 255, 255, .025); }
-.trend-data-table { min-width: 850px; }
+.trend-data-table { min-width: 1250px; }
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .chart-grid article { padding: 26px; }
 .chart-panel-wide { grid-column: 1 / -1; }
