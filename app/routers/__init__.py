@@ -6,6 +6,7 @@
 
 from fastapi import APIRouter
 
+from app.routers.ai_chat import ai_chat_router
 from app.routers.auth import auth_router
 from app.routers.categories import categories_router
 from app.routers.departments import departments_router
@@ -23,6 +24,7 @@ from app.routers.suppliers import suppliers_router
 # 该对象最终在 app.main 中统一添加 /api/v1 前缀。
 api_router = APIRouter()
 
+api_router.include_router(ai_chat_router)
 api_router.include_router(auth_router)
 api_router.include_router(departments_router)
 api_router.include_router(categories_router)
@@ -39,6 +41,7 @@ api_router.include_router(supplier_products_router)
 
 __all__ = [
     "api_router",
+    "ai_chat_router",
     "auth_router",
     "categories_router",
     "departments_router",

@@ -703,5 +703,23 @@
     },
     "alembic/versions/20260927_0018_add_sale_discount_snapshots.py": {
         "description": "为销售单和销售明细增加折扣金额及规则快照字段迁移"
+    },
+    "app/schemas/ai_chat_requests.py": {
+        "description": "AI聊天消息、模型名称与最近对话请求模型"
+    },
+    "app/schemas/ai_chat_responses.py": {
+        "description": "AI助手回答与实际使用模型响应模型"
+    },
+    "app/services/ai_chat.py": {
+        "description": "Gemini请求转发、回答解析与上游错误处理业务逻辑"
+    },
+    "app/routers/ai_chat.py": {
+        "description": "登录员工使用自有Gemini API Key的AI聊天接口"
+    },
+    "frontend/src/components/AiChatWidget.vue": {
+        "description": "全局右下角AI聊天机器人、密钥设置与对话界面"
+    },
+    "tests/test_ai_chat.py": {
+        "description": "AI聊天请求校验、Gemini参数组装与服务错误处理测试"
     }
 }

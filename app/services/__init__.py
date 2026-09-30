@@ -1,5 +1,6 @@
 """业务服务层的公共导出。"""
 
+from app.services.ai_chat import ai_chat_service
 from app.services.auth import (
     auth_login_service,
     change_password_service,
@@ -44,6 +45,7 @@ from app.services.suppliers import (
 )
 
 __all__ = [
+    "ai_chat_service",
     "auth_login_service",
     "change_password_service",
     "create_employee_service",

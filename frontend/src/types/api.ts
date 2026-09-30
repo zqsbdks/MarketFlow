@@ -425,3 +425,17 @@ export interface Purchase {
   updated_at: string
   items?: PurchaseItem[]
 }
+
+// region AI 聊天
+
+export interface AiChatMessage {
+  role: 'user' | 'model'
+  content: string
+}
+
+export interface AiChatResult {
+  message: string
+  model: string
+}
+
+// endregion

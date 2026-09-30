@@ -1,5 +1,7 @@
 import { http, unwrap } from './http'
 import type {
+  AiChatMessage,
+  AiChatResult,
   ApiResponse,
   Category,
   CreateSaleItem,
@@ -39,6 +41,26 @@ import type {
   SupplierProduct,
   Purchase,
 } from '../types/api'
+
+// region AI 聊天
+
+export async function sendAiChat(
+  apiKey: string,
+  model: string,
+  messages: AiChatMessage[],
+) {
+  const response = await http.post<ApiResponse<AiChatResult>>(
+    '/ai-chat',
+    { model, messages },
+    {
+      headers: { 'X-Gemini-Api-Key': apiKey },
+      timeout: 45_000,
+    },
+  )
+  return unwrap(response.data)
+}
+
+// endregion
 
 export async function login(employeeNo: string, password: string) {
   const response = await http.post<ApiResponse<LoginResult>>('/auth/login', {

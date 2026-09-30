@@ -21,6 +21,7 @@ import {
 } from '@lucide/vue'
 
 import { useAuthStore } from '../stores/auth'
+import AiChatWidget from '../components/AiChatWidget.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -117,5 +118,6 @@ function logout() {
         <RouterView />
       </div>
     </main>
+    <AiChatWidget v-if="auth.isAuthenticated && !auth.employee?.must_change_password" />
   </div>
 </template>
