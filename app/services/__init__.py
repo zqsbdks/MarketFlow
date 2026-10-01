@@ -1,5 +1,6 @@
 """业务服务层的公共导出。"""
 
+from app.services.ai_actions import cancel_ai_action_service, confirm_ai_action_service
 from app.services.ai_chat import ai_chat_service
 from app.services.auth import (
     auth_login_service,
@@ -46,8 +47,10 @@ from app.services.suppliers import (
 
 __all__ = [
     "ai_chat_service",
+    "cancel_ai_action_service",
     "auth_login_service",
     "change_password_service",
+    "confirm_ai_action_service",
     "create_employee_service",
     "discard_expired_inventory_batch_service",
     "get_current_employee_info_service",

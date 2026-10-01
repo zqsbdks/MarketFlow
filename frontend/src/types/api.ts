@@ -433,9 +433,30 @@ export interface AiChatMessage {
   content: string
 }
 
+export type AiProvider = 'gemini' | 'openai'
+export type AiActionStatus = 'pending' | 'processing' | 'executed' | 'cancelled' | 'expired' | 'failed'
+
+export interface AiPendingAction {
+  id: number
+  action_type: string
+  summary: string
+  arguments: Record<string, unknown>
+  status: AiActionStatus
+  expires_at: string
+  executed_at: string | null
+  failure_reason: string | null
+}
+
 export interface AiChatResult {
   message: string
+  provider: AiProvider
   model: string
+  pending_actions: AiPendingAction[]
+}
+
+export interface AiActionExecutionResult {
+  action: AiPendingAction
+  result: Record<string, unknown> | null
 }
 
 // endregion

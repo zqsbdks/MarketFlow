@@ -705,21 +705,51 @@
         "description": "为销售单和销售明细增加折扣金额及规则快照字段迁移"
     },
     "app/schemas/ai_chat_requests.py": {
-        "description": "AI聊天消息、模型名称与最近对话请求模型"
+        "description": "AI供应商、模型名称与最近对话请求模型"
     },
     "app/schemas/ai_chat_responses.py": {
-        "description": "AI助手回答与实际使用模型响应模型"
+        "description": "AI回答、待确认操作及执行结果响应模型"
     },
     "app/services/ai_chat.py": {
-        "description": "Gemini请求转发、回答解析与上游错误处理业务逻辑"
+        "description": "多模型对话、MarketFlow工具调用与待确认修改编排逻辑"
     },
     "app/routers/ai_chat.py": {
-        "description": "登录员工使用自有Gemini API Key的AI聊天接口"
+        "description": "AI实时聊天以及修改确认和取消接口"
     },
     "frontend/src/components/AiChatWidget.vue": {
         "description": "全局右下角AI聊天机器人、密钥设置与对话界面"
     },
     "tests/test_ai_chat.py": {
-        "description": "AI聊天请求校验、Gemini参数组装与服务错误处理测试"
+        "description": "多供应商AI解析、工具调用编排与安全限制测试"
+    },
+    "app/models/ai_pending_action.py": {
+        "description": "AI提出但必须由员工二次确认的操作ORM模型"
+    },
+    "app/crud/ai_pending_actions.py": {
+        "description": "AI待确认操作创建、查询和行锁数据访问函数"
+    },
+    "app/services/ai_actions.py": {
+        "description": "AI待确认修改的确认、取消、权限复核和安全执行逻辑"
+    },
+    "app/ai/tools.py": {
+        "description": "MarketFlow实时查询与待确认修改工具白名单"
+    },
+    "app/ai/action_registry.py": {
+        "description": "AI统一业务操作类型、请求参数校验与中文确认摘要注册表"
+    },
+    "app/ai/providers/base.py": {
+        "description": "模型供应商统一接口、返回结构与公共HTTP请求工具"
+    },
+    "app/ai/providers/gemini.py": {
+        "description": "Google Gemini聊天及函数调用格式适配器"
+    },
+    "app/ai/providers/openai.py": {
+        "description": "OpenAI聊天及函数调用格式适配器"
+    },
+    "app/ai/providers/registry.py": {
+        "description": "AI模型供应商固定白名单与适配器选择器"
+    },
+    "alembic/versions/20261001_0019_create_ai_pending_actions.py": {
+        "description": "创建AI待确认操作表及状态索引迁移"
     }
 }

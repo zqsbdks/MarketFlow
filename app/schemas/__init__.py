@@ -3,8 +3,12 @@
 业务 Schema 可按领域拆分为独立文件；跨模块常用的类型可以在这里统一重导出。
 """
 
-from app.schemas.ai_chat_requests import AiChatMessageRequest, AiChatRequest
-from app.schemas.ai_chat_responses import AiChatResponse
+from app.schemas.ai_chat_requests import AiChatMessageRequest, AiChatRequest, AiProviderName
+from app.schemas.ai_chat_responses import (
+    AiActionExecutionResponse,
+    AiChatResponse,
+    AiPendingActionResponse,
+)
 from app.schemas.auth_requests import AuthLoginRequest, AuthPasswordChangeRequest
 from app.schemas.auth_responses import (
     AuthDepartmentResponse,
@@ -120,6 +124,9 @@ __all__ = [
     "AiChatMessageRequest",
     "AiChatRequest",
     "AiChatResponse",
+    "AiActionExecutionResponse",
+    "AiPendingActionResponse",
+    "AiProviderName",
     "AuthDepartmentResponse",
     "AuthLoginEmployee",
     "AuthLoginRequest",

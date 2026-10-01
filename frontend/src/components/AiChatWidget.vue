@@ -2,13 +2,23 @@
 import { computed, nextTick, ref } from 'vue'
 import { Bot, KeyRound, RotateCcw, Send, Settings, Sparkles, X } from '@lucide/vue'
 
-import { sendAiChat } from '../api'
+import { cancelAiAction, confirmAiAction, sendAiChat } from '../api'
 import { getErrorMessage } from '../api/http'
-import type { AiChatMessage } from '../types/api'
+import type { AiChatMessage, AiPendingAction, AiProvider } from '../types/api'
 
-const API_KEY_STORAGE_KEY = 'marketflow_gemini_api_key'
-const MODEL_STORAGE_KEY = 'marketflow_gemini_model'
-const DEFAULT_MODEL = 'gemini-3.5-flash-lite'
+const PROVIDER_STORAGE_KEY = 'marketflow_ai_provider'
+const PROVIDER_DEFAULT_MODELS: Record<AiProvider, string> = {
+  gemini: 'gemini-3.5-flash-lite',
+  openai: 'gpt-5.6-luna',
+}
+
+function apiKeyStorageKey(provider: AiProvider) {
+  return `marketflow_ai_${provider}_api_key`
+}
+
+function modelStorageKey(provider: AiProvider) {
+  return `marketflow_ai_${provider}_model`
+}
 
 interface DisplayMessage extends AiChatMessage {
   id: number
@@ -19,18 +29,27 @@ const isOpen = ref(false)
 const showSettings = ref(false)
 const isSending = ref(false)
 const input = ref('')
-const apiKey = ref(localStorage.getItem(API_KEY_STORAGE_KEY) || '')
+const savedProvider = localStorage.getItem(PROVIDER_STORAGE_KEY)
+const initialProvider: AiProvider = savedProvider === 'openai' ? 'openai' : 'gemini'
+const provider = ref<AiProvider>(initialProvider)
+const providerDraft = ref<AiProvider>(initialProvider)
+const oldGeminiKey = localStorage.getItem('marketflow_gemini_api_key') || ''
+const apiKey = ref(localStorage.getItem(apiKeyStorageKey(initialProvider)) || oldGeminiKey)
 const apiKeyDraft = ref(apiKey.value)
-const model = ref(localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL)
+const model = ref(
+  localStorage.getItem(modelStorageKey(initialProvider)) || PROVIDER_DEFAULT_MODELS[initialProvider],
+)
 const modelDraft = ref(model.value)
 const messageList = ref<HTMLElement | null>(null)
+const pendingActions = ref<AiPendingAction[]>([])
+const actionBusyId = ref<number | null>(null)
 let nextMessageId = 2
 
 const messages = ref<DisplayMessage[]>([
   {
     id: 1,
     role: 'model',
-    content: '你好，我是 MarketFlow 助手。你可以问我系统各模块的用途、操作流程或页面使用方法。',
+    content: '你好，我是 MarketFlow 助手。可以查询实时业务数据，也可以协助处理商品、库存、供应商、进货、销售、员工和折扣；所有修改都要由你确认。',
     localOnly: true,
   },
 ])
@@ -44,20 +63,29 @@ function openWidget() {
 
 function saveSettings() {
   const cleanKey = apiKeyDraft.value.trim()
-  const cleanModel = modelDraft.value.trim() || DEFAULT_MODEL
+  const cleanModel = modelDraft.value.trim() || PROVIDER_DEFAULT_MODELS[providerDraft.value]
+  provider.value = providerDraft.value
   apiKey.value = cleanKey
   model.value = cleanModel
 
-  if (cleanKey) localStorage.setItem(API_KEY_STORAGE_KEY, cleanKey)
-  else localStorage.removeItem(API_KEY_STORAGE_KEY)
-  localStorage.setItem(MODEL_STORAGE_KEY, cleanModel)
+  localStorage.setItem(PROVIDER_STORAGE_KEY, provider.value)
+  if (cleanKey) localStorage.setItem(apiKeyStorageKey(provider.value), cleanKey)
+  else localStorage.removeItem(apiKeyStorageKey(provider.value))
+  localStorage.setItem(modelStorageKey(provider.value), cleanModel)
   showSettings.value = false
 }
 
 function removeApiKey() {
-  apiKey.value = ''
   apiKeyDraft.value = ''
-  localStorage.removeItem(API_KEY_STORAGE_KEY)
+  localStorage.removeItem(apiKeyStorageKey(providerDraft.value))
+  if (providerDraft.value === provider.value) apiKey.value = ''
+}
+
+function loadProviderSettings() {
+  apiKeyDraft.value = localStorage.getItem(apiKeyStorageKey(providerDraft.value)) || ''
+  modelDraft.value =
+    localStorage.getItem(modelStorageKey(providerDraft.value)) ||
+    PROVIDER_DEFAULT_MODELS[providerDraft.value]
 }
 
 function clearConversation() {
@@ -69,6 +97,7 @@ function clearConversation() {
       localOnly: true,
     },
   ]
+  pendingActions.value = []
 }
 
 async function scrollToBottom() {
@@ -96,8 +125,9 @@ async function submitMessage() {
       history.push({ role: message.role, content: message.content })
     }
 
-    const result = await sendAiChat(apiKey.value, model.value, history)
+    const result = await sendAiChat(apiKey.value, provider.value, model.value, history)
     messages.value.push({ id: nextMessageId++, role: 'model', content: result.message })
+    pendingActions.value.push(...result.pending_actions)
   } catch (error) {
     messages.value.push({
       id: nextMessageId++,
@@ -107,6 +137,42 @@ async function submitMessage() {
     })
   } finally {
     isSending.value = false
+    await scrollToBottom()
+  }
+}
+
+async function handleAction(action: AiPendingAction, execute: boolean) {
+  actionBusyId.value = action.id
+  try {
+    const result = execute ? await confirmAiAction(action.id) : await cancelAiAction(action.id)
+    const index = pendingActions.value.findIndex((item) => item.id === action.id)
+    if (index >= 0) pendingActions.value[index] = result.action
+    let completionMessage = execute
+      ? `操作已确认并执行：${action.summary}`
+      : `操作已取消：${action.summary}`
+    // AI创建员工时后端会返回一次性初始凭据，必须显示给执行操作的店长。
+    if (execute && result.result) {
+      const employeeNo = result.result.employee_no
+      const temporaryPassword = result.result.temporary_password
+      if (typeof employeeNo === 'string' && typeof temporaryPassword === 'string') {
+        completionMessage += `\n员工编号：${employeeNo}\n临时密码：${temporaryPassword}\n请安全地交给员工，并要求首次登录后修改。`
+      }
+    }
+    messages.value.push({
+      id: nextMessageId++,
+      role: 'model',
+      content: completionMessage,
+      localOnly: true,
+    })
+  } catch (error) {
+    messages.value.push({
+      id: nextMessageId++,
+      role: 'model',
+      content: `操作处理失败：${getErrorMessage(error)}`,
+      localOnly: true,
+    })
+  } finally {
+    actionBusyId.value = null
     await scrollToBottom()
   }
 }
@@ -127,7 +193,7 @@ function handleEnter(event: KeyboardEvent) {
             <span class="assistant-icon"><Sparkles :size="18" /></span>
             <div>
               <strong>MarketFlow 助手</strong>
-              <span>Gemini 基础问答</span>
+              <span>{{ provider === 'gemini' ? 'Gemini' : 'OpenAI' }} · 实时业务助手</span>
             </div>
           </div>
           <div class="header-actions">
@@ -146,16 +212,27 @@ function handleEnter(event: KeyboardEvent) {
         <div v-if="showSettings" class="ai-settings">
           <div class="settings-title"><KeyRound :size="17" /><strong>连接设置</strong></div>
           <label>
-            Gemini API Key
+            模型供应商
+            <select v-model="providerDraft" @change="loadProviderSettings">
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </label>
+          <label>
+            {{ providerDraft === 'gemini' ? 'Gemini' : 'OpenAI' }} API Key
             <input v-model="apiKeyDraft" type="password" autocomplete="off" placeholder="输入你的 API Key" />
           </label>
           <label>
             模型名称
-            <input v-model="modelDraft" type="text" placeholder="gemini-3.5-flash-lite" />
+            <input v-model="modelDraft" type="text" :placeholder="PROVIDER_DEFAULT_MODELS[providerDraft]" />
           </label>
           <p>密钥只保存在当前浏览器；请仅在可信设备上使用，线上部署必须启用 HTTPS。</p>
           <div class="settings-actions">
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">获取 API Key</a>
+            <a
+              :href="providerDraft === 'gemini' ? 'https://aistudio.google.com/apikey' : 'https://platform.openai.com/api-keys'"
+              target="_blank"
+              rel="noreferrer"
+            >获取 API Key</a>
             <button v-if="apiKey" class="danger-text" type="button" @click="removeApiKey">删除密钥</button>
             <button class="save-button" type="button" @click="saveSettings">保存</button>
           </div>
@@ -175,11 +252,38 @@ function handleEnter(event: KeyboardEvent) {
             <div class="message-label">AI 助手</div>
             <p class="typing"><i /><i /><i /></p>
           </article>
+          <article
+            v-for="action in pendingActions"
+            :key="`action-${action.id}`"
+            class="action-card"
+            :class="action.status"
+          >
+            <div class="action-card-title">
+              <strong>{{ action.status === 'pending' ? '需要确认的修改' : '操作记录' }}</strong>
+              <span>{{ action.status }}</span>
+            </div>
+            <p>{{ action.summary }}</p>
+            <small v-if="action.status === 'pending'">10分钟内有效，确认时会重新检查权限和最新数据。</small>
+            <small v-else-if="action.failure_reason">{{ action.failure_reason }}</small>
+            <div v-if="action.status === 'pending'" class="action-buttons">
+              <button
+                type="button"
+                :disabled="actionBusyId === action.id"
+                @click="handleAction(action, false)"
+              >取消</button>
+              <button
+                class="confirm-action"
+                type="button"
+                :disabled="actionBusyId === action.id"
+                @click="handleAction(action, true)"
+              >{{ actionBusyId === action.id ? '处理中…' : '确认执行' }}</button>
+            </div>
+          </article>
         </div>
 
         <footer class="ai-chat-composer">
           <div v-if="!apiKey" class="key-warning" @click="showSettings = true">
-            请先设置 Gemini API Key
+            请先设置模型供应商和 API Key
           </div>
           <div class="composer-row">
             <textarea
@@ -193,7 +297,7 @@ function handleEnter(event: KeyboardEvent) {
               <Send :size="19" />
             </button>
           </div>
-          <small>AI 可能出错，经营数据请以系统页面显示为准。</small>
+          <small>实时数据来自受控工具；修改必须确认并遵守原有权限与审计规则。</small>
         </footer>
       </section>
     </Transition>
@@ -280,8 +384,8 @@ function handleEnter(event: KeyboardEvent) {
 .ai-settings { padding: 14px; border-bottom: 1px solid #2a3038; background: #191d23; color: #dce1d8; }
 .settings-title { gap: 7px; margin-bottom: 11px; color: #bdff4b; }
 .ai-settings label { display: grid; gap: 6px; margin: 9px 0; font-size: 12px; color: #aab1bc; }
-.ai-settings input { min-height: 38px; padding: 0 11px; border: 1px solid #343b45; border-radius: 8px; outline: 0; background: #111419; color: #eef2ea; }
-.ai-settings input:focus { border-color: #93c83c; }
+.ai-settings input, .ai-settings select { min-height: 38px; padding: 0 11px; border: 1px solid #343b45; border-radius: 8px; outline: 0; background: #111419; color: #eef2ea; }
+.ai-settings input:focus, .ai-settings select:focus { border-color: #93c83c; }
 .ai-settings p { margin: 9px 0; color: #7f8895; font-size: 11px; line-height: 1.55; }
 .settings-actions { justify-content: flex-end; gap: 8px; }
 .settings-actions a, .settings-actions button { border: 0; background: transparent; color: #9ca5b1; font-size: 12px; cursor: pointer; text-decoration: none; }
@@ -300,6 +404,19 @@ function handleEnter(event: KeyboardEvent) {
 .typing i { width: 5px; height: 5px; border-radius: 50%; background: #bdff4b; animation: typing 1s infinite alternate; }
 .typing i:nth-child(2) { animation-delay: 0.2s; }
 .typing i:nth-child(3) { animation-delay: 0.4s; }
+
+.action-card { width: 100%; padding: 13px; border: 1px solid rgba(189, 255, 75, 0.34); border-radius: 12px; background: rgba(189, 255, 75, 0.07); color: #e8ede3; }
+.action-card.executed { border-color: rgba(91, 205, 126, 0.35); }
+.action-card.cancelled, .action-card.failed, .action-card.expired { border-color: #343a43; opacity: 0.72; }
+.action-card-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.action-card-title strong { font-size: 12px; color: #bdff4b; }
+.action-card-title span { padding: 3px 7px; border-radius: 99px; background: #252b32; color: #aab2bd; font-size: 9px; text-transform: uppercase; }
+.action-card p { margin: 8px 0 4px; font-size: 12px; line-height: 1.55; }
+.action-card small { color: #858e9a; font-size: 10px; }
+.action-buttons { display: flex; justify-content: flex-end; gap: 7px; margin-top: 11px; }
+.action-buttons button { padding: 7px 11px; border: 1px solid #3a414b; border-radius: 7px; background: #171b20; color: #aeb6c1; font-size: 11px; cursor: pointer; }
+.action-buttons .confirm-action { border-color: #bdff4b; background: #bdff4b; color: #11150c; font-weight: 700; }
+.action-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ai-chat-composer { padding: 12px 13px 11px; border-top: 1px solid #292e36; background: #171a20; }
 .key-warning { margin-bottom: 8px; padding: 7px 9px; border: 1px solid rgba(255, 178, 82, 0.3); border-radius: 7px; color: #ffbd68; background: rgba(255, 178, 82, 0.08); font-size: 11px; cursor: pointer; }

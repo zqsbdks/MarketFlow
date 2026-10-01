@@ -15,7 +15,7 @@ class ProductsListRequest(BaseModel):
     page_size: int = Field(10, description="每页数量", ge=1, le=100)
     keyword: str | None = Field(
         None,
-        description="商品名称关键字",
+        description="商品名称或商品编号关键字",
         min_length=1,
         max_length=100,
     )

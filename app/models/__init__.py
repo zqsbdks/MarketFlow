@@ -5,6 +5,7 @@ Alembic 只会看到导入进 ``Base.metadata`` 的模型。新增模型后，�
 生成迁移的问题。
 """
 
+from app.models.ai_pending_action import AiPendingAction
 from app.models.base import Base
 from app.models.category import Category
 from app.models.department import Department
@@ -41,6 +42,7 @@ from app.models.supplier_product import SupplierProduct
 
 # 业务模型必须在此导入，确保 Alembic 能从 Base.metadata 发现全部表。
 __all__ = [
+    "AiPendingAction",
     "Base",
     "Category",
     "Department",

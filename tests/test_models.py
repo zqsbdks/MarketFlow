@@ -209,6 +209,20 @@ EXPECTED_COLUMNS = {
         "department_id",
         "created_at",
     },
+    "ai_pending_action": {
+        "id",
+        "employee_id",
+        "provider",
+        "action_type",
+        "arguments",
+        "summary",
+        "status",
+        "expires_at",
+        "executed_at",
+        "failure_reason",
+        "created_at",
+        "updated_at",
+    },
 }
 
 EXPECTED_TABLE_COMMENTS = {
@@ -227,6 +241,7 @@ EXPECTED_TABLE_COMMENTS = {
     "supplier_product": "供应商商品目录表",
     "discount_rule": "折扣规则表",
     "discount_rule_scope": "折扣规则适用范围表",
+    "ai_pending_action": "AI待确认操作表",
 }
 
 
@@ -377,6 +392,7 @@ def test_mutable_master_tables_update_timestamp_in_mysql() -> None:
         "inventory_batch",
         "supplier_product",
         "discount_rule",
+        "ai_pending_action",
     ):
         ddl = str(CreateTable(Base.metadata.tables[table_name]).compile(dialect=mysql.dialect()))
         assert "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" in ddl
@@ -389,10 +405,10 @@ def test_all_relationship_mappers_can_be_configured() -> None:
 
 
 def test_latest_alembic_revision_is_the_only_head() -> None:
-    """增加销售折扣快照字段的迁移是当前唯一的Alembic版本头。"""
+    """AI待确认操作表迁移是当前唯一的Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20260927_0018"]
+    assert script.get_heads() == ["20261001_0019"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

@@ -131,7 +131,13 @@ async def get_products_list(
     # 只添加调用方实际传入的条件；空条件列表表示查询全部商品。
     conditions: list[ColumnElement[bool]] = []
     if keyword is not None:
-        conditions.append(Product.name.ilike(f"%{keyword}%"))
+        # 同一个关键词既可以输入商品名称，也可以输入扫码或页面展示的商品编号。
+        conditions.append(
+            or_(
+                Product.name.ilike(f"%{keyword}%"),
+                Product.product_no.ilike(f"%{keyword}%"),
+            )
+        )
     if department_id is not None:
         conditions.append(Product.department_id == department_id)
     if category_id is not None:

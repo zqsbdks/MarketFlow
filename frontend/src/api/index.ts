@@ -2,6 +2,8 @@ import { http, unwrap } from './http'
 import type {
   AiChatMessage,
   AiChatResult,
+  AiActionExecutionResult,
+  AiProvider,
   ApiResponse,
   Category,
   CreateSaleItem,
@@ -46,16 +48,31 @@ import type {
 
 export async function sendAiChat(
   apiKey: string,
+  provider: AiProvider,
   model: string,
   messages: AiChatMessage[],
 ) {
   const response = await http.post<ApiResponse<AiChatResult>>(
     '/ai-chat',
-    { model, messages },
+    { provider, model: model || undefined, messages },
     {
-      headers: { 'X-Gemini-Api-Key': apiKey },
+      headers: { 'X-AI-Api-Key': apiKey },
       timeout: 45_000,
     },
+  )
+  return unwrap(response.data)
+}
+
+export async function confirmAiAction(actionId: number) {
+  const response = await http.post<ApiResponse<AiActionExecutionResult>>(
+    `/ai-chat/actions/${actionId}/confirm`,
+  )
+  return unwrap(response.data)
+}
+
+export async function cancelAiAction(actionId: number) {
+  const response = await http.post<ApiResponse<AiActionExecutionResult>>(
+    `/ai-chat/actions/${actionId}/cancel`,
   )
   return unwrap(response.data)
 }
