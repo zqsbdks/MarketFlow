@@ -12,6 +12,7 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.backends.redis import RedisBackend
 
+from app.core.config import settings
 from app.core.database import async_engine
 from app.core.purchase_scheduler import run_purchase_scheduler
 from app.core.redis import close_redis, get_redis_client
@@ -49,17 +50,20 @@ async def lifespan(app: FastAPI):
 
     # 后台任务使用独立数据库会话，每天12点签收进货单并刷新库存批次状态。
     scheduler_stop_event = asyncio.Event()
-    scheduler_task = asyncio.create_task(
-        run_purchase_scheduler(scheduler_stop_event),
-        name="purchase-auto-receive",
-    )
+    scheduler_task = None
+    if settings.run_scheduler:
+        scheduler_task = asyncio.create_task(
+            run_purchase_scheduler(scheduler_stop_event),
+            name="purchase-auto-receive",
+        )
 
     # yield 之前是启动阶段，之后是应用收到关闭信号后的清理阶段。
     yield
 
     # 先停止定时任务，再释放数据库连接池，防止任务访问已关闭的连接。
     scheduler_stop_event.set()
-    await scheduler_task
+    if scheduler_task is not None:
+        await scheduler_task
 
     # 先释放数据库连接，再关闭 Redis；两个操作均由客户端库保证幂等性。
     await async_engine.dispose()

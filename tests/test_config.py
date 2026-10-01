@@ -1,6 +1,7 @@
 """验证 Settings 的数据库约束、默认值和可变字段隔离。"""
 
 import pytest
+from cryptography.fernet import Fernet
 from pydantic import ValidationError
 from sqlalchemy.engine import make_url
 
@@ -56,6 +57,8 @@ def test_cors_origins_is_not_shared() -> None:
         ("database_echo", True),
         ("secret_key", "dev-only-change-me-before-production"),
         ("cors_origins", ["*"]),
+        ("run_scheduler", True),
+        ("ai_key_encryption_key", "invalid-key"),
     ],
 )
 def test_production_rejects_unsafe_defaults(unsafe_setting: str, unsafe_value: object) -> None:
@@ -67,6 +70,8 @@ def test_production_rejects_unsafe_defaults(unsafe_setting: str, unsafe_value: o
         "database_echo": False,
         "secret_key": "production-test-secret-key-with-at-least-32-bytes",
         "cors_origins": ["https://app.example.com"],
+        "run_scheduler": False,
+        "ai_key_encryption_key": Fernet.generate_key().decode(),
     }
     safe_values[unsafe_setting] = unsafe_value
 
@@ -82,6 +87,8 @@ def test_production_accepts_safe_configuration() -> None:
         environment="production",
         secret_key="production-test-secret-key-with-at-least-32-bytes",
         cors_origins=["https://app.example.com"],
+        run_scheduler=False,
+        ai_key_encryption_key=Fernet.generate_key().decode(),
     )
 
     assert settings.environment == "production"

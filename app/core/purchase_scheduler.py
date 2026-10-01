@@ -8,6 +8,7 @@ import asyncio
 import logging
 from datetime import datetime, time, timedelta
 
+from app.core.business_time import business_now
 from app.core.database import async_session_factory
 from app.crud.inventory_batches import refresh_inventory_batch_statuses
 from app.crud.products import StockInconsistency, get_stock_inconsistencies
@@ -70,7 +71,7 @@ def _next_batch_status_refresh_time(now: datetime) -> datetime:
 async def _wait_until(stop_event: asyncio.Event, run_time: datetime) -> bool:
     """等待到指定时间；应用提前关闭时返回 False，到达时间时返回 True。"""
 
-    wait_seconds = max((run_time - datetime.now()).total_seconds(), 0)
+    wait_seconds = max((run_time - business_now()).total_seconds(), 0)
     try:
         await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
         return False
@@ -81,10 +82,14 @@ async def _wait_until(stop_event: asyncio.Event, run_time: datetime) -> bool:
 async def _run_auto_receive_once() -> int:
     """执行一次进货单自动签收，并提交本次数据库事务。"""
 
+    now = business_now()
+    cutoff = datetime.combine(now.date(), AUTO_RECEIVE_TIME)
+    if now < cutoff:
+        cutoff -= timedelta(days=1)
     async with async_session_factory() as db:
         try:
             purchases = await auto_receive_due_purchases(
-                arrived_at=datetime.now(),
+                arrived_at=cutoff,
                 employee_id=None,
                 db=db,
             )
@@ -101,7 +106,7 @@ async def _run_batch_status_refresh_once() -> int:
     async with async_session_factory() as db:
         try:
             changed_batch_count = await refresh_inventory_batch_statuses(
-                current_date=datetime.now().date(),
+                current_date=business_now().date(),
                 db=db,
             )
             await db.commit()
@@ -115,7 +120,7 @@ async def _run_auto_receive_scheduler(stop_event: asyncio.Event) -> None:
     """每天 12:00 执行进货单自动签收，直到应用关闭。"""
 
     while not stop_event.is_set():
-        next_run = _next_auto_receive_time(datetime.now())
+        next_run = _next_auto_receive_time(business_now())
         logger.info("下一次进货单自动签收时间：%s", next_run.isoformat(sep=" "))
         if not await _wait_until(stop_event, next_run):
             break
@@ -132,7 +137,7 @@ async def _run_batch_status_scheduler(stop_event: asyncio.Event) -> None:
     """每天凌晨 00:05 刷新批次临期状态，直到应用关闭。"""
 
     while not stop_event.is_set():
-        next_run = _next_batch_status_refresh_time(datetime.now())
+        next_run = _next_batch_status_refresh_time(business_now())
         logger.info("下一次库存批次临期状态刷新时间：%s", next_run.isoformat(sep=" "))
         if not await _wait_until(stop_event, next_run):
             break
@@ -156,7 +161,7 @@ async def _run_stock_consistency_scheduler(stop_event: asyncio.Event) -> None:
     """营业时间内每半小时检查库存一致性，只记录日志而不修复。"""
 
     while not stop_event.is_set():
-        next_run = _next_stock_consistency_check_time(datetime.now())
+        next_run = _next_stock_consistency_check_time(business_now())
         logger.info("下一次库存一致性检查时间：%s", next_run.isoformat(sep=" "))
         if not await _wait_until(stop_event, next_run):
             break
@@ -192,6 +197,15 @@ async def _run_stock_consistency_scheduler(stop_event: asyncio.Event) -> None:
 async def run_purchase_scheduler(stop_event: asyncio.Event) -> None:
     """同时运行自动签收、每日临期刷新和半小时库存一致性检查。"""
 
+    # 进程曾在计划时间停机时，启动后补处理到期的进货单与批次状态。
+    try:
+        await _run_auto_receive_once()
+    except Exception:
+        logger.exception("启动补签收失败；每日计划任务仍将继续运行")
+    try:
+        await _run_batch_status_refresh_once()
+    except Exception:
+        logger.exception("启动批次状态补刷新失败；每日计划任务仍将继续运行")
     await asyncio.gather(
         _run_auto_receive_scheduler(stop_event),
         _run_batch_status_scheduler(stop_event),

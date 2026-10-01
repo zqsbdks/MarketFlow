@@ -16,9 +16,10 @@ function readEmployee(): EmployeeIdentity | null {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('marketflow_token'))
+  // 旧版曾把 Bearer 令牌存入浏览器，升级后不再使用。
+  localStorage.removeItem('marketflow_token')
   const employee = ref<EmployeeIdentity | null>(readEmployee())
-  const isAuthenticated = computed(() => Boolean(token.value))
+  const isAuthenticated = computed(() => Boolean(employee.value))
   const isManager = computed(() => employee.value?.role === '店长')
 
   function saveEmployee(value: EmployeeIdentity) {
@@ -28,10 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function signIn(employeeNo: string, password: string) {
     const result = await api.login(employeeNo, password)
-    token.value = result.access_token
-    localStorage.setItem('marketflow_token', result.access_token)
-    saveEmployee(result.employee)
-    return result.employee
+    saveEmployee(result)
+    return result
   }
 
   async function refreshEmployee() {
@@ -39,15 +38,18 @@ export const useAuthStore = defineStore('auth', () => {
     saveEmployee({ ...result, must_change_password: false })
   }
 
-  function signOut() {
-    token.value = null
-    employee.value = null
-    localStorage.removeItem('marketflow_token')
-    localStorage.removeItem('marketflow_employee')
+  async function signOut() {
+    try {
+      await api.logout()
+    } catch {
+      // 即使网络暂时失败，也先清除本地登录界面状态。
+    } finally {
+      employee.value = null
+      localStorage.removeItem('marketflow_employee')
+    }
   }
 
   return {
-    token,
     employee,
     isAuthenticated,
     isManager,

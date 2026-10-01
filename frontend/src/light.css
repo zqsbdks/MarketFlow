@@ -1,0 +1,182 @@
+/* 浅色模式只覆盖视觉颜色，不改变原有布局与业务组件。 */
+:root[data-theme="light"] {
+  color: #202a23;
+  background: #f4f6f1;
+  --ink: #202a23;
+  --muted: #68746b;
+  --line: #dce3d9;
+  --paper: #ffffff;
+  --panel: #ffffff;
+  --green: #557b20;
+  --green-dark: #405e18;
+  --orange: #b95232;
+  --blue: #4c61b3;
+  --sidebar: #ffffff;
+  --sidebar-soft: #ecf3e2;
+  --shadow: 0 12px 36px rgba(29, 50, 30, .08);
+}
+
+html[data-theme="light"] body { background: #f4f6f1; }
+html[data-theme="light"] #app .sidebar,
+html[data-theme="light"] #app .panel,
+html[data-theme="light"] #app .stat-card,
+html[data-theme="light"] #app .filter-panel {
+  color: var(--ink);
+  background: #fff;
+  border-color: var(--line);
+  box-shadow: var(--shadow);
+}
+html[data-theme="light"] #app .brand-block { border-color: var(--line); }
+html[data-theme="light"] #app .brand-block span,
+html[data-theme="light"] #app .employee-meta span,
+html[data-theme="light"] #app .page-description,
+html[data-theme="light"] #app .stat-card p,
+html[data-theme="light"] #app .stat-card > span,
+html[data-theme="light"] #app .record-count,
+html[data-theme="light"] #app .filter-label { color: var(--muted); }
+html[data-theme="light"] #app .brand-mark,
+html[data-theme="light"] #app .main-nav a.active,
+html[data-theme="light"] #app .primary-button,
+html[data-theme="light"] #app .table-rank,
+html[data-theme="light"] #app .segmented-controls button.active { color: #fff; background: var(--green); border-color: var(--green); }
+html[data-theme="light"] #app .main-nav a { color: #5e6a61; }
+html[data-theme="light"] #app .main-nav a:hover { color: var(--ink); background: #edf2e9; }
+html[data-theme="light"] #app .main-nav a.active { color: #fff; }
+html[data-theme="light"] #app .store-chip,
+html[data-theme="light"] #app .employee-avatar { color: var(--ink); background: #f1f5ed; border-color: var(--line); }
+html[data-theme="light"] #app .sidebar-footer { border-color: var(--line); }
+html[data-theme="light"] #app .icon-button.dark { color: var(--muted); }
+html[data-theme="light"] #app .eyebrow,
+html[data-theme="light"] #app .text-button,
+html[data-theme="light"] #app .discount-value { color: var(--green); }
+html[data-theme="light"] #app .chart-panel { background: #fff; }
+html[data-theme="light"] #app .department-links,
+html[data-theme="light"] #app .department-links button,
+html[data-theme="light"] #app .ranking-list li { border-color: var(--line); }
+html[data-theme="light"] #app .department-links button { color: var(--ink); }
+html[data-theme="light"] #app .department-links button:hover,
+html[data-theme="light"] #app tbody tr:hover { background: #f5f8f2; }
+html[data-theme="light"] #app .department-links span,
+html[data-theme="light"] #app .ranking-list small,
+html[data-theme="light"] #app .rank-number { color: var(--muted); }
+html[data-theme="light"] #app .insight-strip { color: #213020; background: #e7f1d5; }
+html[data-theme="light"] #app .insight-strip .eyebrow,
+html[data-theme="light"] #app .insight-strip span,
+html[data-theme="light"] #app .insight-icon { color: #4a652d; }
+html[data-theme="light"] #app .insight-icon { border-color: #b5c7a0; }
+html[data-theme="light"] #app input,
+html[data-theme="light"] #app select,
+html[data-theme="light"] #app textarea,
+html[data-theme="light"] #app .field.inline,
+html[data-theme="light"] #app .search-field { color: var(--ink); background: #fff; border-color: #cfd9cc; }
+html[data-theme="light"] #app input::-webkit-calendar-picker-indicator { filter: none; }
+html[data-theme="light"] #app .secondary-button,
+html[data-theme="light"] #app .pagination button,
+html[data-theme="light"] #app .segmented-controls button { color: var(--ink); background: #f7f9f5; border-color: var(--line); }
+html[data-theme="light"] #app th,
+html[data-theme="light"] #app .pagination { color: var(--muted); background: #f4f7f1; border-color: var(--line); }
+html[data-theme="light"] #app td { color: #4d5b50; border-color: var(--line); }
+html[data-theme="light"] #app td strong { color: var(--ink); }
+html[data-theme="light"] #app .modal-panel,
+html[data-theme="light"] #app .modal-panel > header,
+html[data-theme="light"] #app .detail-sheet dl div,
+html[data-theme="light"] #app .credential-card dl div { color: var(--ink); background: #fff; }
+html[data-theme="light"] #app .detail-sheet dl,
+html[data-theme="light"] #app .credential-card dl { background: var(--line); }
+html[data-theme="light"] #app .modal-panel > header,
+html[data-theme="light"] #app .detail-hero,
+html[data-theme="light"] #app .receipt-lines > div { border-color: var(--line); }
+html[data-theme="light"] #app .detail-sheet dd,
+html[data-theme="light"] #app .credential-card dd { color: var(--ink); }
+html[data-theme="light"] #app .detail-sheet dt,
+html[data-theme="light"] #app .credential-card dt,
+html[data-theme="light"] #app .form-tip,
+html[data-theme="light"] #app .security-note { color: var(--muted); }
+html[data-theme="light"] #app .password-page,
+html[data-theme="light"] #app .not-found { color: var(--ink); background: #f4f6f1; }
+html[data-theme="light"] #app .password-card { color: var(--ink); background: #fff; border-top-color: var(--green); }
+html[data-theme="light"] #app .dark-text { color: var(--ink); }
+html[data-theme="light"] #app .mobile-bar { color: var(--ink); background: rgba(255,255,255,.94); border-color: var(--line); }
+
+/* 登录页保留左右分栏，浅色模式下改为柔和的日间画布。 */
+html[data-theme="light"] #app .login-page { color: var(--ink); background: #f4f6f1; }
+html[data-theme="light"] #app .login-page::before { color: #c5d0bd; }
+html[data-theme="light"] #app .login-brand svg,
+html[data-theme="light"] #app .story-copy h1 em { color: var(--green); }
+html[data-theme="light"] #app .story-copy > p:last-child { color: var(--muted); }
+html[data-theme="light"] #app .login-card { color: var(--ink); background: #fff; border-color: var(--line); box-shadow: var(--shadow); }
+html[data-theme="light"] #app .login-card .primary-button { color: #fff; background: var(--green); border-color: var(--green); }
+html[data-theme="light"] #app .login-card .primary-button:hover { background: var(--green-dark); }
+html[data-theme="light"] #app .language-switcher select { color: var(--ink); background: #fff; border-color: var(--line); }
+
+/* 各页面的深色专属卡片与状态标记。 */
+html[data-theme="light"] #app .scan-result,
+html[data-theme="light"] #app .cart-lines > article,
+html[data-theme="light"] #app .checkout-summary dl div,
+html[data-theme="light"] #app .empty-hint { color: var(--ink); background: #f8faf6; border-color: var(--line); }
+html[data-theme="light"] #app .cart-empty { border-color: var(--line); }
+html[data-theme="light"] #app .cart-empty strong { color: var(--ink); }
+html[data-theme="light"] #app .amount-due strong,
+html[data-theme="light"] #app .discount-name { color: var(--green) !important; }
+html[data-theme="light"] #app .quantity-control button,
+html[data-theme="light"] #app .remove-button { color: var(--ink); background: #f2f5ee; border-color: var(--line); }
+html[data-theme="light"] #app .discount-status.active,
+html[data-theme="light"] #app .movement-badge.create_batch,
+html[data-theme="light"] #app .status-badge.available,
+html[data-theme="light"] #app .status-badge.arrived { color: #477521; background: #e9f3df; }
+html[data-theme="light"] #app .discount-status.scheduled,
+html[data-theme="light"] #app .movement-badge.sale_deduction { color: #505eb0; background: #e9edfb; }
+html[data-theme="light"] #app .discount-status.ended,
+html[data-theme="light"] #app .movement-badge.update_quantity { color: #916614; background: #fff4db; }
+html[data-theme="light"] #app .discount-status.disabled { color: #65706a; background: #edf0eb; }
+html[data-theme="light"] #app .alert.success { color: #477521; background: #ebf5e4; border-color: #bad5a5; }
+
+/* AI 助手的独立浮层也跟随主题。 */
+html[data-theme="light"] #app .ai-chat-panel,
+html[data-theme="light"] #app .ai-chat-header,
+html[data-theme="light"] #app .ai-settings,
+html[data-theme="light"] #app .ai-chat-composer { color: var(--ink); background: #fff; border-color: var(--line); }
+html[data-theme="light"] #app .assistant-identity strong,
+html[data-theme="light"] #app .action-card { color: var(--ink); }
+html[data-theme="light"] #app .assistant-identity span,
+html[data-theme="light"] #app .ai-settings label,
+html[data-theme="light"] #app .ai-settings p,
+html[data-theme="light"] #app .message-label { color: var(--muted); }
+html[data-theme="light"] #app .ai-settings input,
+html[data-theme="light"] #app .ai-settings select,
+html[data-theme="light"] #app .composer-row textarea { color: var(--ink); background: #fff; border-color: var(--line); }
+html[data-theme="light"] #app .chat-message p,
+html[data-theme="light"] #app .action-buttons button { color: var(--ink); background: #f3f7ef; border-color: var(--line); }
+html[data-theme="light"] #app .chat-message.user p,
+html[data-theme="light"] #app .action-card { background: #eaf4df; border-color: #c7dda9; }
+html[data-theme="light"] #app .action-card-title strong,
+html[data-theme="light"] #app .settings-title { color: var(--green); }
+
+/* ModalPanel 使用 Teleport 挂在 body，而不是 #app 下。 */
+html[data-theme="light"] body .modal-backdrop { background: rgba(30, 41, 32, .42); }
+html[data-theme="light"] body .modal-backdrop .modal-panel,
+html[data-theme="light"] body .modal-backdrop .modal-panel > header,
+html[data-theme="light"] body .modal-backdrop .detail-sheet dl div,
+html[data-theme="light"] body .modal-backdrop .credential-card dl div {
+  color: var(--ink);
+  background: #fff;
+}
+html[data-theme="light"] body .modal-backdrop .modal-panel > header,
+html[data-theme="light"] body .modal-backdrop .detail-hero,
+html[data-theme="light"] body .modal-backdrop .receipt-lines > div,
+html[data-theme="light"] body .modal-backdrop .receipt-head { border-color: var(--line); }
+html[data-theme="light"] body .modal-backdrop .detail-sheet dl,
+html[data-theme="light"] body .modal-backdrop .credential-card dl { background: var(--line); }
+html[data-theme="light"] body .modal-backdrop .detail-sheet dd,
+html[data-theme="light"] body .modal-backdrop .credential-card dd,
+html[data-theme="light"] body .modal-backdrop .receipt-total strong,
+html[data-theme="light"] body .modal-backdrop .receipt-lines strong { color: var(--ink); }
+html[data-theme="light"] body .modal-backdrop .detail-sheet dt,
+html[data-theme="light"] body .modal-backdrop .credential-card dt,
+html[data-theme="light"] body .modal-backdrop .receipt-head p,
+html[data-theme="light"] body .modal-backdrop .receipt-lines span { color: var(--muted); }
+html[data-theme="light"] body .modal-backdrop input,
+html[data-theme="light"] body .modal-backdrop select,
+html[data-theme="light"] body .modal-backdrop textarea { color: var(--ink); background: #fff; border-color: var(--line); }
+html[data-theme="light"] body .modal-backdrop .discount-name { color: var(--green) !important; }
+html[data-theme="light"] body .modal-backdrop .primary-button { color: #fff; background: var(--green); border-color: var(--green); }

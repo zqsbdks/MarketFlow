@@ -1,7 +1,7 @@
 """多供应商AI聊天、工具调用编排和安全限制测试。"""
 
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -17,6 +17,7 @@ from app.ai.providers.base import ProviderError, ProviderToolCall, ProviderTurn
 from app.ai.providers.gemini import GeminiProvider
 from app.ai.providers.openai import OpenAiProvider
 from app.ai.tools import MARKETFLOW_TOOL_DEFINITIONS, ToolExecutionResult, select_marketflow_tools
+from app.core.business_time import business_now
 from app.models.ai_pending_action import AiPendingAction
 from app.schemas.ai_chat_requests import AiChatMessageRequest, AiChatRequest
 from app.services.ai_actions import confirm_ai_action_service
@@ -181,7 +182,7 @@ def _pending_inventory_action(employee_id: int = 7) -> AiPendingAction:
         arguments={"batch_id": 3, "remaining_quantity": 8, "reason": "AI盘点建议"},
         summary="将批次B003的库存修改为8件",
         status="pending",
-        expires_at=datetime.now() + timedelta(minutes=5),
+        expires_at=business_now() + timedelta(minutes=5),
         executed_at=None,
         failure_reason=None,
     )
@@ -233,13 +234,14 @@ async def test_confirm_ai_action_executes_existing_inventory_service(
         AsyncMock(),
     )
     db = AsyncMock()
+    db.info = {}
 
     response = await confirm_ai_action_service(action_id=10, employee_id=7, db=db)
 
     assert response.action.status == "executed"
     assert response.result == {"id": 3, "remaining_quantity": 8}
     update_service.assert_awaited_once()
-    assert db.commit.await_count == 2
+    assert db.commit.await_count == 1
 
 
 async def test_confirm_ai_action_executes_discount_product_service(
@@ -255,7 +257,7 @@ async def test_confirm_ai_action_executes_discount_product_service(
         arguments={"discount_rule_id": 5, "product_ids": [10, 11]},
         summary="为折扣规则ID 5添加2个商品",
         status="pending",
-        expires_at=datetime.now() + timedelta(minutes=5),
+        expires_at=business_now() + timedelta(minutes=5),
         executed_at=None,
         failure_reason=None,
     )
@@ -277,10 +279,12 @@ async def test_confirm_ai_action_executes_discount_product_service(
     )
     monkeypatch.setattr(ai_actions_module, "create_operation_audit_log", AsyncMock())
 
+    db = AsyncMock()
+    db.info = {}
     response = await confirm_ai_action_service(
         action_id=11,
         employee_id=7,
-        db=AsyncMock(),
+        db=db,
     )
 
     assert response.action.status == "executed"
@@ -412,7 +416,7 @@ async def test_ai_chat_can_query_then_prepare_one_write_action(
         arguments={"discount_rule_id": 5, "is_active": True},
         summary="开启折扣规则ID 5",
         status="pending",
-        expires_at=datetime.now() + timedelta(minutes=5),
+        expires_at=business_now() + timedelta(minutes=5),
         executed_at=None,
         failure_reason=None,
     )

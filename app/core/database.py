@@ -30,10 +30,21 @@ if not ASYNC_DATABASE_URL.startswith("sqlite"):
 # Engine 在整个进程中共享，由 lifespan 在应用关闭时统一 dispose。
 async_engine = create_async_engine(ASYNC_DATABASE_URL, **engine_options)
 
+
+class MarketFlowSession(AsyncSession):
+    """AI 确认流程可暂缓现有 Service 的中途提交，保持一次修改的原子性。"""
+
+    async def commit(self) -> None:
+        if self.info.get("defer_commit"):
+            await self.flush()
+            return
+        await super().commit()
+
+
 # expire_on_commit=False 让已提交 ORM 对象在响应序列化阶段仍可读取属性。
 async_session_factory = async_sessionmaker(
     bind=async_engine,
-    class_=AsyncSession,
+    class_=MarketFlowSession,
     expire_on_commit=False,
 )
 
@@ -58,4 +69,4 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
 
 
 # 明确公共接口，避免调用方依赖模块内部的临时配置变量。
-__all__ = ["Base", "async_engine", "async_session_factory", "get_db_session"]
+__all__ = ["Base", "MarketFlowSession", "async_engine", "async_session_factory", "get_db_session"]

@@ -751,5 +751,53 @@
     },
     "alembic/versions/20261001_0019_create_ai_pending_actions.py": {
         "description": "创建AI待确认操作表及状态索引迁移"
+    },
+    "alembic/versions/20261001_0020_ai_provider_credential.py": {
+        "description": "创建员工AI密钥加密存储表迁移"
+    },
+    "app/core/business_time.py": {
+        "description": "日本门店业务时间统一工具"
+    },
+    "app/core/csrf.py": {
+        "description": "浏览器登录Cookie的CSRF校验工具"
+    },
+    "app/core/scheduler_worker.py": {
+        "description": "独立定时任务进程入口"
+    },
+    "app/models/ai_provider_credential.py": {
+        "description": "员工AI模型密钥加密存储ORM模型"
+    },
+    "app/services/ai_credentials.py": {
+        "description": "AI模型密钥加密保存、读取与删除业务逻辑"
+    },
+    "frontend/src/i18n.ts": {
+        "description": "前端日英中文切换与界面文案翻译"
+    },
+    "frontend/src/components/LanguageSwitcher.vue": {
+        "description": "前端语言切换组件"
+    },
+    "frontend/src/theme.ts": {
+        "description": "日夜模式状态与浏览器偏好保存"
+    },
+    "frontend/src/components/ThemeSwitcher.vue": {
+        "description": "日夜模式切换按钮"
+    },
+    "frontend/src/light.css": {
+        "description": "前端日间模式配色样式"
+    },
+    "tests/test_business_safety.py": {
+        "description": "日本业务时间、AI事务与密钥加密测试"
+    },
+    "compose.yaml": {
+        "description": "前后端、数据库、缓存及定时任务容器编排"
+    },
+    "Dockerfile": {
+        "description": "后端FastAPI容器镜像配置"
+    },
+    "frontend/Dockerfile": {
+        "description": "前端构建与Nginx静态服务镜像配置"
+    },
+    "frontend/nginx.conf": {
+        "description": "前端页面与后端API反向代理配置"
     }
 }

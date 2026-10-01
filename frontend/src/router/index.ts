@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import AppLayout from '../layouts/AppLayout.vue'
 import { useAuthStore } from '../stores/auth'
+import { setPageTitle } from '../i18n'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -107,7 +108,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  document.title = `${String(to.meta.title || '经营管理台')} · MarketFlow`
+  setPageTitle(`${String(to.meta.title || '经营管理台')} · MarketFlow`)
 
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }

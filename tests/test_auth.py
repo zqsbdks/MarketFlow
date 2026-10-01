@@ -107,6 +107,29 @@ def test_login_returns_documented_response(monkeypatch) -> None:
     assert payload["sub"] == "1"
 
 
+def test_browser_session_does_not_return_token_in_json(monkeypatch) -> None:
+    """浏览器登录使用 HttpOnly Cookie，不把 Bearer 令牌暴露给页面脚本。"""
+
+    employee = build_employee()
+
+    async def login(**_kwargs):
+        return build_login_result(employee)
+
+    monkeypatch.setattr("app.routers.auth.auth_login_service", login)
+    application = create_app()
+    application.dependency_overrides[get_db] = override_db
+    with TestClient(application) as client:
+        response = client.post(
+            "/api/v1/auth/session",
+            json={"employee_no": "E00001", "password": "correct-password"},
+        )
+
+    assert response.status_code == 200
+    assert "access_token" not in response.text
+    assert response.json()["data"]["employee_no"] == "E00001"
+    assert "httponly" in response.headers["set-cookie"].lower()
+
+
 def test_login_rejects_invalid_credentials(monkeypatch) -> None:
     """不存在的员工或错误密码统一返回 401。"""
 

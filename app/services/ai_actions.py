@@ -1,12 +1,19 @@
 """AI 待确认操作的确认、取消与安全执行业务逻辑。"""
 
-from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
+from app.core.cache import (
+    CATEGORIES_CACHE_NAMESPACE,
+    DEPARTMENTS_CACHE_NAMESPACE,
+    SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
+    SUPPLIERS_CACHE_NAMESPACE,
+    clear_cache_namespaces,
+)
 from app.crud.ai_pending_actions import get_ai_pending_action_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.ai_pending_action import AiPendingAction
@@ -102,7 +109,7 @@ async def confirm_ai_action_service(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="AI操作不存在")
     _validate_pending_action(action, employee_id)
 
-    if action.expires_at <= datetime.now():
+    if action.expires_at <= business_now():
         action.status = "expired"
         await db.commit()
         raise HTTPException(
@@ -110,9 +117,9 @@ async def confirm_ai_action_service(
             detail="该AI操作已经过期，请重新发起",
         )
 
-    # 先将记录标记为处理中并提交，其他并发确认请求就不能再次执行同一操作。
+    # 持有 FOR UPDATE 行锁，直至业务修改、审计与状态一起提交。
     action.status = "processing"
-    await db.commit()
+    db.info["defer_commit"] = True
 
     result: dict[str, Any]
     try:
@@ -328,6 +335,7 @@ async def confirm_ai_action_service(
                 detail="该AI操作类型未开放执行权限",
             )
     except Exception as error:
+        db.info.pop("defer_commit", None)
         await db.rollback()
         failed_action = await get_ai_pending_action_by_id(
             action_id=action_id,
@@ -343,21 +351,34 @@ async def confirm_ai_action_service(
             await db.commit()
         raise
 
-    action.status = "executed"
-    action.executed_at = datetime.now()
-    action.failure_reason = None
-    await create_operation_audit_log(
-        employee_id=employee_id,
-        module="ai_assistant",
-        action="confirm_action",
-        target_type="ai_pending_action",
-        target_id=action.id,
-        before_data={"status": "processing"},
-        after_data={"status": "executed", "action_type": action.action_type},
-        reason="员工确认执行AI建议",
-        db=db,
+    try:
+        action.status = "executed"
+        action.executed_at = business_now()
+        action.failure_reason = None
+        await create_operation_audit_log(
+            employee_id=employee_id,
+            module="ai_assistant",
+            action="confirm_action",
+            target_type="ai_pending_action",
+            target_id=action.id,
+            before_data={"status": "processing"},
+            after_data={"status": "executed", "action_type": action.action_type},
+            reason="员工确认执行AI建议",
+            db=db,
+        )
+        db.info.pop("defer_commit", None)
+        await db.commit()
+    except Exception:
+        db.info.pop("defer_commit", None)
+        await db.rollback()
+        raise
+    # Service 曾在中途清缓存；提交后再清一次，避免并发读回填旧值。
+    await clear_cache_namespaces(
+        CATEGORIES_CACHE_NAMESPACE,
+        DEPARTMENTS_CACHE_NAMESPACE,
+        SUPPLIERS_CACHE_NAMESPACE,
+        SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
     )
-    await db.commit()
     return AiActionExecutionResponse(action=_action_response(action), result=result)
 
 

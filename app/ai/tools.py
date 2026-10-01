@@ -14,6 +14,7 @@ from app.ai.action_registry import (
     build_business_action_summary,
     validate_business_action,
 )
+from app.core.business_time import business_now
 from app.crud.ai_pending_actions import create_ai_pending_action
 from app.crud.auth import get_employee_by_id
 from app.models.ai_pending_action import AiPendingAction
@@ -707,7 +708,7 @@ async def execute_marketflow_tool(
                 action_type="update_inventory_batch_quantity",
                 arguments=action_arguments,
                 summary=summary,
-                expires_at=datetime.now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
+                expires_at=business_now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
                 db=db,
             )
             return ToolExecutionResult(
@@ -733,7 +734,7 @@ async def execute_marketflow_tool(
                 department_id=batch.department_id,
                 db=db,
             )
-            if batch.expiration_date is None or batch.expiration_date >= date.today():
+            if batch.expiration_date is None or batch.expiration_date >= business_now().date():
                 raise HTTPException(status_code=400, detail="只有已经过期的库存批次可以废弃")
             if batch.remaining_quantity == 0:
                 raise HTTPException(status_code=400, detail="该过期批次已经没有剩余库存")
@@ -748,7 +749,7 @@ async def execute_marketflow_tool(
                 action_type="discard_expired_inventory_batch",
                 arguments=action_arguments,
                 summary=summary,
-                expires_at=datetime.now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
+                expires_at=business_now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
                 db=db,
             )
             return ToolExecutionResult(
@@ -783,7 +784,7 @@ async def execute_marketflow_tool(
                 action_type="update_product_status",
                 arguments=action_arguments,
                 summary=summary,
-                expires_at=datetime.now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
+                expires_at=business_now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
                 db=db,
             )
             return ToolExecutionResult(
@@ -811,7 +812,7 @@ async def execute_marketflow_tool(
                 action_type=action_type,
                 arguments=action_arguments,
                 summary=summary,
-                expires_at=datetime.now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
+                expires_at=business_now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
                 db=db,
             )
             return ToolExecutionResult(

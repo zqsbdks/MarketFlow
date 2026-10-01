@@ -16,6 +16,7 @@ import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
 import type { Category, Department, ProductDetail, ProductListItem, ProductStatus } from '../types/api'
 import { formatMoney } from '../utils'
+import { promptTranslated } from '../i18n'
 
 const products = ref<ProductListItem[]>([])
 const auth = useAuthStore()
@@ -127,7 +128,7 @@ async function submitEdit() {
 async function toggleDetailStatus() {
   if (!detail.value) return
   const nextStatus: ProductStatus = detail.value.status === 'on_sale' ? 'stopped' : 'on_sale'
-  const reason = window.prompt(`请输入${nextStatus === 'on_sale' ? '上架' : '停售'}理由（可不填）`) || undefined
+  const reason = promptTranslated(`请输入${nextStatus === 'on_sale' ? '上架' : '停售'}理由（可不填）`) || undefined
   try {
     detail.value = await updateProductStatus(detail.value.id, nextStatus, reason)
     notice.value = `商品已${nextStatus === 'on_sale' ? '上架' : '停售'}。`

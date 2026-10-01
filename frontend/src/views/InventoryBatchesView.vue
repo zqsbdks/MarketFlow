@@ -22,6 +22,7 @@ import type {
   Supplier,
 } from '../types/api'
 import { formatDateTime, formatMoney } from '../utils'
+import { confirmTranslated, promptTranslated } from '../i18n'
 
 const auth = useAuthStore()
 const batches = ref<InventoryBatchListItem[]>([])
@@ -129,9 +130,9 @@ async function discardExpiredBatch() {
   if (!detail.value || detail.value.status !== 'expired' || detail.value.remaining_quantity <= 0) {
     return
   }
-  if (!window.confirm(`确认废弃批次 ${detail.value.batch_no} 的全部剩余库存吗？`)) return
+  if (!confirmTranslated(`确认废弃批次 ${detail.value.batch_no} 的全部剩余库存吗？`)) return
 
-  const reason = window.prompt('请输入废弃原因（可不填）') || undefined
+  const reason = promptTranslated('请输入废弃原因（可不填）') || undefined
   saving.value = true
   error.value = ''
   try {

@@ -7,6 +7,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from cryptography.fernet import Fernet
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -55,6 +56,10 @@ class Settings(BaseSettings):
     redis_max_connections: int = Field(default=10, ge=1)
     redis_timeout: float = Field(default=5.0, gt=0)
 
+    # Web 进程可关闭调度器，由单独的 scheduler 服务运行，避免多 worker 重复执行。
+    run_scheduler: bool = False
+    ai_key_encryption_key: str | None = None
+
     # default_factory 确保不同 Settings 实例不会共享同一个可变列表。
     cors_origins: list[str] = Field(default_factory=lambda: ["*"])
 
@@ -70,10 +75,18 @@ class Settings(BaseSettings):
             unsafe_options.append("APP_DEBUG 必须为 false")
         if self.database_echo:
             unsafe_options.append("APP_DATABASE_ECHO 必须为 false")
+        if self.run_scheduler:
+            unsafe_options.append("APP_RUN_SCHEDULER 必须为 false，由独立进程运行任务")
         if self.secret_key == "dev-only-change-me-before-production":
             unsafe_options.append("APP_SECRET_KEY 必须替换为随机密钥")
         if "*" in self.cors_origins:
             unsafe_options.append("APP_CORS_ORIGINS 不能包含通配符 *")
+        try:
+            if not self.ai_key_encryption_key:
+                raise ValueError("missing key")
+            Fernet(self.ai_key_encryption_key.encode("ascii"))
+        except (ValueError, UnicodeEncodeError):
+            unsafe_options.append("APP_AI_KEY_ENCRYPTION_KEY 必须是有效的 Fernet 密钥")
         if unsafe_options:
             raise ValueError("生产环境配置不安全：" + "；".join(unsafe_options))
         return self

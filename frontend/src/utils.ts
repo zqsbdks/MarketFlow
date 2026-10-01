@@ -1,33 +1,46 @@
+import { language } from './i18n'
+
+function displayLocale(): string {
+  return language.value === 'ja' ? 'ja-JP' : language.value === 'en' ? 'en-US' : 'zh-CN'
+}
+
 export function formatMoney(value: string | number): string {
-  return new Intl.NumberFormat('zh-CN', {
+  return new Intl.NumberFormat(displayLocale(), {
     style: 'currency',
-    currency: 'CNY',
+    currency: 'JPY',
     minimumFractionDigits: 2,
   }).format(Number(value))
 }
 
 export function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  // API 的无时区 DATETIME 按门店日本时间解释，避免浏览器按本机时区偏移。
+  const normalized = value.replace(' ', 'T')
+  const zonedValue = /(?:Z|[+-]\d{2}:\d{2})$/u.test(normalized)
+    ? normalized : `${normalized}+09:00`
+  return new Intl.DateTimeFormat(displayLocale(), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date(value))
+    timeZone: 'Asia/Tokyo',
+  }).format(new Date(zonedValue))
 }
 
 export function toLocalInput(date: Date): string {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date)
+  const part = (type: string) => parts.find((item) => item.type === type)?.value || '00'
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`
 }
 
 export function createDefaultRange(days = 7) {
-  const end = new Date()
-  end.setHours(21, 0, 0, 0)
-  const start = new Date(end)
-  start.setDate(start.getDate() - days + 1)
-  start.setHours(9, 0, 0, 0)
-  return { start: toLocalInput(start), end: toLocalInput(end) }
+  const japanDay = toLocalInput(new Date()).slice(0, 10)
+  const startDay = new Date(`${japanDay}T00:00:00Z`)
+  startDay.setUTCDate(startDay.getUTCDate() - days + 1)
+  return { start: `${startDay.toISOString().slice(0, 10)}T09:00`, end: `${japanDay}T21:00` }
 }
 
 export function apiDateTime(value: string): string | undefined {

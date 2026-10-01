@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
 from app.crud.auth import get_employee_by_id
 from app.crud.sales import InsufficientStockError, create_sale, get_sales_detail, get_sales_list
 from app.models.discount_rule import DiscountRule
@@ -211,7 +212,7 @@ async def preview_sale_price_service(
         requested_quantities[item.product_id] = old_quantity + item.quantity
 
     # 第三步：使用统一折扣函数取得每件商品当前最低成交价。
-    now = datetime.now()
+    now = business_now()
     product_ids = list(requested_quantities.keys())
     prices = await get_product_discount_prices(product_ids=product_ids, now=now, db=db)
 
@@ -295,7 +296,7 @@ async def create_sale_service(
         )
 
     # 第二步：销售时间由服务器生成，前端不能伪造历史销售时间。
-    sold_at = datetime.now()
+    sold_at = business_now()
     if not BUSINESS_OPENING_TIME <= sold_at.time() <= BUSINESS_CLOSING_TIME:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,

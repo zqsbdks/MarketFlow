@@ -9,6 +9,8 @@ import { getDepartments, getReportAnalytics } from '../api'
 import { getErrorMessage } from '../api/http'
 import PageHeader from '../components/PageHeader.vue'
 import type { Department, ReportAnalytics, ReportMetric } from '../types/api'
+import { theme } from '../theme'
+import { language, translate } from '../i18n'
 import { apiDateTime, createDefaultRange, formatDateTime, formatMoney } from '../utils'
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
@@ -96,11 +98,28 @@ function formatPercent(value: string | null | undefined) {
 }
 
 function formatTrendLabel(value: string) {
-  const date = new Date(value)
-  if (interval.value === 'year') return `${date.getFullYear()}年`
-  if (interval.value === 'month') return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}`
-  if (interval.value === 'day') return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+  const year = value.slice(0, 4)
+  const month = value.slice(5, 7)
+  const day = value.slice(8, 10)
+  if (interval.value === 'year') return language.value === 'en' ? year : `${year}年`
+  if (interval.value === 'month') return `${year}/${month}`
+  if (interval.value === 'day') return `${month}/${day}`
   return formatDateTime(value)
+}
+
+function localizeChartOption<T>(value: T): T {
+  if (typeof value === 'string') return translate(value) as T
+  if (Array.isArray(value)) return value.map(localizeChartOption) as T
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, localizeChartOption(item)]),
+    ) as T
+  }
+  return value
+}
+
+function setLocalizedOption(chart: EChartsType, option: Parameters<EChartsType['setOption']>[0]) {
+  chart.setOption(localizeChartOption(option))
 }
 
 async function loadAnalytics() {
@@ -157,13 +176,13 @@ function renderCharts() {
   const trend = analytics.value?.sales_trend ?? []
   if (trendChartElement.value && trend.length) {
     trendChart ??= init(trendChartElement.value)
-    trendChart.setOption({
+    setLocalizedOption(trendChart, {
       color: ['#7887ff', '#f8d66d', '#c8ff5a'],
       tooltip: { trigger: 'axis' },
       legend: { top: 2, left: 'center', data: ['营业额', '销售成本', '毛利润'], textStyle: { color: '#a5aab4' } },
       grid: { left: 14, right: 20, top: 62, bottom: 34, containLabel: true },
       xAxis: { type: 'category', data: trend.map((item) => formatTrendLabel(item.start_time)), axisLabel: { color: '#8d929c', hideOverlap: true, margin: 14 } },
-      yAxis: { type: 'value', name: '金额（元）', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
+      yAxis: { type: 'value', name: '金额（¥）', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
       series: [
         { name: '营业额', type: 'bar', data: trend.map((item) => Number(item.revenue)) },
         { name: '销售成本', type: 'bar', data: trend.map((item) => Number(item.sales_cost)) },
@@ -178,7 +197,7 @@ function renderCharts() {
   const labels = trend.map((item) => formatTrendLabel(item.start_time))
   if (trafficChartElement.value && trend.length) {
     trafficChart ??= init(trafficChartElement.value)
-    trafficChart.setOption({
+    setLocalizedOption(trafficChart, {
       color: ['#7887ff', '#c8ff5a'], tooltip: { trigger: 'axis' },
       legend: { top: 2, left: 'center', data: ['销售数量', '销售单数'], textStyle: { color: '#a5aab4' } },
       grid: { left: 12, right: 16, top: 62, bottom: 34, containLabel: true },
@@ -196,13 +215,13 @@ function renderCharts() {
 
   if (efficiencyChartElement.value && trend.length) {
     efficiencyChart ??= init(efficiencyChartElement.value)
-    efficiencyChart.setOption({
+    setLocalizedOption(efficiencyChart, {
       color: ['#f8d66d', '#7887ff'], tooltip: { trigger: 'axis' },
       legend: { top: 2, left: 'center', data: ['平均每单金额', '平均每单件数'], textStyle: { color: '#a5aab4' } },
       grid: { left: 12, right: 16, top: 62, bottom: 34, containLabel: true },
       xAxis: { type: 'category', data: labels, axisLabel: { color: '#8d929c', hideOverlap: true, margin: 14 } },
       yAxis: [
-        { type: 'value', name: '元/单', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
+        { type: 'value', name: '¥/单', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
         { type: 'value', name: '件/单', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { show: false } },
       ],
       series: [
@@ -232,7 +251,7 @@ function renderCharts() {
 
   if (marginChartElement.value && trend.length) {
     marginChart ??= init(marginChartElement.value)
-    marginChart.setOption({
+    setLocalizedOption(marginChart, {
       color: ['#ff8066'], tooltip: { trigger: 'axis', valueFormatter: (value: unknown) => `${Number(value).toFixed(2)}%` },
       grid: { left: 12, right: 16, top: 34, bottom: 34, containLabel: true },
       xAxis: { type: 'category', data: labels, axisLabel: { color: '#8d929c', hideOverlap: true, margin: 14 } },
@@ -246,14 +265,14 @@ function renderCharts() {
 
   if (discountChartElement.value && trend.length) {
     discountChart ??= init(discountChartElement.value)
-    discountChart.setOption({
+    setLocalizedOption(discountChart, {
       color: ['#ff8066', '#f8d66d'],
       tooltip: { trigger: 'axis' },
       legend: { top: 2, left: 'center', data: ['优惠金额', '优惠率'], textStyle: { color: '#a5aab4' } },
       grid: { left: 12, right: 16, top: 62, bottom: 34, containLabel: true },
       xAxis: { type: 'category', data: labels, axisLabel: { color: '#8d929c', hideOverlap: true, margin: 14 } },
       yAxis: [
-        { type: 'value', name: '优惠金额（元）', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
+        { type: 'value', name: '优惠金额（¥）', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c' }, splitLine: { lineStyle: { color: '#292c33' } } },
         { type: 'value', name: '优惠率', nameTextStyle: { color: '#8d929c' }, axisLabel: { color: '#8d929c', formatter: '{value}%' }, splitLine: { show: false } },
       ],
       series: [
@@ -269,7 +288,7 @@ function renderCharts() {
   const growthValues = [analytics.value?.revenue_growth_rate, analytics.value?.gross_profit_growth_rate]
   if (growthChartElement.value && growthValues.some((item) => item !== undefined)) {
     growthChart ??= init(growthChartElement.value)
-    growthChart.setOption({
+    setLocalizedOption(growthChart, {
       color: ['#c8ff5a'], tooltip: { trigger: 'axis', valueFormatter: (value: unknown) => `${Number(value).toFixed(2)}%` },
       grid: { left: 12, right: 16, top: 24, bottom: 12, containLabel: true },
       xAxis: { type: 'category', data: ['营业额增长率', '毛利润增长率'], axisLabel: { color: '#8d929c' } },
@@ -284,7 +303,7 @@ function renderCharts() {
   const shares = analytics.value?.department_revenue_share ?? []
   if (shareChartElement.value && shares.length) {
     shareChart ??= init(shareChartElement.value)
-    shareChart.setOption({
+    setLocalizedOption(shareChart, {
       color: ['#c8ff5a', '#7887ff', '#ff8066', '#f8d66d'],
       tooltip: { trigger: 'item', formatter: '{b}<br/>{c}%' },
       legend: { bottom: 0, textStyle: { color: '#a5aab4' } },
@@ -299,6 +318,24 @@ function renderCharts() {
   } else {
     shareChart?.dispose()
     shareChart = null
+  }
+
+  if (theme.value === 'light') {
+    const axisColors = {
+      xAxis: { axisLabel: { color: '#607062' } },
+      yAxis: { axisLabel: { color: '#607062' }, nameTextStyle: { color: '#607062' }, splitLine: { lineStyle: { color: '#e2e8df' } } },
+    }
+    trendChart?.setOption({ ...axisColors, color: ['#5368b8', '#b88a24', '#729c2a'], legend: { textStyle: { color: '#607062' } } })
+    trafficChart?.setOption({ ...axisColors, color: ['#5368b8', '#729c2a'], legend: { textStyle: { color: '#607062' } } })
+    efficiencyChart?.setOption({ ...axisColors, color: ['#b88a24', '#5368b8'], legend: { textStyle: { color: '#607062' } } })
+    marginChart?.setOption({ ...axisColors, color: ['#bf5a43'] })
+    discountChart?.setOption({ ...axisColors, color: ['#bf5a43', '#b88a24'], legend: { textStyle: { color: '#607062' } } })
+    growthChart?.setOption({ ...axisColors, color: ['#729c2a'] })
+    shareChart?.setOption({
+      color: ['#729c2a', '#5368b8', '#bf5a43', '#b88a24'],
+      legend: { textStyle: { color: '#607062' } },
+      series: [{ label: { color: '#344a37' } }],
+    })
   }
 }
 
@@ -316,6 +353,8 @@ watch(displayMode, async () => {
   await nextTick()
   renderCharts()
 })
+watch(theme, () => renderCharts())
+watch(language, () => renderCharts())
 
 onMounted(async () => {
   window.addEventListener('resize', resizeCharts)

@@ -1,12 +1,13 @@
 """销售记录的数据访问函数。"""
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.business_time import business_now
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.discount_rule import DiscountRule
 from app.models.enums import InventoryBatchStatus, ProductStatus, SaleSource
@@ -131,7 +132,7 @@ async def create_sale(
                 InventoryBatch.remaining_quantity > 0,
                 or_(
                     InventoryBatch.expiration_date.is_(None),
-                    InventoryBatch.expiration_date >= date.today(),
+                    InventoryBatch.expiration_date >= business_now().date(),
                 ),
             )
             .order_by(

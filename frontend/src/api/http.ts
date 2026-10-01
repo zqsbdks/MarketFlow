@@ -5,13 +5,12 @@ import type { ApiResponse } from '../types/api'
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 15_000,
+  withCredentials: true,
 })
 
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('marketflow_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  const csrf = document.cookie.split('; ').find((part) => part.startsWith('marketflow_csrf='))
+  if (csrf) config.headers['X-CSRF-Token'] = decodeURIComponent(csrf.split('=')[1] || '')
   return config
 })
 
@@ -19,7 +18,6 @@ http.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse<unknown>>) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('marketflow_token')
       localStorage.removeItem('marketflow_employee')
       if (window.location.pathname !== '/login') {
         window.location.assign('/login')

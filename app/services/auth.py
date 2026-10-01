@@ -1,10 +1,9 @@
 """员工登录业务逻辑。"""
 
-from datetime import UTC, datetime
-
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
 from app.core.security import hash_password, verify_password
 from app.core.token import create_access_token
 from app.crud.auth import (
@@ -44,7 +43,7 @@ async def auth_login_service(
             detail="账号已停用",
         )
 
-    login_time = datetime.now(UTC).replace(tzinfo=None)
+    login_time = business_now()
     await update_employee_last_login(
         employee=employee,
         login_time=login_time,

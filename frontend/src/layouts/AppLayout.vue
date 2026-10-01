@@ -22,6 +22,8 @@ import {
 
 import { useAuthStore } from '../stores/auth'
 import AiChatWidget from '../components/AiChatWidget.vue'
+import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,8 +55,8 @@ function isActive(path: string) {
   return route.path === path
 }
 
-function logout() {
-  auth.signOut()
+async function logout() {
+  await auth.signOut()
   router.push('/login')
 }
 </script>
@@ -95,9 +97,12 @@ function logout() {
       </nav>
 
       <div class="sidebar-footer">
+        <LanguageSwitcher />
+        <ThemeSwitcher />
         <div class="employee-avatar">{{ auth.employee?.name?.slice(0, 1) || '员' }}</div>
         <div class="employee-meta">
-          <strong>{{ auth.employee?.name || '当前员工' }}</strong>
+          <strong v-if="auth.employee?.name" data-no-translate>{{ auth.employee.name }}</strong>
+          <strong v-else>当前员工</strong>
           <span>{{ auth.employee?.role }} · {{ auth.employee?.employee_no }}</span>
         </div>
         <button class="icon-button dark" title="退出登录" type="button" @click="logout">
@@ -112,7 +117,8 @@ function logout() {
           <Menu :size="21" />
         </button>
         <strong>MarketFlow</strong>
-        <span />
+        <LanguageSwitcher />
+        <ThemeSwitcher />
       </header>
       <div class="page-container">
         <RouterView />

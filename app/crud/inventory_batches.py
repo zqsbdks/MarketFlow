@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.core.business_time import business_now
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.enums import InventoryBatchStatus
 from app.models.inventory_batch import InventoryBatch
@@ -204,14 +205,14 @@ async def update_inventory_batch_quantity(
     # 判断顺序必须与自动刷新函数保持一致：售罄 > 已过期 > 临期 > 可用。
     if remaining_quantity == 0:
         batch.status = InventoryBatchStatus.SOLD_OUT
-    elif batch.expiration_date is not None and batch.expiration_date < date.today():
+    elif batch.expiration_date is not None and batch.expiration_date < business_now().date():
         # 今天到期的批次当天仍可销售，第二天才转为已过期。
         batch.status = InventoryBatchStatus.EXPIRED
     elif (
         batch.expiration_date is not None
         and batch.product.expiry_warning_days is not None
         and batch.expiration_date
-        <= date.today() + timedelta(days=batch.product.expiry_warning_days)
+        <= business_now().date() + timedelta(days=batch.product.expiry_warning_days)
     ):
         batch.status = InventoryBatchStatus.NEAR_EXPIRY
     else:

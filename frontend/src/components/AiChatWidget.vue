@@ -2,7 +2,10 @@
 import { computed, nextTick, ref } from 'vue'
 import { Bot, KeyRound, RotateCcw, Send, Settings, Sparkles, X } from '@lucide/vue'
 
-import { cancelAiAction, confirmAiAction, sendAiChat } from '../api'
+import {
+  cancelAiAction, confirmAiAction, deleteAiCredential, getAiCredentialStatus,
+  saveAiCredential, sendAiChat,
+} from '../api'
 import { getErrorMessage } from '../api/http'
 import type { AiChatMessage, AiPendingAction, AiProvider } from '../types/api'
 
@@ -33,9 +36,13 @@ const savedProvider = localStorage.getItem(PROVIDER_STORAGE_KEY)
 const initialProvider: AiProvider = savedProvider === 'openai' ? 'openai' : 'gemini'
 const provider = ref<AiProvider>(initialProvider)
 const providerDraft = ref<AiProvider>(initialProvider)
-const oldGeminiKey = localStorage.getItem('marketflow_gemini_api_key') || ''
-const apiKey = ref(localStorage.getItem(apiKeyStorageKey(initialProvider)) || oldGeminiKey)
-const apiKeyDraft = ref(apiKey.value)
+// 升级后删除旧版本留在浏览器的明文密钥；用户只需重新配置一次。
+localStorage.removeItem('marketflow_gemini_api_key')
+localStorage.removeItem(apiKeyStorageKey('openai'))
+const keyConfigured = ref(false)
+const draftKeyConfigured = ref(false)
+const apiKeyDraft = ref('')
+const settingsError = ref('')
 const model = ref(
   localStorage.getItem(modelStorageKey(initialProvider)) || PROVIDER_DEFAULT_MODELS[initialProvider],
 )
@@ -54,35 +61,68 @@ const messages = ref<DisplayMessage[]>([
   },
 ])
 
-const canSend = computed(() => Boolean(input.value.trim() && apiKey.value && !isSending.value))
+const canSend = computed(() => Boolean(input.value.trim() && keyConfigured.value && !isSending.value))
 
-function openWidget() {
-  isOpen.value = true
-  if (!apiKey.value) showSettings.value = true
+async function refreshCredentialStatus(selectedProvider: AiProvider) {
+  try {
+    return (await getAiCredentialStatus(selectedProvider)).configured
+  } catch (error) {
+    settingsError.value = getErrorMessage(error)
+    return false
+  }
 }
 
-function saveSettings() {
+async function openWidget() {
+  isOpen.value = true
+  keyConfigured.value = await refreshCredentialStatus(provider.value)
+  draftKeyConfigured.value = keyConfigured.value
+  if (!keyConfigured.value) showSettings.value = true
+}
+
+async function saveSettings() {
   const cleanKey = apiKeyDraft.value.trim()
   const cleanModel = modelDraft.value.trim() || PROVIDER_DEFAULT_MODELS[providerDraft.value]
+  settingsError.value = ''
+  try {
+    if (cleanKey) await saveAiCredential(providerDraft.value, cleanKey)
+    else if (!(await getAiCredentialStatus(providerDraft.value)).configured) {
+      settingsError.value = '请输入 API Key'
+      return
+    }
+  } catch (error) {
+    settingsError.value = getErrorMessage(error)
+    return
+  }
   provider.value = providerDraft.value
-  apiKey.value = cleanKey
+  keyConfigured.value = true
+  draftKeyConfigured.value = true
+  apiKeyDraft.value = ''
   model.value = cleanModel
 
   localStorage.setItem(PROVIDER_STORAGE_KEY, provider.value)
-  if (cleanKey) localStorage.setItem(apiKeyStorageKey(provider.value), cleanKey)
-  else localStorage.removeItem(apiKeyStorageKey(provider.value))
+  localStorage.removeItem(apiKeyStorageKey(provider.value))
+  localStorage.removeItem('marketflow_gemini_api_key')
   localStorage.setItem(modelStorageKey(provider.value), cleanModel)
   showSettings.value = false
 }
 
-function removeApiKey() {
+async function removeApiKey() {
+  settingsError.value = ''
+  try {
+    await deleteAiCredential(providerDraft.value)
+  } catch (error) {
+    settingsError.value = getErrorMessage(error)
+    return
+  }
   apiKeyDraft.value = ''
   localStorage.removeItem(apiKeyStorageKey(providerDraft.value))
-  if (providerDraft.value === provider.value) apiKey.value = ''
+  draftKeyConfigured.value = false
+  if (providerDraft.value === provider.value) keyConfigured.value = false
 }
 
-function loadProviderSettings() {
-  apiKeyDraft.value = localStorage.getItem(apiKeyStorageKey(providerDraft.value)) || ''
+async function loadProviderSettings() {
+  apiKeyDraft.value = ''
+  draftKeyConfigured.value = await refreshCredentialStatus(providerDraft.value)
   modelDraft.value =
     localStorage.getItem(modelStorageKey(providerDraft.value)) ||
     PROVIDER_DEFAULT_MODELS[providerDraft.value]
@@ -108,7 +148,7 @@ async function scrollToBottom() {
 async function submitMessage() {
   const content = input.value.trim()
   if (!content || isSending.value) return
-  if (!apiKey.value) {
+  if (!keyConfigured.value) {
     showSettings.value = true
     return
   }
@@ -125,7 +165,7 @@ async function submitMessage() {
       history.push({ role: message.role, content: message.content })
     }
 
-    const result = await sendAiChat(apiKey.value, provider.value, model.value, history)
+    const result = await sendAiChat(provider.value, model.value, history)
     messages.value.push({ id: nextMessageId++, role: 'model', content: result.message })
     pendingActions.value.push(...result.pending_actions)
   } catch (error) {
@@ -226,14 +266,15 @@ function handleEnter(event: KeyboardEvent) {
             模型名称
             <input v-model="modelDraft" type="text" :placeholder="PROVIDER_DEFAULT_MODELS[providerDraft]" />
           </label>
-          <p>密钥只保存在当前浏览器；请仅在可信设备上使用，线上部署必须启用 HTTPS。</p>
+          <p>密钥加密保存在服务器，当前员工登录后自动使用。留空可只更新模型名称。</p>
+          <p v-if="settingsError" class="form-error">{{ settingsError }}</p>
           <div class="settings-actions">
             <a
               :href="providerDraft === 'gemini' ? 'https://aistudio.google.com/apikey' : 'https://platform.openai.com/api-keys'"
               target="_blank"
               rel="noreferrer"
             >获取 API Key</a>
-            <button v-if="apiKey" class="danger-text" type="button" @click="removeApiKey">删除密钥</button>
+            <button v-if="draftKeyConfigured" class="danger-text" type="button" @click="removeApiKey">删除密钥</button>
             <button class="save-button" type="button" @click="saveSettings">保存</button>
           </div>
         </div>
@@ -282,7 +323,7 @@ function handleEnter(event: KeyboardEvent) {
         </div>
 
         <footer class="ai-chat-composer">
-          <div v-if="!apiKey" class="key-warning" @click="showSettings = true">
+          <div v-if="!keyConfigured" class="key-warning" @click="showSettings = true">
             请先设置模型供应商和 API Key
           </div>
           <div class="composer-row">

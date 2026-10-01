@@ -1,12 +1,13 @@
 """进货管理的业务逻辑。"""
 
-from datetime import date, datetime, time
+from datetime import date, time
 
 from fastapi import HTTPException
 from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
 from app.crud.auth import get_employee_by_id
 from app.crud.employees import get_department_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
@@ -211,7 +212,7 @@ async def create_purchase_service(
     # 模拟系统规定每天中午统一处理进货，因此 12:00 起不再接收当天的新进货单。
     # datetime.now().time() 只取当前时间中的“时、分、秒”，方便与 12:00 比较。
     purchase_cutoff_time = time(hour=12)
-    current_time = datetime.now().time()
+    current_time = business_now().time()
     if current_time >= purchase_cutoff_time:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -355,7 +356,7 @@ async def auto_receive_purchases_service(
             detail="只有店长可以执行自动签收",
         )
 
-    now = datetime.now()
+    now = business_now()
     try:
         received = await auto_receive_due_purchases(
             arrived_at=now,

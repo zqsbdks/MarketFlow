@@ -9,6 +9,7 @@ from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
 from app.crud.auth import get_employee_by_id
 from app.crud.discount_rule import (
     create_discount_rule,
@@ -292,7 +293,7 @@ async def get_discount_rule_list_service(
         )
 
     # 同一次请求中的查询和响应组装必须共用同一个当前时间，避免临界点状态不一致。
-    now = datetime.now()
+    now = business_now()
     offset = (page - 1) * page_size
     rules, total = await get_discount_rules_list(
         offset=offset,
@@ -356,7 +357,7 @@ async def get_discount_rule_detail_service(
         )
 
     # 详情和列表复用同一个响应组装函数，保证字段和状态计算方式一致。
-    return _build_discount_rule_list_item(rule, datetime.now())
+    return _build_discount_rule_list_item(rule, business_now())
 
 
 # endregion
@@ -533,7 +534,7 @@ async def create_discount_rule_service(
 
     # 第五步：根据执行周期检查需要填写的时间字段，并清理每周执行日。
     weekdays: list[int] | None = None
-    now = datetime.now()
+    now = business_now()
     if request.schedule_type == DiscountScheduleType.ONCE:
         if request.starts_at is None or request.ends_at is None:
             raise HTTPException(
@@ -651,7 +652,7 @@ async def create_discount_rule_service(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="新创建的折扣规则不存在",
         )
-    return _build_discount_rule_list_item(saved_rule, datetime.now())
+    return _build_discount_rule_list_item(saved_rule, business_now())
 
 
 # endregion
@@ -1179,7 +1180,7 @@ async def update_discount_rule_service(
                     status_code=http_status.HTTP_400_BAD_REQUEST,
                     detail="单次折扣的结束时间必须晚于开始时间",
                 )
-            if new_ends_at <= datetime.now():
+            if new_ends_at <= business_now():
                 raise HTTPException(
                     status_code=http_status.HTTP_400_BAD_REQUEST,
                     detail="单次折扣的结束时间必须晚于当前时间",
@@ -1254,7 +1255,7 @@ async def update_discount_rule_service(
 
     # 前端提交的值与数据库完全相同时直接返回，不产生空审计记录。
     if not update_data:
-        return _build_discount_rule_list_item(rule, datetime.now())
+        return _build_discount_rule_list_item(rule, business_now())
 
     # 第七步：更新规则和写入审计记录共用一个事务，任一步失败都会回滚。
     try:
@@ -1289,7 +1290,7 @@ async def update_discount_rule_service(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="修改后的折扣规则不存在",
         )
-    return _build_discount_rule_list_item(updated_rule, datetime.now())
+    return _build_discount_rule_list_item(updated_rule, business_now())
 
 
 # endregion
@@ -1347,7 +1348,7 @@ async def update_discount_rule_status_service(
 
     # 请求状态与数据库相同时不执行更新，也不生成没有实际变化的审计记录。
     if rule.is_active == request.is_active:
-        return _build_discount_rule_list_item(rule, datetime.now())
+        return _build_discount_rule_list_item(rule, business_now())
 
     # 第三步：修改状态并记录修改前后的值，然后统一提交事务。
     try:
@@ -1382,7 +1383,7 @@ async def update_discount_rule_status_service(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="修改后的折扣规则不存在",
         )
-    return _build_discount_rule_list_item(updated_rule, datetime.now())
+    return _build_discount_rule_list_item(updated_rule, business_now())
 
 
 # endregion

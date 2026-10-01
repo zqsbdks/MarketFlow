@@ -1,8 +1,7 @@
-# FastAPI 通用异步项目骨架
+# MarketFlow 门店经营管理系统
 
-这是一个可直接复制的新项目基础结构，包含 FastAPI、Pydantic Settings、
-SQLAlchemy 2.x 异步 MySQL 会话、Alembic 异步迁移、可选 Redis 缓存、JWT、密码哈希、
-CORS 和统一异常响应。
+FastAPI + MySQL 后端与 Vue 3 前端组成的门店经营系统，支持进货、库存批次、
+销售、折扣、报表和需要人工确认的 AI 辅助操作。
 
 ## 快速开始
 
@@ -65,19 +64,16 @@ scripts/           # 可重复执行的项目自动化脚本
 Alembic 与应用共同读取 `.env` 中的 `APP_DATABASE_URL`，无需在 `alembic.ini`
 中重复配置密码。
 
-模板不携带固定的空迁移。请为每个新项目使用一个空的专用数据库，添加并导入 ORM
-模型后，先生成该项目自己的第一份迁移，再执行升级：
+项目已有完整迁移历史。部署已有项目时只执行升级，不要重新生成“第一份迁移”：
 
 ```powershell
-# 第一次也使用这条命令；迁移说明可以写中文
-python -m alembic revision --autogenerate -m "create initial tables"
-
-# 检查生成文件无误后再应用
 python -m alembic upgrade head
 
 # 回退一个版本
 python -m alembic downgrade -1
 ```
+
+只有修改 ORM 结构、准备新版本时才使用 `revision --autogenerate`，且必须人工检查迁移。
 
 项目默认使用 MySQL。将 `.env` 配置为异步 `aiomysql` 驱动 URL：
 
@@ -95,6 +91,33 @@ APP_DATABASE_URL="mysql+aiomysql://user:password@localhost:3306/dbname?charset=u
 避免开发配置被误带到线上。Redis 默认关闭；只有设置
 `APP_REDIS_URL` 后才会创建连接。生产环境应设置真实的 CORS 来源、关闭调试与
 SQL 输出，并替换 `APP_SECRET_KEY`。
+
+## 容器部署
+
+1. 将 `.env.deploy.example` 复制为 `.env`，设置强 MySQL 密码、随机 `APP_SECRET_KEY`、
+   独立的 `APP_AI_KEY_ENCRYPTION_KEY`、真实域名和 CORS 来源。数据库 URL 的密码须
+   与 `MYSQL_PASSWORD` 一致。加密密钥丢失将使已保存的员工 AI Key 无法解密。
+2. 在目标服务器执行 `docker compose build` 和 `docker compose up -d mysql redis`。
+3. 待数据库健康后，执行 `docker compose run --rm backend python -m alembic upgrade head`。
+4. 执行 `docker compose up -d backend scheduler frontend`，再检查
+   `docker compose ps`、`docker compose logs backend scheduler` 和 `/health/ready`。
+
+`frontend` 默认映射宿主机 8080 端口。生产环境必须通过 HTTPS 入口访问；
+生产 Cookie 带 `Secure` 标记，直接以 HTTP 访问将无法保持登录。仅开放 HTTPS
+入口和必要的 SSH 端口，勿将 MySQL、Redis 或后端 8000 端口直接暴露到公网。
+浏览器登录保存在 HttpOnly Cookie 中，页面刷新后无需重新登录；AI API Key 经服务端
+加密后按员工保存，首次配置后无需每次输入。升级前曾存于浏览器的旧 Key 不会自动
+上传，需要员工重新配置一次。导航栏及登录页可切换日语、英语、中文和日夜模式；
+默认日语、夜间模式，选择会在本浏览器中保留。服务端业务时间和页面默认查询时间
+均按日本时间计算。
+定时任务只在单独的 `scheduler` 容器运行，Web 容器通过
+`APP_RUN_SCHEDULER=false` 禁用任务；不要同时启动第二个调度实例。
+业务日期和定时任务按 `Asia/Tokyo` 计算；Compose 中 MySQL 也使用 UTC+09:00，
+以使数据库自动生成的创建/更新时间与业务时间一致。
+首次启动后按 [COMMANDS.md](COMMANDS.md) 创建初始店长账号。
+
+升级时先备份 MySQL 数据卷，再拉取代码、重新构建镜像、执行 `alembic upgrade head`，
+最后更新服务。不要使用 `docker compose down -v`，那会删除数据库卷。
 
 日志默认输出到控制台。设置 `APP_LOG_FILE="logs/app.log"` 后，会同时启用
 10 MB 轮转文件日志并保留最近 5 份。

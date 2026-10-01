@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.core.business_time import business_now
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole, InventoryBatchStatus, ProductStatus, PurchaseStatus
@@ -130,7 +131,7 @@ async def create_purchase(
     """创建一张进货单及其全部进货明细，并发送到当前数据库事务。"""
 
     # 创建时间由后端统一确定；预计到货时间固定为下单时间的两天后。
-    ordered_at = datetime.now()
+    ordered_at = business_now()
     expected_arrival_at = ordered_at + timedelta(days=2)
 
     # 进货单号格式为 PUR + 下单日期 + 当天四位流水号，例如 PUR202609130001。

@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
 from app.crud.auth import get_employee_by_id
 from app.crud.inventory_batches import (
     discard_expired_inventory_batch,
@@ -283,7 +284,7 @@ async def discard_expired_inventory_batch_service(
         )
 
     # 第三步：以到期日期判断是否真正过期，不依赖凌晨状态任务是否已经执行。
-    if batch.expiration_date is None or batch.expiration_date >= date.today():
+    if batch.expiration_date is None or batch.expiration_date >= business_now().date():
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail="只有已经过期的库存批次可以废弃",

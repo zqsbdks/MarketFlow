@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import { ArrowLeft, Pencil, Save, UserRound } from '@lucide/vue'
 import { getEmployeeDetail, updateEmployeeDetail } from '../api'
 import { getErrorMessage } from '../api/http'
+import { confirmTranslated } from '../i18n'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
 import type { EmployeeDetail, EmployeeDetailUpdate } from '../types/api'
@@ -39,7 +40,7 @@ function beginEdit() {
 }
 
 function cancelEdit() {
-  if (dirty.value && !window.confirm('放弃尚未保存的修改？')) return
+  if (dirty.value && !confirmTranslated('放弃尚未保存的修改？')) return
   editing.value = false
   error.value = ''
 }
@@ -96,7 +97,7 @@ async function save() {
 
 function confirmLeave() {
   if (saving.value) return false
-  return !dirty.value || window.confirm('有尚未保存的修改，确定离开？')
+  return !dirty.value || confirmTranslated('有尚未保存的修改，确定离开？')
 }
 onBeforeRouteLeave(confirmLeave)
 onBeforeRouteUpdate(confirmLeave)

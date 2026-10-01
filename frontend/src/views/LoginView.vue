@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, BarChart3, Boxes, Eye, EyeOff, LockKeyhole, Store } from '@lucide/vue'
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Store } from '@lucide/vue'
 
 import { getErrorMessage } from '../api/http'
 import { useAuthStore } from '../stores/auth'
+import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,15 +46,10 @@ async function submit() {
         <h1>掌控门店<br /><em>每一次流动</em></h1>
         <p>销售、商品、部门与团队，在同一个实时经营界面中保持清晰。</p>
       </div>
-      <div class="story-metrics">
-        <div><b>04</b><span>经营部门</span></div>
-        <div><BarChart3 :size="21" /><span>实时经营概览</span></div>
-        <div><Boxes :size="21" /><span>商品库存脉搏</span></div>
-      </div>
-      <p class="story-footnote">MARKETFLOW · RETAIL OPERATIONS SYSTEM</p>
     </section>
 
     <section class="login-form-side">
+      <div class="login-preferences"><LanguageSwitcher /><ThemeSwitcher /></div>
       <form class="login-card" @submit.prevent="submit">
         <div class="mobile-login-brand"><Store :size="22" /><strong>MarketFlow</strong></div>
         <p class="eyebrow">SECURE ACCESS</p>

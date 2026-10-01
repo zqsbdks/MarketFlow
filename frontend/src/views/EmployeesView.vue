@@ -10,6 +10,7 @@ import {
   updateEmployeeStatus,
 } from '../api'
 import { getErrorMessage } from '../api/http'
+import { confirmTranslated, promptTranslated } from '../i18n'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
@@ -72,8 +73,8 @@ async function submitCreate() {
 }
 
 async function toggleStatus(item: EmployeeListItem) {
-  if (!window.confirm(`确定要${item.is_active ? '停用' : '启用'} ${item.name} 的账号吗？`)) return
-  const reason = window.prompt('修改理由（可不填写）') || undefined
+  if (!confirmTranslated(`确定要${item.is_active ? '停用' : '启用'} ${item.name} 的账号吗？`)) return
+  const reason = promptTranslated('修改理由（可不填写）') || undefined
   try {
     await updateEmployeeStatus(item.id, !item.is_active, reason)
     await loadEmployees()
@@ -83,8 +84,8 @@ async function toggleStatus(item: EmployeeListItem) {
 }
 
 async function resetPassword(item: EmployeeListItem) {
-  if (!window.confirm(`确定重置 ${item.name} 的密码吗？`)) return
-  const reason = window.prompt('重置理由（可不填写）') || undefined
+  if (!confirmTranslated(`确定重置 ${item.name} 的密码吗？`)) return
+  const reason = promptTranslated('重置理由（可不填写）') || undefined
   try {
     credential.value = await resetEmployeePassword(item.id, reason)
     credentialOpen.value = true

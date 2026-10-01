@@ -28,6 +28,7 @@ import {
   updateDiscountRuleStatus,
 } from '../api'
 import { getErrorMessage } from '../api/http'
+import { confirmTranslated, language, promptTranslated, translate } from '../i18n'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
@@ -262,7 +263,7 @@ async function openDetail(rule: DiscountRule) {
 
 async function toggleRule(rule: DiscountRule) {
   const actionName = rule.is_active ? '关闭' : '开启'
-  const reason = window.prompt(`${actionName}“${rule.name}”的理由（可不填）`, '')
+  const reason = promptTranslated(`${actionName}“${rule.name}”的理由（可不填）`, '')
   if (reason === null) return
   saving.value = true
   error.value = ''
@@ -278,7 +279,7 @@ async function toggleRule(rule: DiscountRule) {
 }
 
 async function removeRule(rule: DiscountRule) {
-  if (!window.confirm(`确定删除折扣规则“${rule.name}”吗？关联商品也会一起移除。`)) return
+  if (!confirmTranslated(`确定删除折扣规则“${rule.name}”吗？关联商品也会一起移除。`)) return
   saving.value = true
   error.value = ''
   try {
@@ -293,7 +294,7 @@ async function removeRule(rule: DiscountRule) {
 }
 
 async function removeAllRules() {
-  if (!window.confirm('确定清空权限范围内的全部折扣规则吗？此操作不可撤销。')) return
+  if (!confirmTranslated('确定清空权限范围内的全部折扣规则吗？此操作不可撤销。')) return
   saving.value = true
   error.value = ''
   try {
@@ -370,7 +371,7 @@ async function addSelectedProducts() {
 
 async function removeProduct(item: DiscountRuleProduct) {
   if (productRule.value === null) return
-  if (!window.confirm(`确定将“${item.product_name}”移出当前折扣吗？`)) return
+  if (!confirmTranslated(`确定将“${item.product_name}”移出当前折扣吗？`)) return
   try {
     await deleteDiscountRuleProduct(productRule.value.id, item.product_id)
     await loadProductManagement(productRule.value)
@@ -381,7 +382,7 @@ async function removeProduct(item: DiscountRuleProduct) {
 
 async function removeAllProducts() {
   if (productRule.value === null || ruleProducts.value.length === 0) return
-  if (!window.confirm('确定移除这条规则下的全部商品吗？')) return
+  if (!confirmTranslated('确定移除这条规则下的全部商品吗？')) return
   try {
     await clearDiscountRuleProducts(productRule.value.id)
     await loadProductManagement(productRule.value)
@@ -398,13 +399,22 @@ const statusLabels: Record<DiscountComputedStatus, string> = {
   active: '正在生效',
   ended: '已结束',
 }
-const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日']
+const weekdayLabels = computed(() => {
+  if (language.value === 'ja') return ['月', '火', '水', '木', '金', '土', '日']
+  if (language.value === 'en') return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  return ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+})
+
+function weekdayText(day: number): string {
+  const label = weekdayLabels.value[day - 1] || ''
+  return language.value === 'ja' ? `${label}曜` : label
+}
 
 function formatDiscount(rule: DiscountRule) {
   const value = Number(rule.discount_value)
-  if (rule.discount_type === 'percentage') return `${Math.round(value * 100)}% 售价`
-  if (rule.discount_type === 'amount_off') return `每件减 ${formatMoney(value)}`
-  return `固定价 ${formatMoney(value)}`
+  if (rule.discount_type === 'percentage') return translate(`${Math.round(value * 100)}% 售价`)
+  if (rule.discount_type === 'amount_off') return translate(`每件减 ${formatMoney(value)}`)
+  return translate(`固定价 ${formatMoney(value)}`)
 }
 
 function formatSchedule(rule: DiscountRule) {
@@ -413,8 +423,8 @@ function formatSchedule(rule: DiscountRule) {
     return `${formatDateTime(rule.starts_at)} ～ ${formatDateTime(rule.ends_at)}`
   }
   const timeRange = `${rule.daily_start_time?.slice(0, 5)} ～ ${rule.daily_end_time?.slice(0, 5)}`
-  if (rule.schedule_type === 'daily') return `每天 ${timeRange}`
-  const weekdays = (rule.weekdays ?? []).map((day) => `周${weekdayLabels[day - 1]}`).join('、')
+  if (rule.schedule_type === 'daily') return translate(`每天 ${timeRange}`)
+  const weekdays = (rule.weekdays ?? []).map(weekdayText).join(language.value === 'en' ? ', ' : '、')
   return `${weekdays} ${timeRange}`
 }
 
@@ -498,7 +508,7 @@ onMounted(async () => {
         <label>执行周期<select v-model="form.schedule_type"><option value="once">单次活动</option><option value="daily">每日循环</option><option value="weekly">每周循环</option></select></label>
         <div v-if="form.schedule_type === 'once'" class="form-pair"><label>开始时间<input v-model="form.starts_at" type="datetime-local" required /></label><label>结束时间<input v-model="form.ends_at" type="datetime-local" required /></label></div>
         <div v-else class="form-pair"><label>每天开始<input v-model="form.daily_start_time" type="time" required /></label><label>每天结束<input v-model="form.daily_end_time" type="time" required /></label></div>
-        <fieldset v-if="form.schedule_type === 'weekly'" class="weekday-field"><legend>执行星期</legend><label v-for="(label, index) in weekdayLabels" :key="label"><input v-model="form.weekdays" type="checkbox" :value="index + 1" />周{{ label }}</label></fieldset>
+        <fieldset v-if="form.schedule_type === 'weekly'" class="weekday-field"><legend>执行星期</legend><label v-for="(label, index) in weekdayLabels" :key="index"><input v-model="form.weekdays" type="checkbox" :value="index + 1" />{{ weekdayText(index + 1) }}</label></fieldset>
         <label v-if="formMode === 'create'" class="switch-field"><input v-model="form.is_active" type="checkbox" />创建后立即开启</label>
         <label v-else>修改理由（可选）<input v-model="form.reason" maxlength="255" /></label>
         <button class="primary-button" :disabled="saving">{{ saving ? '正在保存…' : '保存折扣规则' }}</button>

@@ -4,14 +4,16 @@
 业务项目可以基于返回载荷继续加载用户、检查权限或执行令牌撤销校验。
 """
 
+import secrets
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.csrf import csrf_for_session
 from app.crud.auth import get_employee_by_id
 from app.dependencies.db import get_db
 
@@ -21,6 +23,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 # region 验证JWT载荷
 async def get_current_token_payload(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, Any]:
     """校验 Bearer 令牌并返回 JWT 载荷。
@@ -35,18 +38,19 @@ async def get_current_token_payload(
         dict[str, Any]: 已验证的 JWT 载荷，其中保证包含非空 ``sub``。
     """
 
-    if not credentials:
+    token = credentials.credentials if credentials else request.cookies.get("marketflow_session")
+    if not token:
         # 明确返回 Bearer 认证挑战头，客户端可以据此触发重新登录。
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="缺少 Authorization 请求头",
+            detail="缺少登录凭据",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     try:
         # PyJWT 会同时校验签名、允许的算法以及标准 exp 过期声明。
         payload = jwt.decode(
-            credentials.credentials,
+            token,
             settings.secret_key,
             algorithms=[settings.jwt_algorithm],
             options={"require": ["exp", "sub"]},
@@ -66,6 +70,18 @@ async def get_current_token_payload(
             detail="访问令牌缺少用户标识",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # 先验证过期时间，再验证 CSRF，确保过期登录统一返回 401。
+    if credentials is None and request.method not in {"GET", "HEAD", "OPTIONS"}:
+        csrf_cookie = request.cookies.get("marketflow_csrf")
+        csrf_header = request.headers.get("X-CSRF-Token")
+        if (
+            not csrf_cookie
+            or not csrf_header
+            or not secrets.compare_digest(csrf_cookie, csrf_header)
+            or not secrets.compare_digest(csrf_cookie, csrf_for_session(token))
+        ):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF 校验失败")
 
     return payload
 

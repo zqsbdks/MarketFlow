@@ -4,12 +4,19 @@ from datetime import timedelta
 
 import jwt
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core.config import settings
+from app.core.csrf import csrf_for_session
 from app.core.token import create_access_token
 from app.dependencies.auth import get_current_employee_id, get_current_token_payload
+
+
+def _request() -> Request:
+    """构造不带 Cookie 的普通 GET 请求，覆盖 Bearer 兼容路径。"""
+
+    return Request({"type": "http", "method": "GET", "headers": []})
 
 
 @pytest.mark.asyncio
@@ -23,7 +30,7 @@ async def test_current_token_payload_returns_token_payload() -> None:
         credentials=token,
     )
 
-    payload = await get_current_token_payload(credentials)
+    payload = await get_current_token_payload(_request(), credentials)
 
     assert payload["sub"] == "test-user"
 
@@ -34,7 +41,7 @@ async def test_current_token_payload_rejects_missing_credentials() -> None:
 
     # 直接调用依赖函数，精确验证异常类型和状态码。
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_token_payload(None)
+        await get_current_token_payload(_request(), None)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
@@ -52,7 +59,7 @@ async def test_current_token_payload_rejects_missing_expiration() -> None:
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_token_payload(credentials)
+        await get_current_token_payload(_request(), credentials)
 
     assert exc_info.value.status_code == 401
 
@@ -65,7 +72,7 @@ async def test_current_token_payload_rejects_expired_token() -> None:
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_token_payload(credentials)
+        await get_current_token_payload(_request(), credentials)
 
     assert exc_info.value.status_code == 401
 
@@ -82,9 +89,32 @@ async def test_current_token_payload_rejects_wrong_signature() -> None:
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_token_payload(credentials)
+        await get_current_token_payload(_request(), credentials)
 
     assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_cookie_auth_requires_matching_csrf_header_for_writes() -> None:
+    """浏览器自动携带 Cookie 时，修改请求必须再提供 CSRF 令牌。"""
+
+    token = create_access_token({"sub": "123"})
+    csrf = csrf_for_session(token)
+    cookie = f"marketflow_session={token}; marketflow_csrf={csrf}".encode()
+    request = Request({"type": "http", "method": "POST", "headers": [(b"cookie", cookie)]})
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_token_payload(request, None)
+    assert exc_info.value.status_code == 403
+
+    valid_request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "headers": [(b"cookie", cookie), (b"x-csrf-token", csrf.encode())],
+        }
+    )
+    payload = await get_current_token_payload(valid_request, None)
+    assert payload["sub"] == "123"
 
 
 @pytest.mark.asyncio

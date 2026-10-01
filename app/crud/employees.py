@@ -7,6 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.business_time import business_now
 from app.models.department import Department
 from app.models.employee import Employee
 from app.models.employee_detail import EmployeeDetail
@@ -45,7 +46,7 @@ async def create_employee(
         department_id=department_id,
         password_hash=password_hash,
         must_change_password=True,
-        detail=EmployeeDetail(hire_date=date.today()),
+        detail=EmployeeDetail(hire_date=business_now().date()),
     )
     db.add(new_employee)
 

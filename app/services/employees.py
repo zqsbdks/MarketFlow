@@ -1,10 +1,9 @@
 """员工管理业务逻辑。"""
 
-from datetime import date
-
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_time import business_now
 from app.core.security import hash_password
 from app.crud.auth import get_employee_by_id
 from app.crud.employees import (
@@ -503,7 +502,7 @@ async def update_employee_detail_service(
         )
 
     # 出生日期不能晚于今天，也不能晚于入职日期。
-    if request.birth_date > date.today() or request.birth_date > request.hire_date:
+    if request.birth_date > business_now().date() or request.birth_date > request.hire_date:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="出生日期不能晚于今天或入职日期",
@@ -542,7 +541,7 @@ async def update_employee_detail_service(
                 separation_date = employee_detail.separation_date
             # 状态改变或原日期也为空时，使用今天。
             if separation_date is None:
-                separation_date = date.today()
+                separation_date = business_now().date()
     # 有离职日期时才比较；离职可以和入职同一天，但不能更早。
     if separation_date is not None and separation_date < request.hire_date:
         raise HTTPException(

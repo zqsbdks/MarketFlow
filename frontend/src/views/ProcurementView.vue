@@ -26,6 +26,7 @@ import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
 import type { Category, Department, Purchase, Supplier, SupplierProduct } from '../types/api'
 import { formatMoney } from '../utils'
+import { promptTranslated } from '../i18n'
 
 type Tab = 'purchases' | 'catalog' | 'suppliers'
 
@@ -146,13 +147,13 @@ async function runAutoReceive() {
 }
 
 async function toggleSupplier(item: Supplier) {
-  const reason = window.prompt('状态修改理由（可不填写）') || undefined
+  const reason = promptTranslated('状态修改理由（可不填写）') || undefined
   try { await updateSupplierStatus(item.id, !item.is_active, reason); await loadAll() }
   catch (reason) { error.value = getErrorMessage(reason) }
 }
 
 async function toggleCatalog(item: SupplierProduct) {
-  const reason = window.prompt('状态修改理由（可不填写）') || undefined
+  const reason = promptTranslated('状态修改理由（可不填写）') || undefined
   try { await updateSupplierProductStatus(item.id, !item.is_active, reason); await loadAll() }
   catch (reason) { error.value = getErrorMessage(reason) }
 }

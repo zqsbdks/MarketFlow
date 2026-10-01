@@ -21,7 +21,6 @@ import type {
   EmployeeDetailUpdate,
   EmployeeListItem,
   EmployeeRole,
-  LoginResult,
   InventoryBatchDetail,
   InventoryBatchListItem,
   InventoryMovement,
@@ -47,7 +46,6 @@ import type {
 // region AI 聊天
 
 export async function sendAiChat(
-  apiKey: string,
   provider: AiProvider,
   model: string,
   messages: AiChatMessage[],
@@ -56,10 +54,27 @@ export async function sendAiChat(
     '/ai-chat',
     { provider, model: model || undefined, messages },
     {
-      headers: { 'X-AI-Api-Key': apiKey },
       timeout: 45_000,
     },
   )
+  return unwrap(response.data)
+}
+
+export async function getAiCredentialStatus(provider: AiProvider) {
+  const response = await http.get<ApiResponse<{ configured: boolean }>>(`/ai-chat/credentials/${provider}`)
+  return unwrap(response.data)
+}
+
+export async function saveAiCredential(provider: AiProvider, apiKey: string) {
+  const response = await http.put<ApiResponse<{ configured: boolean }>>(
+    `/ai-chat/credentials/${provider}`,
+    { api_key: apiKey },
+  )
+  return unwrap(response.data)
+}
+
+export async function deleteAiCredential(provider: AiProvider) {
+  const response = await http.delete<ApiResponse<{ configured: boolean }>>(`/ai-chat/credentials/${provider}`)
   return unwrap(response.data)
 }
 
@@ -80,11 +95,15 @@ export async function cancelAiAction(actionId: number) {
 // endregion
 
 export async function login(employeeNo: string, password: string) {
-  const response = await http.post<ApiResponse<LoginResult>>('/auth/login', {
+  const response = await http.post<ApiResponse<EmployeeIdentity>>('/auth/session', {
     employee_no: employeeNo,
     password,
   })
   return unwrap(response.data)
+}
+
+export async function logout() {
+  await http.post('/auth/logout')
 }
 
 export async function getMe() {

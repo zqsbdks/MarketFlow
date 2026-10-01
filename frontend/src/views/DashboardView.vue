@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
@@ -21,6 +21,7 @@ import LoadingBlock from '../components/LoadingBlock.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import type { DepartmentReport, OverviewReport, RankingItem } from '../types/api'
+import { theme } from '../theme'
 import { apiDateTime, createDefaultRange, formatMoney } from '../utils'
 
 use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
@@ -77,6 +78,7 @@ async function loadDashboard() {
 
 function renderChart() {
   if (!chartElement.value) return
+  const light = theme.value === 'light'
   chart ??= init(chartElement.value)
   chart.setOption({
     animationDuration: 700,
@@ -87,24 +89,26 @@ function renderChart() {
       data: departments.value.map((item) => item.department_name),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#8d929c', fontSize: 12 },
+      axisLabel: { color: light ? '#607062' : '#8d929c', fontSize: 12 },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: '#292c33' } },
-      axisLabel: { color: '#737883', formatter: (value: number) => `${value / 1000}k` },
+      splitLine: { lineStyle: { color: light ? '#e2e8df' : '#292c33' } },
+      axisLabel: { color: light ? '#607062' : '#737883', formatter: (value: number) => `${value / 1000}k` },
     },
     series: [
       {
         type: 'bar',
         data: departments.value.map((item) => Number(item.revenue)),
         barWidth: 28,
-        itemStyle: { color: '#c8ff5a', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: light ? '#729c2a' : '#c8ff5a', borderRadius: [3, 3, 0, 0] },
         emphasis: { itemStyle: { color: '#7887ff' } },
       },
     ],
   })
 }
+
+watch(theme, () => renderChart())
 
 function resizeChart() {
   chart?.resize()
@@ -147,7 +151,7 @@ onBeforeUnmount(() => {
         <article class="panel chart-panel">
           <div class="panel-heading">
             <div><p class="eyebrow">DEPARTMENT MIX</p><h2>部门营业额对比</h2></div>
-            <span class="panel-note">单位：元</span>
+            <span class="panel-note">单位：¥</span>
           </div>
           <div ref="chartElement" class="department-chart" />
           <div class="department-links">
