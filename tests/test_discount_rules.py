@@ -882,6 +882,7 @@ async def test_regular_employee_can_close_own_department_rule(monkeypatch) -> No
     update_status.assert_awaited_once_with(
         discount_rule_id=rule.id,
         is_active=False,
+        expected_version=1,
         db=db,
     )
     audit_log.assert_awaited_once()

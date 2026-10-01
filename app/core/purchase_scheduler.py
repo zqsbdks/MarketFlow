@@ -10,6 +10,7 @@ from datetime import datetime, time, timedelta
 
 from app.core.business_time import business_now
 from app.core.database import async_session_factory
+from app.core.distributed_lock import distributed_lock
 from app.crud.inventory_batches import refresh_inventory_batch_statuses
 from app.crud.products import StockInconsistency, get_stock_inconsistencies
 from app.crud.purchases import auto_receive_due_purchases
@@ -82,38 +83,46 @@ async def _wait_until(stop_event: asyncio.Event, run_time: datetime) -> bool:
 async def _run_auto_receive_once() -> int:
     """执行一次进货单自动签收，并提交本次数据库事务。"""
 
-    now = business_now()
-    cutoff = datetime.combine(now.date(), AUTO_RECEIVE_TIME)
-    if now < cutoff:
-        cutoff -= timedelta(days=1)
-    async with async_session_factory() as db:
-        try:
-            purchases = await auto_receive_due_purchases(
-                arrived_at=cutoff,
-                employee_id=None,
-                db=db,
-            )
-            await db.commit()
-            return len(purchases)
-        except Exception:
-            await db.rollback()
-            raise
+    async with distributed_lock("auto-receive", ttl_seconds=600) as acquired:
+        if not acquired:
+            logger.info("其他实例正在执行自动签收，本实例跳过")
+            return 0
+        now = business_now()
+        cutoff = datetime.combine(now.date(), AUTO_RECEIVE_TIME)
+        if now < cutoff:
+            cutoff -= timedelta(days=1)
+        async with async_session_factory() as db:
+            try:
+                purchases = await auto_receive_due_purchases(
+                    arrived_at=cutoff,
+                    employee_id=None,
+                    db=db,
+                )
+                await db.commit()
+                return len(purchases)
+            except Exception:
+                await db.rollback()
+                raise
 
 
 async def _run_batch_status_refresh_once() -> int:
     """根据新一天的日期刷新批次临期状态。"""
 
-    async with async_session_factory() as db:
-        try:
-            changed_batch_count = await refresh_inventory_batch_statuses(
-                current_date=business_now().date(),
-                db=db,
-            )
-            await db.commit()
-            return changed_batch_count
-        except Exception:
-            await db.rollback()
-            raise
+    async with distributed_lock("batch-status-refresh", ttl_seconds=600) as acquired:
+        if not acquired:
+            logger.info("其他实例正在刷新批次状态，本实例跳过")
+            return 0
+        async with async_session_factory() as db:
+            try:
+                changed_batch_count = await refresh_inventory_batch_statuses(
+                    current_date=business_now().date(),
+                    db=db,
+                )
+                await db.commit()
+                return changed_batch_count
+            except Exception:
+                await db.rollback()
+                raise
 
 
 async def _run_auto_receive_scheduler(stop_event: asyncio.Event) -> None:
@@ -153,8 +162,12 @@ async def _run_batch_status_scheduler(stop_event: asyncio.Event) -> None:
 async def _run_stock_consistency_check_once() -> list[StockInconsistency]:
     """只读查询商品总库存与批次库存不一致的数据。"""
 
-    async with async_session_factory() as db:
-        return await get_stock_inconsistencies(db=db)
+    async with distributed_lock("stock-consistency", ttl_seconds=1500) as acquired:
+        if not acquired:
+            logger.info("其他实例正在检查库存一致性，本实例跳过")
+            return []
+        async with async_session_factory() as db:
+            return await get_stock_inconsistencies(db=db)
 
 
 async def _run_stock_consistency_scheduler(stop_event: asyncio.Event) -> None:

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Boxes, Building2, PackageCheck, Pencil, Plus, RefreshCw, Truck } from '@lucide/vue'
 
 import {
@@ -46,6 +46,7 @@ const detailOpen = ref(false)
 const supplierOpen = ref(false)
 const catalogOpen = ref(false)
 const purchaseOpen = ref(false)
+const purchaseRequestId = ref(crypto.randomUUID())
 const supplierDetailOpen = ref(false)
 const catalogDetailOpen = ref(false)
 const supplierEditOpen = ref(false)
@@ -116,15 +117,26 @@ async function submitCatalog() {
 function addPurchaseLine() { purchaseForm.items.push({ supplier_product_id: '', quantity: 1 }) }
 function removePurchaseLine(index: number) { if (purchaseForm.items.length > 1) purchaseForm.items.splice(index, 1) }
 
+watch(
+  purchaseForm,
+  () => {
+    // 修改部门、商品或数量后视为新的创建请求；原样重试时仍使用同一个ID。
+    purchaseRequestId.value = crypto.randomUUID()
+  },
+  { deep: true },
+)
+
 async function submitPurchase() {
   saving.value = true; clearMessages()
   try {
     await createPurchase({
+      client_request_id: purchaseRequestId.value,
       department_id: Number(purchaseForm.department_id),
       items: purchaseForm.items.map((item) => ({
         supplier_product_id: Number(item.supplier_product_id), quantity: Number(item.quantity),
       })),
     })
+    purchaseRequestId.value = crypto.randomUUID()
     purchaseOpen.value = false; notice.value = '进货单创建成功'; await loadAll()
   } catch (reason) { error.value = getErrorMessage(reason) }
   finally { saving.value = false }

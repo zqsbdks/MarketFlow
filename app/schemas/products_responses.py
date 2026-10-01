@@ -50,6 +50,7 @@ class ProductsItemResponse(BaseModel):
     low_stock_threshold: int | None = Field(None, description="低库存预警阈值", ge=0)
     is_low_stock: bool = Field(..., description="可售库存是否达到低库存预警阈值")
     status: ProductStatus = Field(..., description="商品销售状态")
+    version: int = Field(..., description="乐观锁版本号", ge=1)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -106,6 +107,7 @@ class ItemResponse(BaseModel):
     expiry_warning_days: int | None = Field(None, description="临期提前提醒天数", ge=0)
     low_stock_threshold: int | None = Field(None, description="低库存预警阈值", ge=0)
     status: ProductStatus = Field(..., description="商品销售状态")
+    version: int = Field(..., description="乐观锁版本号", ge=1)
 
     model_config = ConfigDict(from_attributes=True)
 

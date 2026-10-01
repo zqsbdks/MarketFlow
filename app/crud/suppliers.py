@@ -1,8 +1,9 @@
 """供应商管理的数据访问函数。"""
 
-from sqlalchemy import Integer, cast, func, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.business_sequence import next_business_sequence
 from app.models.supplier import Supplier
 
 
@@ -107,15 +108,10 @@ async def update_supplier(
 
 # region 生成供应商编号
 async def get_next_supplier_no(db: AsyncSession) -> str:
-    """读取现有供应商编号中的最大数字，并生成下一个编号。"""
+    """使用数据库行锁计数器生成不重复的供应商编号。"""
 
-    # 从SUP00001的第4个字符开始截取00001，转成整数后取得最大值。
-    number_part = cast(func.substr(Supplier.supplier_no, 4), Integer)
-    statement = select(func.coalesce(func.max(number_part), 0))
-    current_max_number = int(await db.scalar(statement) or 0)
-
-    # :05d表示数字不足5位时在左侧补0，例如1会变成00001。
-    return f"SUP{current_max_number + 1:05d}"
+    next_number = await next_business_sequence("supplier", db)
+    return f"SUP{next_number:05d}"
 
 
 # endregion

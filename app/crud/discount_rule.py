@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.core.exceptions import ConcurrentUpdateError
+
 from app.models.discount_rule import DiscountRule
 from app.models.discount_rule_scope import DiscountRuleScope
 from app.models.enums import (
@@ -521,14 +523,19 @@ async def delete_discount_rules(
 async def update_discount_rule_status(
     discount_rule_id: int,
     is_active: bool,
+    expected_version: int,
     db: AsyncSession,
 ) -> None:
     """修改折扣规则的人工启停状态；事务提交由Service统一负责。"""
 
     statement = (
-        update(DiscountRule).where(DiscountRule.id == discount_rule_id).values(is_active=is_active)
+        update(DiscountRule)
+        .where(DiscountRule.id == discount_rule_id, DiscountRule.version == expected_version)
+        .values(is_active=is_active, version=DiscountRule.version + 1)
     )
-    await db.execute(statement)
+    result = await db.execute(statement)
+    if result.rowcount != 1:
+        raise ConcurrentUpdateError("折扣规则已被其他员工修改，请刷新后重试")
     await db.flush()
 
 
@@ -539,14 +546,19 @@ async def update_discount_rule_status(
 async def update_discount_rule(
     discount_rule_id: int,
     update_data: dict[str, object],
+    expected_version: int,
     db: AsyncSession,
 ) -> None:
     """修改折扣规则资料；事务提交由Service统一负责。"""
 
     statement = (
-        update(DiscountRule).where(DiscountRule.id == discount_rule_id).values(**update_data)
+        update(DiscountRule)
+        .where(DiscountRule.id == discount_rule_id, DiscountRule.version == expected_version)
+        .values(**update_data, version=DiscountRule.version + 1)
     )
-    await db.execute(statement)
+    result = await db.execute(statement)
+    if result.rowcount != 1:
+        raise ConcurrentUpdateError("折扣规则已被其他员工修改，请刷新后重试")
     await db.flush()
 
 

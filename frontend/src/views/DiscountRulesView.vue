@@ -167,6 +167,7 @@ const form = reactive<RuleFormState>(emptyRuleForm())
 const formMode = ref<'create' | 'edit'>('create')
 const formOpen = ref(false)
 const editingRuleId = ref<number | null>(null)
+const editingRuleVersion = ref<number | null>(null)
 
 function buildRulePayload(includeDepartment: boolean): DiscountRulePayload {
   const payload: DiscountRulePayload = {
@@ -185,6 +186,7 @@ function buildRulePayload(includeDepartment: boolean): DiscountRulePayload {
     payload.is_active = form.is_active
   } else {
     payload.reason = form.reason || undefined
+    payload.expected_version = editingRuleVersion.value ?? undefined
   }
   return payload
 }
@@ -192,6 +194,7 @@ function buildRulePayload(includeDepartment: boolean): DiscountRulePayload {
 function openCreateForm() {
   formMode.value = 'create'
   editingRuleId.value = null
+  editingRuleVersion.value = null
   Object.assign(form, emptyRuleForm())
   formOpen.value = true
 }
@@ -202,6 +205,7 @@ async function openEditForm(rule: DiscountRule) {
     const detail = await getDiscountRule(rule.id)
     formMode.value = 'edit'
     editingRuleId.value = detail.id
+    editingRuleVersion.value = detail.version
     Object.assign(form, {
       department_id: detail.department_id,
       name: detail.name,
@@ -268,7 +272,7 @@ async function toggleRule(rule: DiscountRule) {
   saving.value = true
   error.value = ''
   try {
-    await updateDiscountRuleStatus(rule.id, !rule.is_active, reason)
+    await updateDiscountRuleStatus(rule.id, !rule.is_active, rule.version, reason)
     successMessage.value = `已${actionName}折扣规则。`
     await loadRules()
   } catch (cause) {

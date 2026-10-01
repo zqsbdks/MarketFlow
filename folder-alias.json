@@ -755,8 +755,17 @@
     "alembic/versions/20261001_0020_ai_provider_credential.py": {
         "description": "创建员工AI密钥加密存储表迁移"
     },
+    "alembic/versions/20261001_0021_concurrency_safety.py": {
+        "description": "业务编号、乐观锁和重复提交保护数据库迁移"
+    },
     "app/core/business_time.py": {
         "description": "日本门店业务时间统一工具"
+    },
+    "app/core/business_sequence.py": {
+        "description": "并发安全的业务编号分配工具"
+    },
+    "app/core/distributed_lock.py": {
+        "description": "Redis跨进程定时任务分布式锁"
     },
     "app/core/csrf.py": {
         "description": "浏览器登录Cookie的CSRF校验工具"
@@ -766,6 +775,9 @@
     },
     "app/models/ai_provider_credential.py": {
         "description": "员工AI模型密钥加密存储ORM模型"
+    },
+    "app/models/business_sequence.py": {
+        "description": "业务编号计数器ORM模型"
     },
     "app/services/ai_credentials.py": {
         "description": "AI模型密钥加密保存、读取与删除业务逻辑"

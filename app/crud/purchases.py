@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.business_time import business_now
+from app.core.business_sequence import next_business_sequence
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole, InventoryBatchStatus, ProductStatus, PurchaseStatus
@@ -119,6 +120,17 @@ async def get_purchase_by_id(
     return result.scalar_one_or_none()
 
 
+async def get_purchase_by_client_request_id(
+    client_request_id: str, db: AsyncSession
+) -> Purchase | None:
+    """按客户端幂等ID查询已创建的进货单。"""
+
+    result = await db.execute(
+        select(Purchase).where(Purchase.client_request_id == client_request_id)
+    )
+    return result.scalar_one_or_none()
+
+
 # endregion
 
 
@@ -135,14 +147,10 @@ async def create_purchase(
     expected_arrival_at = ordered_at + timedelta(days=2)
 
     # 进货单号格式为 PUR + 下单日期 + 当天四位流水号，例如 PUR202609130001。
-    # substr(..., 12) 从编号第 12 个字符开始取出最后四位流水号。
+    # 计数器行会被数据库锁定，因此多人同时创建也不会取得重复编号。
     purchase_no_prefix = f"PUR{ordered_at:%Y%m%d}"
-    number_part = cast(func.substr(Purchase.purchase_no, 12), Integer)
-    number_statement = select(func.coalesce(func.max(number_part), 0)).where(
-        Purchase.purchase_no.like(f"{purchase_no_prefix}%")
-    )
-    current_max_number = int(await db.scalar(number_statement) or 0)
-    purchase_no = f"{purchase_no_prefix}{current_max_number + 1:04d}"
+    next_number = await next_business_sequence(f"purchase:{ordered_at:%Y%m%d}", db)
+    purchase_no = f"{purchase_no_prefix}{next_number:04d}"
 
     # 一次查询取得请求中使用的所有供应商商品，避免在循环里重复访问数据库。
     supplier_product_ids = [item.supplier_product_id for item in purchase.items]
@@ -219,6 +227,7 @@ async def create_purchase(
     # 将明细对象放入 relationship，SQLAlchemy 会在写入主表后自动填写 purchase_id。
     new_purchase = Purchase(
         purchase_no=purchase_no,
+        client_request_id=(str(purchase.client_request_id) if purchase.client_request_id else None),
         department_id=purchase.department_id,
         created_by=created_by,
         received_by=None,
@@ -414,5 +423,6 @@ __all__ = [
     "auto_receive_due_purchases",
     "create_purchase",
     "get_all_purchases",
+    "get_purchase_by_client_request_id",
     "get_purchase_by_id",
 ]

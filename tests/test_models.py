@@ -69,6 +69,7 @@ EXPECTED_COLUMNS = {
         "stock_quantity",
         "expiry_warning_days",
         "low_stock_threshold",
+        "version",
         "status",
         "created_at",
         "updated_at",
@@ -76,6 +77,7 @@ EXPECTED_COLUMNS = {
     "sale": {
         "id",
         "sale_no",
+        "client_request_id",
         "sold_at",
         "original_total_amount",
         "discount_amount",
@@ -119,6 +121,7 @@ EXPECTED_COLUMNS = {
     "purchase": {
         "id",
         "purchase_no",
+        "client_request_id",
         "department_id",
         "created_by",
         "received_by",
@@ -199,6 +202,7 @@ EXPECTED_COLUMNS = {
         "created_by",
         "created_at",
         "updated_at",
+        "version",
     },
     "discount_rule_scope": {
         "id",
@@ -231,6 +235,12 @@ EXPECTED_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "business_sequence": {
+        "sequence_key",
+        "current_value",
+        "created_at",
+        "updated_at",
+    },
 }
 
 EXPECTED_TABLE_COMMENTS = {
@@ -251,6 +261,7 @@ EXPECTED_TABLE_COMMENTS = {
     "discount_rule_scope": "折扣规则适用范围表",
     "ai_pending_action": "AI待确认操作表",
     "ai_provider_credential": "员工AI模型密钥表",
+    "business_sequence": "业务编号计数器表",
 }
 
 
@@ -417,7 +428,7 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """AI待确认操作表迁移是当前唯一的Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20261001_0020"]
+    assert script.get_heads() == ["20261001_0021"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

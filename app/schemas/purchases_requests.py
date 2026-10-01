@@ -1,6 +1,7 @@
 """进货管理接口的请求模型。"""
 
 from datetime import date
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -65,6 +66,7 @@ class CreatePurchaseRequest(BaseModel):
         description="进货商品明细，至少包含一项",
         min_length=1,
     )
+    client_request_id: UUID | None = Field(None, description="客户端生成的幂等请求ID")
 
 
 # endregion

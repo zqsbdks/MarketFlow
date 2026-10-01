@@ -5,11 +5,18 @@ from decimal import Decimal
 
 from fastapi import HTTPException
 from fastapi import status as http_status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.business_time import business_now
 from app.crud.auth import get_employee_by_id
-from app.crud.sales import InsufficientStockError, create_sale, get_sales_detail, get_sales_list
+from app.crud.sales import (
+    InsufficientStockError,
+    create_sale,
+    get_sale_by_client_request_id,
+    get_sales_detail,
+    get_sales_list,
+)
 from app.models.discount_rule import DiscountRule
 from app.models.enums import DiscountType, ProductStatus
 from app.models.sale import Sale
@@ -295,6 +302,13 @@ async def create_sale_service(
             detail="请先修改初始密码",
         )
 
+    # 相同幂等ID已完成结账时直接返回原小票，避免双击按钮重复扣减库存。
+    request_id = str(request.client_request_id) if request.client_request_id else None
+    if request_id:
+        existing_sale = await get_sale_by_client_request_id(request_id, db)
+        if existing_sale is not None:
+            return _build_sale_detail_response(existing_sale)
+
     # 第二步：销售时间由服务器生成，前端不能伪造历史销售时间。
     sold_at = business_now()
     if not BUSINESS_OPENING_TIME <= sold_at.time() <= BUSINESS_CLOSING_TIME:
@@ -333,6 +347,7 @@ async def create_sale_service(
             applied_discount_rules=applied_discount_rules,
             sold_at=sold_at,
             employee_id=current_employee_id,
+            client_request_id=request_id,
             db=db,
         )
         await db.commit()
@@ -356,6 +371,16 @@ async def create_sale_service(
                 f"商品“{exc.product_name}”可销售库存不足："
                 f"需要{exc.requested}件，当前只有{exc.available}件"
             ),
+        ) from exc
+    except IntegrityError as exc:
+        await db.rollback()
+        if request_id:
+            existing_sale = await get_sale_by_client_request_id(request_id, db)
+            if existing_sale is not None:
+                return _build_sale_detail_response(existing_sale)
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="销售请求重复或销售单号冲突，请刷新后重试",
         ) from exc
     except Exception:
         # 未预料的数据库或程序异常同样必须回滚，不能留下部分扣减的数据。

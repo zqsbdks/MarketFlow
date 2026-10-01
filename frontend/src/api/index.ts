@@ -196,10 +196,12 @@ export async function updateProduct(productId: number, payload: Record<string, u
 export async function updateProductStatus(
   productId: number,
   status: 'on_sale' | 'stopped',
+  expectedVersion: number,
   reason?: string,
 ) {
   const response = await http.put<ApiResponse<ProductDetail>>(`/products/${productId}/status`, {
     status,
+    expected_version: expectedVersion,
     reason: reason || undefined,
   })
   return unwrap(response.data)
@@ -267,8 +269,11 @@ export async function getSale(saleNo: string) {
   return unwrap(response.data)
 }
 
-export async function createSale(items: CreateSaleItem[]) {
-  const response = await http.post<ApiResponse<SaleDetail>>('/sales', { items })
+export async function createSale(items: CreateSaleItem[], clientRequestId: string) {
+  const response = await http.post<ApiResponse<SaleDetail>>('/sales', {
+    items,
+    client_request_id: clientRequestId,
+  })
   return unwrap(response.data)
 }
 
@@ -314,12 +319,14 @@ export async function updateDiscountRule(ruleId: number, payload: DiscountRulePa
 export async function updateDiscountRuleStatus(
   ruleId: number,
   isActive: boolean,
+  expectedVersion: number,
   reason?: string,
 ) {
   return unwrap(
     (
       await http.patch<ApiResponse<DiscountRule>>(`/discount-rules/${ruleId}/status`, {
         is_active: isActive,
+        expected_version: expectedVersion,
         reason: reason || undefined,
       })
     ).data,

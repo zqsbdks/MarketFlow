@@ -45,6 +45,7 @@ class ProductStatusUpdateRequest(BaseModel):
         description="商品销售状态：on_sale为上架，stopped为停售",
     )
     reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
+    expected_version: int | None = Field(None, description="前端读取商品时取得的版本号", ge=1)
 
 
 # endregion
@@ -89,6 +90,7 @@ class UpdateProductRequest(BaseModel):
         ge=0,
     )
     reason: str | None = Field(None, description="修改理由，可不填写", max_length=255)
+    expected_version: int | None = Field(None, description="前端读取商品时取得的版本号", ge=1)
 
     # 自动去除字符串首尾空格，避免把“ 牛肉 ”保存为带空格的商品名称。
     model_config = ConfigDict(str_strip_whitespace=True)

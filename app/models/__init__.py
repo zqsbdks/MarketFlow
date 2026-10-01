@@ -8,6 +8,7 @@ Alembic 只会看到导入进 ``Base.metadata`` 的模型。新增模型后，�
 from app.models.ai_pending_action import AiPendingAction
 from app.models.ai_provider_credential import AiProviderCredential
 from app.models.base import Base
+from app.models.business_sequence import BusinessSequence
 from app.models.category import Category
 from app.models.department import Department
 from app.models.discount_rule import DiscountRule
@@ -46,6 +47,7 @@ __all__ = [
     "AiPendingAction",
     "AiProviderCredential",
     "Base",
+    "BusinessSequence",
     "Category",
     "Department",
     "DiscountRule",

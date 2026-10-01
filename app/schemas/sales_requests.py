@@ -1,6 +1,7 @@
 """销售记录接口的请求模型。"""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,6 +48,7 @@ class CreateSaleRequest(BaseModel):
 
     # 一张销售单至少需要一个商品；同一商品重复出现时由 Service 自动合并数量。
     items: list[CreateSaleItemRequest] = Field(..., description="销售商品", min_length=1)
+    client_request_id: UUID | None = Field(None, description="客户端生成的幂等请求ID")
 
 
 # endregion

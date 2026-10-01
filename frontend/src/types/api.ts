@@ -163,6 +163,7 @@ export interface ProductListItem {
   low_stock_threshold: number | null
   is_low_stock: boolean
   status: ProductStatus
+  version: number
 }
 
 export interface ProductDetail {
@@ -177,6 +178,7 @@ export interface ProductDetail {
   expiry_warning_days?: number | null
   low_stock_threshold: number | null
   status: ProductStatus
+  version: number
 }
 
 export interface DiscountRule {
@@ -198,6 +200,7 @@ export interface DiscountRule {
   created_by_name: string
   created_at: string
   updated_at: string
+  version: number
 }
 
 export interface DiscountRuleProduct {
@@ -231,6 +234,7 @@ export interface DiscountRulePayload {
   weekdays: number[] | null
   is_active?: boolean
   reason?: string
+  expected_version?: number
 }
 
 export type InventoryBatchStatus = 'available' | 'near_expiry' | 'expired' | 'sold_out'

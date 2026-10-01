@@ -134,6 +134,7 @@ class UpdateDiscountRuleStatusRequest(BaseModel):
     """开启或关闭折扣规则时提交的数据。"""
 
     is_active: bool = Field(..., description="true表示开启，false表示关闭")
+    expected_version: int | None = Field(None, ge=1, description="前端读取规则时取得的版本号")
     reason: str | None = Field(
         None,
         min_length=1,
@@ -152,6 +153,7 @@ class UpdateDiscountRuleRequest(BaseModel):
     """修改折扣规则配置时提交的可选字段。"""
 
     name: str | None = Field(None, min_length=1, max_length=100, description="折扣规则名称")
+    expected_version: int | None = Field(None, ge=1, description="前端读取规则时取得的版本号")
     discount_type: DiscountType | None = Field(None, description="折扣计算方式")
     discount_value: Decimal | None = Field(
         None,

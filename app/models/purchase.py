@@ -53,6 +53,9 @@ class Purchase(TimestampMixin, Base):
         unique=True,
         comment="进货单号",
     )
+    client_request_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, unique=True, comment="客户端幂等请求ID"
+    )
     # 一张进货单只属于一个部门，明细商品也必须属于这个部门。
     department_id: Mapped[int] = mapped_column(
         BigInteger,

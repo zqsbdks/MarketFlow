@@ -15,6 +15,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Time,
@@ -148,6 +149,13 @@ class DiscountRule(TimestampMixin, Base):
         default=True,
         server_default=text("1"),
         comment="折扣规则是否启用",
+    )
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
+        comment="乐观锁版本号",
     )
     created_by: Mapped[int] = mapped_column(
         BigInteger,

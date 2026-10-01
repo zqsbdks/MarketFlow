@@ -4,6 +4,8 @@ from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
+
+from app.core.exceptions import ConcurrentUpdateError
 from sqlalchemy.sql.selectable import Subquery
 
 from app.models.enums import InventoryBatchStatus, ProductStatus
@@ -322,6 +324,7 @@ async def update_product(
     product_id: int,
     # update_data：经过 Service 校验后，真正需要写入数据库的字段和值。
     update_data: dict[str, object],
+    expected_version: int,
     # db：当前请求的异步数据库会话；CRUD 不在这里提交事务。
     db: AsyncSession,
 ) -> Product:
@@ -329,11 +332,17 @@ async def update_product(
 
     # 第一步：创建 UPDATE 语句。
     # update_data 已由 Service 使用 exclude_unset=True 过滤，只包含前端传入的字段。
-    update_statement = update(Product).where(Product.id == product_id).values(**update_data)
+    update_statement = (
+        update(Product)
+        .where(Product.id == product_id, Product.version == expected_version)
+        .values(**update_data, version=Product.version + 1)
+    )
 
     # 第二步：把 UPDATE 语句发送给数据库。
     # 此处不调用 commit，由 Service 在全部业务操作成功后统一提交。
-    await db.execute(update_statement)
+    result = await db.execute(update_statement)
+    if result.rowcount != 1:
+        raise ConcurrentUpdateError("商品资料已被其他员工修改，请刷新后重试")
 
     # 第三步：重新查询修改后的商品。
     # UPDATE 只能修改商品表，selectinload 不能放在 UPDATE 上加载关联对象。

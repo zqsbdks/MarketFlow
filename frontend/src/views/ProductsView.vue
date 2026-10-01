@@ -114,6 +114,7 @@ async function submitEdit() {
       low_stock_threshold:
         editForm.low_stock_threshold === '' ? null : editForm.low_stock_threshold,
       reason: editForm.reason || undefined,
+      expected_version: detail.value.version,
     })
     editOpen.value = false
     notice.value = '商品资料修改成功。'
@@ -130,7 +131,12 @@ async function toggleDetailStatus() {
   const nextStatus: ProductStatus = detail.value.status === 'on_sale' ? 'stopped' : 'on_sale'
   const reason = promptTranslated(`请输入${nextStatus === 'on_sale' ? '上架' : '停售'}理由（可不填）`) || undefined
   try {
-    detail.value = await updateProductStatus(detail.value.id, nextStatus, reason)
+    detail.value = await updateProductStatus(
+      detail.value.id,
+      nextStatus,
+      detail.value.version,
+      reason,
+    )
     notice.value = `商品已${nextStatus === 'on_sale' ? '上架' : '停售'}。`
     await loadProducts()
   } catch (cause) {

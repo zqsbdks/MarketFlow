@@ -11,7 +11,12 @@ from app.core.business_time import business_now
 from app.crud.auth import get_employee_by_id
 from app.crud.employees import get_department_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
-from app.crud.purchases import auto_receive_due_purchases, get_all_purchases, get_purchase_by_id
+from app.crud.purchases import (
+    auto_receive_due_purchases,
+    get_all_purchases,
+    get_purchase_by_client_request_id,
+    get_purchase_by_id,
+)
 from app.crud.purchases import create_purchase as create_purchase_crud
 from app.models.enums import EmployeeRole, PurchaseStatus
 from app.schemas.purchases_requests import CreatePurchaseRequest
@@ -193,6 +198,16 @@ async def create_purchase_service(
 ) -> PurchaseDetailResponse:
     """校验请求并创建进货单，最后返回完整的进货单详情。"""
 
+    request_id = str(purchase.client_request_id) if purchase.client_request_id else None
+    if request_id:
+        existing_purchase = await get_purchase_by_client_request_id(request_id, db)
+        if existing_purchase is not None:
+            return await get_purchase_detail_service(
+                purchase_id=existing_purchase.id,
+                current_employee_id=current_employee_id,
+                db=db,
+            )
+
     # current_employee_id 是当前登录员工的 ID，先确认该账号仍可正常使用。
     current_employee = await get_employee_by_id(db=db, employee_id=current_employee_id)
     if current_employee is None:
@@ -320,6 +335,14 @@ async def create_purchase_service(
     except IntegrityError as error:
         # 自动生成的进货单号发生唯一键冲突时，撤销本次事务。
         await db.rollback()
+        if request_id:
+            existing_purchase = await get_purchase_by_client_request_id(request_id, db)
+            if existing_purchase is not None:
+                return await get_purchase_detail_service(
+                    purchase_id=existing_purchase.id,
+                    current_employee_id=current_employee_id,
+                    db=db,
+                )
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
             detail="进货单号冲突，请重新提交",

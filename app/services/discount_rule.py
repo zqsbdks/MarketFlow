@@ -132,6 +132,7 @@ def _build_discount_rule_list_item(
         created_by_name=rule.creator.name,
         created_at=rule.created_at,
         updated_at=rule.updated_at,
+        version=rule.version or 1,
     )
 
 
@@ -1091,7 +1092,9 @@ async def update_discount_rule_service(
             )
 
     # exclude_unset=True只保留前端实际传入的字段；reason只写入审计表，不更新规则表。
-    requested_data = request.model_dump(exclude_unset=True, exclude={"reason"})
+    requested_data = request.model_dump(
+        exclude_unset=True, exclude={"reason", "expected_version"}
+    )
     if not requested_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -1262,6 +1265,7 @@ async def update_discount_rule_service(
         await update_discount_rule(
             discount_rule_id=discount_rule_id,
             update_data=update_data,
+            expected_version=request.expected_version or rule.version or 1,
             db=db,
         )
         await create_operation_audit_log(
@@ -1355,6 +1359,7 @@ async def update_discount_rule_status_service(
         await update_discount_rule_status(
             discount_rule_id=discount_rule_id,
             is_active=request.is_active,
+            expected_version=request.expected_version or rule.version or 1,
             db=db,
         )
         await create_operation_audit_log(

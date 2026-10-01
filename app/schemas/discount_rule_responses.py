@@ -35,6 +35,7 @@ class DiscountRuleListItemResponse(BaseModel):
     created_by_name: str = Field(..., min_length=1, max_length=50, description="创建员工姓名")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
+    version: int = Field(..., ge=1, description="乐观锁版本号")
 
 
 # endregion

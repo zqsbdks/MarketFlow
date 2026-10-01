@@ -105,6 +105,7 @@ async def get_products_list_service(
                 low_stock_threshold=product.low_stock_threshold,
                 is_low_stock=is_low_stock,
                 status=product.status,
+                    version=product.version or 1,
             )
         )
 
@@ -162,6 +163,8 @@ async def get_product_detail_service(
 
     # ItemResponse 配置了 from_attributes=True，因此可以直接从 Product ORM
     # 对象读取同名属性；嵌套的 department 和 category 也会自动转换。
+    if product.version is None:
+        product.version = 1
     return ItemResponse.model_validate(product)
 
 
@@ -243,6 +246,7 @@ async def update_product_status_service(
     updated_product = await update_product(
         product_id=product_id,
         update_data={"status": request.status},
+        expected_version=request.expected_version or product.version or 1,
         db=db,
     )
 
@@ -262,6 +266,8 @@ async def update_product_status_service(
     await db.commit()
 
     # 第七步：返回与商品详情、商品资料修改接口相同的响应结构。
+    if updated_product.version is None:
+        updated_product.version = 1
     return ItemResponse.model_validate(updated_product)
 
 
@@ -339,7 +345,9 @@ async def update_product_service(
 
     # 第五步：把 Pydantic 请求模型转换成字典。
     # exclude_unset=True 表示只保留前端实际传入的字段，未传字段不会覆盖数据库原值。
-    update_data = request.model_dump(exclude_unset=True, exclude={"reason"})
+    update_data = request.model_dump(
+        exclude_unset=True, exclude={"reason", "expected_version"}
+    )
     if not update_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -390,6 +398,7 @@ async def update_product_service(
     updated_product = await update_product(
         product_id=product_id,
         update_data=update_data,
+        expected_version=request.expected_version or product.version or 1,
         db=db,
     )
 
@@ -410,6 +419,8 @@ async def update_product_service(
 
     # 第十步：将 Product ORM 对象转换成接口声明的 ItemResponse 响应模型。
     # from_attributes=True 允许 Pydantic 读取 Product、department 和 category 的属性。
+    if updated_product.version is None:
+        updated_product.version = 1
     return ItemResponse.model_validate(updated_product)
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.business_time import business_now
+from app.core.business_sequence import next_business_sequence
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.discount_rule import DiscountRule
 from app.models.enums import InventoryBatchStatus, ProductStatus, SaleSource
@@ -90,6 +91,7 @@ async def create_sale(
     sold_at: datetime,
     # employee_id：实际执行收银操作的员工 ID，用于审计记录。
     employee_id: int,
+    client_request_id: str | None,
     # db：当前请求共用的数据库会话；本函数只 flush，不负责 commit。
     db: AsyncSession,
 ) -> Sale:
@@ -255,13 +257,11 @@ async def create_sale(
 
     # 第六步：生成当天递增销售单号，例如 S202609170001。
     sale_no_prefix = f"S{sold_at:%Y%m%d}"
-    latest_sale_no = await db.scalar(
-        select(func.max(Sale.sale_no)).where(Sale.sale_no.like(f"{sale_no_prefix}%"))
-    )
-    next_number = int(latest_sale_no[-4:]) + 1 if latest_sale_no else 1
+    next_number = await next_business_sequence(f"sale:{sold_at:%Y%m%d}", db)
     # 第七步：创建销售主表；items relationship 会自动给明细填写 sale_id。
     sale = Sale(
         sale_no=f"{sale_no_prefix}{next_number:04d}",
+        client_request_id=client_request_id,
         sold_at=sold_at,
         original_total_amount=original_total_amount,
         discount_amount=total_discount_amount,
@@ -326,12 +326,26 @@ async def get_sales_detail(
     return detail_result
 
 
+async def get_sale_by_client_request_id(
+    client_request_id: str, db: AsyncSession
+) -> Sale | None:
+    """按客户端幂等ID查询已完成的销售单。"""
+
+    statement = (
+        select(Sale)
+        .where(Sale.client_request_id == client_request_id)
+        .options(selectinload(Sale.items))
+    )
+    return await db.scalar(statement)
+
+
 # endregion
 
 
 __all__ = [
     "InsufficientStockError",
     "create_sale",
+    "get_sale_by_client_request_id",
     "get_sales_detail",
     "get_sales_list",
 ]

@@ -21,6 +21,10 @@ from app.schemas import ResponseModel
 logger = logging.getLogger(__name__)  # 获取当前模块的日志记录器。
 
 
+class ConcurrentUpdateError(Exception):
+    """客户端基于旧版本提交修改时抛出的乐观锁冲突。"""
+
+
 # ----------------------------------------------------------------------
 # 1. 核心异常响应生成器 (单点控制 JSON 结构与序列化)
 # ----------------------------------------------------------------------
@@ -155,6 +159,17 @@ async def integrity_error_handler(request: Request, exc: Exception) -> JSONRespo
     )
 
 
+async def concurrent_update_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """返回409，提示前端刷新最新资料后重新修改。"""
+
+    assert isinstance(exc, ConcurrentUpdateError)
+    return create_exception_response(
+        status_code=status.HTTP_409_CONFLICT,
+        message=str(exc),
+        error_data=None,
+    )
+
+
 async def sqlalchemy_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """处理通用的 SQLAlchemy 数据库查询异常。
 
@@ -234,6 +249,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     # 注册数据库完整性异常处理器。
     app.add_exception_handler(IntegrityError, integrity_error_handler)
+    app.add_exception_handler(ConcurrentUpdateError, concurrent_update_error_handler)
     # 注册通用数据库异常处理器。
     app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
     # 注册未知异常兜底处理器。

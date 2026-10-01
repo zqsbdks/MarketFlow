@@ -60,6 +60,9 @@ class Sale(CreatedAtMixin, Base):
         comment="销售单主键",
     )
     sale_no: Mapped[str] = mapped_column(String(30), nullable=False, comment="销售单号")
+    client_request_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, unique=True, comment="客户端幂等请求ID"
+    )
     sold_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

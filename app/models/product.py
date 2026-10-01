@@ -122,6 +122,9 @@ class Product(TimestampMixin, Base):
         nullable=True,
         comment="低库存预警阈值",
     )
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default=text("1"), comment="乐观锁版本号"
+    )
     status: Mapped[ProductStatus] = mapped_column(
         Enum(
             ProductStatus,

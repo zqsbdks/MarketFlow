@@ -20,6 +20,7 @@ import { formatDateTime, formatMoney } from '../utils'
 const products = ref<ProductListItem[]>([])
 const selectedProductId = ref<number | ''>('')
 const cart = ref<Array<{ product: ProductListItem; quantity: number }>>([])
+const checkoutRequestId = ref(crypto.randomUUID())
 const pricePreview = ref<SalePricePreview | null>(null)
 const completedSale = ref<SaleDetail | null>(null)
 const receiptOpen = ref(false)
@@ -174,7 +175,8 @@ async function checkout() {
     for (const item of cart.value) {
       requestItems.push({ product_id: item.product.id, quantity: item.quantity })
     }
-    completedSale.value = await createSale(requestItems)
+    completedSale.value = await createSale(requestItems, checkoutRequestId.value)
+    checkoutRequestId.value = crypto.randomUUID()
     cart.value = []
     selectedProductId.value = ''
     scanMessage.value = '结账成功，可以开始下一次模拟购物。'
@@ -189,7 +191,15 @@ async function checkout() {
 // endregion
 
 
-watch(cart, refreshPricePreview, { deep: true })
+watch(
+  cart,
+  () => {
+    // 购物车内容变化代表新的结账意图；内容不变的网络重试继续复用原ID。
+    checkoutRequestId.value = crypto.randomUUID()
+    void refreshPricePreview()
+  },
+  { deep: true },
+)
 onMounted(loadProducts)
 </script>
 
