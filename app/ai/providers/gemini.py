@@ -20,6 +20,26 @@ class GeminiProvider(AiProviderAdapter):
     name = "gemini"
     default_model = "gemini-3.5-flash-lite"
 
+    # region Gemini工具定义适配
+    def _build_tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """将公共JSON Schema放入Gemini专用的parametersJsonSchema字段。"""
+
+        declarations: list[dict[str, Any]] = []
+        for tool in tools:
+            # Pydantic生成的是JSON Schema，包含$defs、$ref、anyOf等结构。
+            # Gemini的parameters使用另一种Schema格式，不能直接接收这些内容。
+            # parametersJsonSchema才是官方接收JSON Schema的字段；两者不能同时传。
+            declarations.append(
+                {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parametersJsonSchema": tool["parameters"],
+                }
+            )
+        return [{"functionDeclarations": declarations}]
+
+    # endregion
+
     def _build_contents(self, messages: list[AiChatMessageRequest]) -> list[dict[str, Any]]:
         """Gemini 使用 model 角色，因此项目历史消息可以直接映射。"""
 
@@ -78,7 +98,7 @@ class GeminiProvider(AiProviderAdapter):
         payload = {
             "systemInstruction": {"parts": [{"text": system_instruction}]},
             "contents": self._build_contents(messages),
-            "tools": [{"functionDeclarations": tools}],
+            "tools": self._build_tools(tools),
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1000},
         }
         response = await post_json(
@@ -125,7 +145,7 @@ class GeminiProvider(AiProviderAdapter):
         payload = {
             "systemInstruction": {"parts": [{"text": system_instruction}]},
             "contents": contents,
-            "tools": [{"functionDeclarations": tools}],
+            "tools": self._build_tools(tools),
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1000},
         }
         response = await post_json(

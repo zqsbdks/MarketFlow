@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.action_registry import (
     ACTION_NAMES,
-    BusinessActionArguments,
+    ACTION_PARAMETER_MODELS,
     build_business_action_summary,
     validate_business_action,
 )
@@ -298,21 +298,131 @@ MARKETFLOW_TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "description": "提出上架或停售一个商品。只生成待确认操作，绝不直接修改数据库。",
         "parameters": ProductStatusArguments.model_json_schema(),
     },
-    {
-        "name": "prepare_business_action",
-        "description": (
-            "提出其他MarketFlow数据变更，只生成待确认卡片，用户确认后才执行。"
-            "action_type可选值及含义："
-            + "；".join(f"{code}={name}" for code, name in ACTION_NAMES.items())
-            + "。payload必须提供对应接口所需的完整参数和目标ID。常用结构："
-            "修改操作包含对应的product_id、supplier_id、supplier_product_id、employee_id或"
-            "discount_rule_id；状态修改再带is_active或status；添加折扣商品带product_ids；"
-            "创建进货单带department_id和items；创建销售单带items；创建折扣带department_id、"
-            "name、discount_type、discount_value、schedule_type及该周期所需时间。"
-        ),
-        "parameters": BusinessActionArguments.model_json_schema(),
-    },
+    *[
+        {
+            "name": f"prepare_{action_type}",
+            "description": (
+                f"提出{ACTION_NAMES[action_type]}。只生成待确认卡片，用户确认后才执行。"
+            ),
+            "parameters": parameter_model.model_json_schema(),
+        }
+        for action_type, parameter_model in ACTION_PARAMETER_MODELS.items()
+    ],
 ]
+
+TOOL_DEFINITIONS_BY_NAME = {
+    definition["name"]: definition for definition in MARKETFLOW_TOOL_DEFINITIONS
+}
+
+DEFAULT_TOOL_NAMES = {
+    "search_products",
+    "list_inventory_batches",
+    "list_purchases",
+    "get_sales_overview",
+}
+
+TOOL_GROUPS: tuple[tuple[tuple[str, ...], set[str]], ...] = (
+    (
+        ("库存", "批次", "临期", "过期", "商品", "stock", "inventory", "product"),
+        {
+            "search_products",
+            "list_inventory_batches",
+            "get_inventory_batch",
+            "list_categories",
+            "list_departments",
+            "prepare_inventory_adjustment",
+            "prepare_discard_expired_batch",
+            "prepare_product_status_update",
+            "prepare_update_product_details",
+        },
+    ),
+    (
+        ("供应商", "供货商", "供货目录", "supplier"),
+        {
+            "list_suppliers",
+            "get_supplier",
+            "list_supplier_products",
+            "get_supplier_product",
+            "list_categories",
+            "list_departments",
+            "prepare_create_supplier",
+            "prepare_update_supplier",
+            "prepare_update_supplier_status",
+            "prepare_create_supplier_product",
+            "prepare_update_supplier_product",
+            "prepare_update_supplier_product_status",
+        },
+    ),
+    (
+        ("进货", "采购", "到货", "purchase", "procurement"),
+        {
+            "list_purchases",
+            "get_purchase",
+            "list_supplier_products",
+            "get_supplier_product",
+            "list_departments",
+            "prepare_create_purchase",
+        },
+    ),
+    (
+        ("销售", "收银", "购物车", "营业", "sale", "checkout"),
+        {
+            "search_products",
+            "get_sales_overview",
+            "prepare_create_sale",
+        },
+    ),
+    (
+        ("员工", "店长", "正式员工", "契约工", "employee"),
+        {
+            "list_employees",
+            "get_employee",
+            "list_departments",
+            "prepare_create_employee",
+            "prepare_update_employee_status",
+            "prepare_update_employee_details",
+        },
+    ),
+    (
+        ("折扣", "打折", "优惠", "discount"),
+        {
+            "list_discount_rules",
+            "get_discount_rule",
+            "list_discount_products",
+            "search_products",
+            "list_categories",
+            "list_departments",
+            "prepare_create_discount_rule",
+            "prepare_add_discount_products",
+            "prepare_remove_discount_product",
+            "prepare_clear_discount_products",
+            "prepare_update_discount_rule",
+            "prepare_update_discount_status",
+            "prepare_delete_discount_rule",
+            "prepare_clear_discount_rules",
+        },
+    ),
+)
+
+
+def select_marketflow_tools(user_message: str) -> list[dict[str, Any]]:
+    """根据本轮问题选择相关工具，避免向模型一次发送过多函数定义。"""
+
+    normalized_message = user_message.casefold()
+    selected_names: set[str] = set()
+    for keywords, group_names in TOOL_GROUPS:
+        if any(keyword.casefold() in normalized_message for keyword in keywords):
+            selected_names.update(group_names)
+
+    if not selected_names:
+        selected_names.update(DEFAULT_TOOL_NAMES)
+
+    # 保持主定义列表中的固定顺序，便于测试和排查供应商请求。
+    return [
+        definition
+        for definition in MARKETFLOW_TOOL_DEFINITIONS
+        if definition["name"] in selected_names
+    ]
 
 
 # endregion
@@ -686,20 +796,19 @@ async def execute_marketflow_tool(
                 },
                 pending_action=action,
             )
-        if name == "prepare_business_action":
-            business_values = BusinessActionArguments.model_validate(arguments)
-            action_arguments = validate_business_action(
-                business_values.action_type,
-                business_values.payload,
-            )
+        if name.startswith("prepare_"):
+            action_type = name.removeprefix("prepare_")
+            if action_type not in ACTION_PARAMETER_MODELS:
+                raise ValueError("该业务操作尚未向AI开放")
+            action_arguments = validate_business_action(action_type, arguments)
             summary = build_business_action_summary(
-                business_values.action_type,
+                action_type,
                 action_arguments,
             )
             action = await create_ai_pending_action(
                 employee_id=employee_id,
                 provider=provider,
-                action_type=business_values.action_type,
+                action_type=action_type,
                 arguments=action_arguments,
                 summary=summary,
                 expires_at=datetime.now() + timedelta(minutes=AI_ACTION_EXPIRY_MINUTES),
@@ -728,8 +837,8 @@ async def execute_marketflow_tool(
 WRITE_TOOL_NAMES = {
     "prepare_inventory_adjustment",
     "prepare_discard_expired_batch",
-    "prepare_business_action",
     "prepare_product_status_update",
+    *(f"prepare_{action_type}" for action_type in ACTION_PARAMETER_MODELS),
 }
 
 __all__ = [
@@ -737,4 +846,5 @@ __all__ = [
     "ToolExecutionResult",
     "WRITE_TOOL_NAMES",
     "execute_marketflow_tool",
+    "select_marketflow_tools",
 ]

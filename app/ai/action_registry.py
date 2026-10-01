@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.schemas.discount_rule_requests import (
     AddDiscountRuleProductsRequest,
@@ -51,17 +51,6 @@ AiBusinessActionType = Literal[
     "delete_discount_rule",
     "clear_discount_rules",
 ]
-
-
-# region AI统一业务操作请求
-class BusinessActionArguments(BaseModel):
-    """模型调用统一写工具时提交的操作类型和业务参数。"""
-
-    action_type: AiBusinessActionType = Field(..., description="准备执行的业务操作类型")
-    payload: dict[str, Any] = Field(..., description="该操作需要的完整业务参数")
-
-
-# endregion
 
 
 # region 带目标ID的参数模型
@@ -116,8 +105,6 @@ class UpdateDiscountStatusArguments(UpdateDiscountRuleStatusRequest):
 
 class EmptyArguments(BaseModel):
     """不需要额外业务参数的批量操作。"""
-
-    model_config = ConfigDict(extra="forbid")
 
 
 # endregion
@@ -213,7 +200,7 @@ def build_business_action_summary(action_type: str, payload: dict[str, Any]) -> 
 
 __all__ = [
     "ACTION_NAMES",
-    "BusinessActionArguments",
+    "ACTION_PARAMETER_MODELS",
     "build_business_action_summary",
     "validate_business_action",
 ]

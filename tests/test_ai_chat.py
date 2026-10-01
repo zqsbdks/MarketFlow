@@ -1,5 +1,6 @@
 """多供应商AI聊天、工具调用编排和安全限制测试。"""
 
+from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock
@@ -8,13 +9,14 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+import app.ai.providers.gemini as gemini_module
 import app.services.ai_actions as ai_actions_module
 import app.services.ai_chat as ai_chat_module
 from app.ai.action_registry import validate_business_action
 from app.ai.providers.base import ProviderError, ProviderToolCall, ProviderTurn
 from app.ai.providers.gemini import GeminiProvider
 from app.ai.providers.openai import OpenAiProvider
-from app.ai.tools import ToolExecutionResult
+from app.ai.tools import MARKETFLOW_TOOL_DEFINITIONS, ToolExecutionResult, select_marketflow_tools
 from app.models.ai_pending_action import AiPendingAction
 from app.schemas.ai_chat_requests import AiChatMessageRequest, AiChatRequest
 from app.services.ai_actions import confirm_ai_action_service
@@ -107,6 +109,61 @@ def test_business_action_registry_validates_discount_and_rejects_missing_fields(
 
     with pytest.raises(ValidationError):
         validate_business_action("add_discount_products", {"discount_rule_id": 5})
+
+
+def test_marketflow_tools_are_selected_by_business_topic() -> None:
+    """每次只向模型发送当前业务相关工具，且不再出现Gemini不兼容的任意对象结构。"""
+
+    tools = select_marketflow_tools("请创建一个晚间折扣并添加商品")
+    tool_names = {tool["name"] for tool in tools}
+
+    assert "prepare_create_discount_rule" in tool_names
+    assert "prepare_add_discount_products" in tool_names
+    assert len(tools) <= 20
+    assert all("additionalProperties" not in str(tool["parameters"]) for tool in tools)
+
+
+# endregion
+
+
+# region Gemini出站请求兼容测试
+async def test_gemini_sends_json_schema_in_correct_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """拦截真实适配器的两次出站请求，防止JSON Schema再次误放进parameters。"""
+
+    original_tools = deepcopy(MARKETFLOW_TOOL_DEFINITIONS)
+    post = AsyncMock(
+        return_value={"candidates": [{"content": {"role": "model", "parts": [{"text": "你好"}]}}]}
+    )
+    monkeypatch.setattr(gemini_module, "post_json", post)
+    provider = GeminiProvider()
+    messages = [AiChatMessageRequest(role="user", content="你好")]
+    initial = await provider.request_initial(
+        api_key="test-key",
+        model="test-model",
+        system_instruction="test",
+        messages=messages,
+        tools=MARKETFLOW_TOOL_DEFINITIONS,
+    )
+    await provider.request_followup(
+        api_key="test-key",
+        model="test-model",
+        system_instruction="test",
+        messages=messages,
+        tools=MARKETFLOW_TOOL_DEFINITIONS,
+        initial_turn=initial,
+        tool_results=[(ProviderToolCall("call-1", "search_products", {}), {"ok": True})],
+    )
+    assert post.await_count == 2
+    for call in post.await_args_list:
+        declarations = call.args[2]["tools"][0]["functionDeclarations"]
+        assert len(declarations) == len(original_tools)
+        for declaration, original in zip(declarations, original_tools, strict=True):
+            assert "parameters" not in declaration
+            assert declaration["parametersJsonSchema"] == original["parameters"]
+    # 公共定义继续供其他供应商使用，不能被Gemini适配器原地修改。
+    assert MARKETFLOW_TOOL_DEFINITIONS == original_tools
 
 
 # endregion
@@ -334,10 +391,10 @@ async def test_ai_chat_can_query_then_prepare_one_write_action(
                     [
                         ProviderToolCall(
                             "call-2",
-                            "prepare_business_action",
+                            "prepare_update_discount_status",
                             {
-                                "action_type": "update_discount_status",
-                                "payload": {"discount_rule_id": 5, "is_active": True},
+                                "discount_rule_id": 5,
+                                "is_active": True,
                             },
                         )
                     ],
