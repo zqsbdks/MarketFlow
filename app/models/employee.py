@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.models.discount_rule import DiscountRule
     from app.models.employee_detail import EmployeeDetail
     from app.models.purchase import Purchase
+    from app.models.store import Store
 
 
 class Employee(TimestampMixin, Base):
@@ -34,12 +35,17 @@ class Employee(TimestampMixin, Base):
     __tablename__ = "employee"
     __table_args__ = (
         CheckConstraint(
-            "role = '店长' OR department_id IS NOT NULL",
+            "role IN ('店长', '总部') OR department_id IS NOT NULL",
             name="ck_employee_department_required",
         ),
         CheckConstraint(
-            "role IN ('店长', '正式员工', '契约工')",
+            "role IN ('总部', '店长', '正式员工', '契约工')",
             name="employee_role",
+        ),
+        CheckConstraint(
+            "(role = '总部' AND store_id IS NULL AND department_id IS NULL) "
+            "OR (role <> '总部' AND store_id IS NOT NULL)",
+            name="ck_employee_store_matches_role",
         ),
         UniqueConstraint("employee_no", name="uq_employee_employee_no"),
         {"mysql_charset": "utf8mb4", "comment": "员工表"},
@@ -74,6 +80,10 @@ class Employee(TimestampMixin, Base):
         index=True,
         comment="所属部门",
     )
+    store_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("store.id"), nullable=True, index=True,
+        comment="员工归属门店；总部为空",
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -95,6 +105,7 @@ class Employee(TimestampMixin, Base):
     )
 
     department: Mapped[Department | None] = relationship(back_populates="employees")
+    store: Mapped[Store | None] = relationship()
     detail: Mapped[EmployeeDetail | None] = relationship(
         back_populates="employee",
         cascade="all, delete-orphan",

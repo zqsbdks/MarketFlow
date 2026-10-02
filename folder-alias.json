@@ -1,4 +1,18 @@
 {
+    "scripts/seed_contact_notices.py": {"description": "日语联络事项演示数据与确认灯号生成脚本"},
+    "tests/test_contact_notices_mysql.py": {"description": "联络事项MySQL发布确认自动关闭完整流程回滚测试"},
+    "tests/test_contact_notices.py": {"description": "联络事项权限、确认名单与自动关闭测试"},
+    "frontend/src/components/NoticeReminder.vue": {"description": "首页联络事项未读和待确认提醒"},
+    "app/models/contact_notice.py": {"description": "联络事项与员工确认记录ORM模型"},
+    "app/crud/contact_notices.py": {"description": "联络事项分页查询与接收名单数据访问"},
+    "app/services/contact_notices.py": {"description": "联络事项权限、发布确认与自动关闭业务"},
+    "app/routers/contact_notices.py": {"description": "联络事项查询、发布与员工确认API"},
+    "app/schemas/contact_notices_requests.py": {"description": "联络事项查询、创建修改和状态请求模型"},
+    "app/schemas/contact_notices_responses.py": {"description": "联络事项分页详情与确认名单响应模型"},
+    "app/core/contact_notice_scheduler.py": {"description": "联络事项到期自动关闭定时任务"},
+    "alembic/versions/20261001_0022_contact_notices.py": {"description": "联络事项和员工确认表迁移"},
+    "frontend/src/api/contactNotices.ts": {"description": "联络事项前端类型与API请求"},
+    "frontend/src/views/ContactNoticesView.vue": {"description": "联络事项发布、筛选与确认名单页面"},
     ".github": {
         "description": "GitHub仓库自动化配置目录"
     },
@@ -811,5 +825,29 @@
     },
     "frontend/nginx.conf": {
         "description": "前端页面与后端API反向代理配置"
-    }
+    },
+    "app/core/store_policy.py": { "description": "多门店读写隔离及权限上下文" },
+    "app/models/store.py": { "description": "门店及门店部门启用配置模型" },
+    "app/models/store_scoped.py": { "description": "门店归属ORM模型基类" },
+    "app/models/contact_notice.py": { "description": "联络事项及员工确认模型" },
+    "app/models/ai_conversation.py": { "description": "员工AI会话及长期记忆模型" },
+    "app/routers/stores.py": { "description": "总部门店管理与员工调店API" },
+    "app/routers/contact_notices.py": { "description": "联络事项发布与确认API" },
+    "app/routers/ai_conversations.py": { "description": "员工AI历史会话API" },
+    "app/schemas/stores.py": { "description": "门店总部操作请求模型" },
+    "app/schemas/contact_notices_requests.py": { "description": "联络事项请求模型" },
+    "app/schemas/contact_notices_responses.py": { "description": "联络事项响应模型" },
+    "app/services/contact_notices.py": { "description": "联络事项权限与发布确认逻辑" },
+    "app/services/ai_memory.py": { "description": "员工AI对话历史与摘要逻辑" },
+    "app/core/contact_notice_scheduler.py": { "description": "联络事项到期自动关闭任务" },
+    "frontend/src/stores/storeScope.ts": { "description": "前端门店切换与只读范围状态" },
+    "frontend/src/views/StoresView.vue": { "description": "总部门店与员工管理页面" },
+    "frontend/src/views/ContactNoticesView.vue": { "description": "联络事项发布及确认页面" },
+    "frontend/src/components/NoticeReminder.vue": { "description": "联络事项提醒组件" },
+    "frontend/src/api/contactNotices.ts": { "description": "联络事项前端API封装" },
+    "scripts/seed_multi_store.py": { "description": "多门店日语演示数据生成脚本" },
+    "scripts/seed_contact_notices.py": { "description": "联络事项演示数据生成脚本" },
+    "app/services/purchase_planning.py": { "description": "七天进货计划、上周同曜日销量与库存参考查询" },
+    "frontend/src/components/PurchasePlanner.vue": { "description": "表格式七天进货计划和下单组件" },
+    "tests/test_purchase_planning.py": { "description": "进货计划与单张签收接口回归测试" }
 }

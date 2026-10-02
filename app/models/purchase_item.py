@@ -10,6 +10,7 @@ from sqlalchemy import BigInteger, CheckConstraint, Date, ForeignKey, Integer, N
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.inventory_batch import InventoryBatch
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from app.models.supplier_product import SupplierProduct
 
 
-class PurchaseItem(CreatedAtMixin, Base):
+class PurchaseItem(StoreScopedMixin, CreatedAtMixin, Base):
     """保存进货单中的商品、供货商、数量、成本和保质期信息。"""
 
     # SQLAlchemy会把这个模型映射到MySQL中的purchase_item表。

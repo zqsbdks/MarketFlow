@@ -38,6 +38,7 @@ class AiPendingActionResponse(BaseModel):
 
 # region AI聊天响应
 class AiChatResponse(BaseModel):
+    conversation_id: int | None = None
     """返回模型回答，以及本轮产生的待确认数据修改。"""
 
     message: str = Field(..., min_length=1, description="AI回答正文")

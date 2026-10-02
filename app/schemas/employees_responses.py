@@ -48,6 +48,9 @@ class EmployeesItemResponse(BaseModel):
     )
     name: str = Field(..., description="员工姓名", min_length=1, max_length=50)
     role: EmployeeRole = Field(..., description="员工角色")
+    store_id: int | None = Field(None, description="所属门店ID；总部账号为空")
+    store_no: str | None = Field(None, description="所属门店编号；总部账号为空")
+    store_name: str | None = Field(None, description="所属门店名称；总部账号为空")
     department_name: str | None = Field(None, description="所属部门名称")
     is_active: bool = Field(..., description="是否启用")
 
@@ -128,6 +131,9 @@ class EmployeeDetailResponse(BaseModel):
         max_length=50,
     )
     role: EmployeeRole = Field(..., description="员工工种")
+    store_id: int | None = Field(None, description="所属门店ID；总部账号为空")
+    store_no: str | None = Field(None, description="所属门店编号；总部账号为空")
+    store_name: str | None = Field(None, description="所属门店名称；总部账号为空")
 
     # 店长可以没有所属部门，因此需要允许为空。
     department_id: int | None = Field(None, description="部门ID")

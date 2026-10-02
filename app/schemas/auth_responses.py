@@ -28,6 +28,7 @@ class AuthLoginEmployee(BaseModel):
     employee_no: str = Field(..., description="员工编号", min_length=3, max_length=20)
     name: str = Field(..., description="员工姓名", min_length=1, max_length=50)
     role: EmployeeRole = Field(..., description="员工角色")
+    store_id: int | None = Field(None, description="所属门店；总部为空")
     department: AuthDepartmentResponse | None = Field(None, description="所属部门信息")
     must_change_password: bool = Field(..., description="是否需要修改密码")
 
@@ -57,6 +58,7 @@ class AuthMeResponse(BaseModel):
     employee_no: str = Field(..., description="员工编号", min_length=3, max_length=20)
     name: str = Field(..., description="员工姓名", min_length=1, max_length=50)
     role: EmployeeRole = Field(..., description="员工角色")
+    store_id: int | None = Field(None, description="所属门店；总部为空")
     department: AuthDepartmentResponse | None = Field(None, description="所属部门信息")
     is_active: bool = Field(..., description="账号是否激活")
 

@@ -25,6 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import DiscountScheduleType, DiscountType
 
 if TYPE_CHECKING:
@@ -34,12 +35,12 @@ if TYPE_CHECKING:
 
 
 # region 折扣规则模型
-class DiscountRule(TimestampMixin, Base):
+class DiscountRule(StoreScopedMixin, TimestampMixin, Base):
     """保存实际参与商品展示、扫码试算和销售结算的折扣规则。"""
 
     __tablename__ = "discount_rule"
     __table_args__ = (
-        UniqueConstraint("name", name="uq_discount_rule_name"),
+        UniqueConstraint("store_id", "name", name="uq_discount_rule_name"),
         CheckConstraint(
             "discount_type IN ('percentage', 'amount_off', 'fixed_price')",
             name="discount_rule_type",

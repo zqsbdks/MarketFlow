@@ -1,4 +1,4 @@
-export type EmployeeRole = '店长' | '正式员工' | '契约工'
+export type EmployeeRole = '总部' | '店长' | '正式员工' | '契约工'
 export type EmployeeGender = '男' | '女' | '未填写'
 export type EmploymentStatus = '在职' | '休假' | '离职' | '解雇'
 
@@ -102,6 +102,7 @@ export interface Department {
 
 export interface EmployeeIdentity {
   id: number
+  store_id: number | null
   employee_no: string
   name: string
   role: EmployeeRole
@@ -341,6 +342,9 @@ export interface EmployeeListItem {
   employee_no: string
   name: string
   role: EmployeeRole
+  store_id: number | null
+  store_no: string | null
+  store_name: string | null
   department_name: string | null
   is_active: boolean
 }
@@ -430,6 +434,30 @@ export interface Purchase {
   items?: PurchaseItem[]
 }
 
+export interface PurchasePlanningDay {
+  date: string
+  expected_quantity: number
+  received_quantity: number
+  last_week_sales: number
+}
+
+export interface PurchasePlanningItem {
+  supplier_product_id: number
+  product_id: number | null
+  name: string
+  supplier_name: string
+  unit_cost: string
+  saleable_stock: number
+  near_expiry_stock_quantity: number
+  days: PurchasePlanningDay[]
+}
+
+export interface PurchasePlanning {
+  arrival_date: string
+  days: string[]
+  items: PurchasePlanningItem[]
+}
+
 // region AI 聊天
 
 export interface AiChatMessage {
@@ -452,10 +480,24 @@ export interface AiPendingAction {
 }
 
 export interface AiChatResult {
+  conversation_id: number | null
   message: string
   provider: AiProvider
   model: string
   pending_actions: AiPendingAction[]
+}
+
+export interface AiConversationSummary {
+  id: number
+  title: string
+  provider: AiProvider
+  model: string | null
+  store_id: number | null
+}
+
+export interface AiConversationDetail extends AiConversationSummary {
+  messages: (AiChatMessage & { id: number; actions: AiPendingAction[] })[]
+  next_before_id: number | null
 }
 
 export interface AiActionExecutionResult {

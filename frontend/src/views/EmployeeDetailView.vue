@@ -125,6 +125,7 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
         <span :class="['status-badge', detail.employment_status === '在职' ? 'on_sale' : 'stopped']">{{ detail.employment_status }}</span>
         <dl class="identity-facts">
           <div><dt>账号状态</dt><dd>{{ detail.is_active ? '已启用' : '已停用' }}</dd></div>
+          <div><dt>所属门店</dt><dd>{{ detail.store_no && detail.store_name ? `${detail.store_no} · ${detail.store_name}` : '总部（无所属门店）' }}</dd></div>
           <div><dt>入职日期</dt><dd>{{ detail.hire_date }}</dd></div>
           <div><dt>最后登录</dt><dd>{{ displayTime(detail.last_login_at) }}</dd></div>
         </dl>
@@ -160,6 +161,7 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
         </dl>
         <div class="section-divider"><p class="eyebrow">EMPLOYMENT RECORD</p><h2>任职信息</h2></div>
         <dl class="detail-grid">
+          <div><dt>所属门店</dt><dd>{{ detail.store_no && detail.store_name ? `${detail.store_no} · ${detail.store_name}` : '总部（无所属门店）' }}</dd></div>
           <div><dt>雇佣状态</dt><dd>{{ detail.employment_status }}</dd></div>
           <div><dt>离职或解雇日期</dt><dd>{{ detail.separation_date || '未填写' }}</dd></div>
           <div class="wide"><dt>离职或解雇原因</dt><dd>{{ detail.separation_reason || '未填写' }}</dd></div>

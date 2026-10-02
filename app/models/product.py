@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import ProductStatus
 
 if TYPE_CHECKING:
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     from app.models.supplier_product import SupplierProduct
 
 
-class Product(TimestampMixin, Base):
+class Product(StoreScopedMixin, TimestampMixin, Base):
     """商品主数据及第一版的当前库存数量。"""
 
     __tablename__ = "product"
@@ -50,6 +51,7 @@ class Product(TimestampMixin, Base):
         ),
         CheckConstraint("status IN ('on_sale', 'stopped')", name="product_status"),
         UniqueConstraint("product_no", name="uq_product_product_no"),
+        UniqueConstraint("store_id", "supplier_product_id", name="uq_store_catalog_product"),
         ForeignKeyConstraint(
             ["category_id", "department_id"],
             ["category.id", "category.department_id"],
@@ -76,7 +78,6 @@ class Product(TimestampMixin, Base):
             ondelete="RESTRICT",
         ),
         nullable=False,
-        unique=True,
         index=True,
         comment="来源供应商商品目录ID",
     )
@@ -157,7 +158,7 @@ class Product(TimestampMixin, Base):
     # discount_scopes表示直接指定当前商品的折扣规则范围。
     discount_scopes: Mapped[list[DiscountRuleScope]] = relationship(back_populates="product")
     # supplier_product用于取得该商品的来源供应商、目录报价和默认保质期。
-    supplier_product: Mapped[SupplierProduct] = relationship(back_populates="product")
+    supplier_product: Mapped[SupplierProduct] = relationship(back_populates="products")
 
 
 __all__ = ["Product"]

@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import jwt
 import pytest
+from unittest.mock import AsyncMock
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -118,10 +119,14 @@ async def test_cookie_auth_requires_matching_csrf_header_for_writes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_current_employee_id_returns_integer() -> None:
+async def test_current_employee_id_returns_integer(monkeypatch) -> None:
     """数字字符串形式的 sub 应转换为员工整数 ID。"""
 
-    employee_id = await get_current_employee_id({"sub": "123"})
+    async def fake_employee(**_kwargs):
+        return type("EmployeeStub", (), {"is_active": True})()
+    monkeypatch.setattr("app.dependencies.auth.get_employee_by_id", fake_employee)
+    monkeypatch.setattr("app.core.store_policy.configure_store_context", AsyncMock())
+    employee_id = await get_current_employee_id(_request(), {"sub": "123"}, AsyncMock())
 
     assert employee_id == 123
 
@@ -131,7 +136,7 @@ async def test_current_employee_id_rejects_non_numeric_subject() -> None:
     """无法转换为整数的 sub 应返回 401。"""
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_employee_id({"sub": "not-an-id"})
+        await get_current_employee_id(_request(), {"sub": "not-an-id"}, AsyncMock())
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "访问令牌中的员工标识无效"

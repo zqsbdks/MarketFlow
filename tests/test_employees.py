@@ -20,6 +20,7 @@ from app.dependencies.db import get_db
 from app.main import create_app
 from app.models.department import Department
 from app.models.employee import Employee
+from app.models.store import Store
 from app.models.enums import EmployeeRole
 from app.schemas.employees_requests import EmployeesCreateRequest
 from app.schemas.employees_responses import (
@@ -361,6 +362,8 @@ async def test_get_list_employees_service_builds_items_and_pages(monkeypatch) ->
         department_id=1,
     )
     employee.department = department
+    employee.store_id = 1
+    employee.store = Store(id=1, store_no="DP0001", name="MarketFlow 本店")
 
     async def get_current(**_kwargs):
         return manager
@@ -386,6 +389,8 @@ async def test_get_list_employees_service_builds_items_and_pages(monkeypatch) ->
     assert result.total_pages == 3
     assert len(result.items) == 1
     assert result.items[0].department_name == "精肉部"
+    assert result.items[0].store_no == "DP0001"
+    assert result.items[0].store_name == "MarketFlow 本店"
     assert result.items[0].role == EmployeeRole.REGULAR_EMPLOYEE
 
 

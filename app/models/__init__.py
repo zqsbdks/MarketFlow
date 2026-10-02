@@ -9,6 +9,9 @@ from app.models.ai_pending_action import AiPendingAction
 from app.models.ai_provider_credential import AiProviderCredential
 from app.models.base import Base
 from app.models.business_sequence import BusinessSequence
+from app.models.store import Store, StoreDepartment
+from app.models.ai_conversation import AiConversation, AiMessage
+from app.models.contact_notice import ContactNotice, ContactNoticeRecipient
 from app.models.category import Category
 from app.models.department import Department
 from app.models.discount_rule import DiscountRule
@@ -48,6 +51,8 @@ __all__ = [
     "AiProviderCredential",
     "Base",
     "BusinessSequence",
+    "ContactNotice",
+    "ContactNoticeRecipient",
     "Category",
     "Department",
     "DiscountRule",

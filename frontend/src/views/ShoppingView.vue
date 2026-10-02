@@ -11,6 +11,7 @@ import {
 
 import { createSale, getProducts, previewSalePrice } from '../api'
 import { getErrorMessage } from '../api/http'
+import { useStoreScope } from '../stores/storeScope'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import type { ProductListItem, SaleDetail, SalePricePreview } from '../types/api'
@@ -18,6 +19,7 @@ import { formatDateTime, formatMoney } from '../utils'
 
 // region 页面状态
 const products = ref<ProductListItem[]>([])
+const storeScope = useStoreScope()
 const selectedProductId = ref<number | ''>('')
 const cart = ref<Array<{ product: ProductListItem; quantity: number }>>([])
 const checkoutRequestId = ref(crypto.randomUUID())
@@ -166,6 +168,7 @@ async function refreshPricePreview() {
 
 // region 确认结账
 async function checkout() {
+  if (!storeScope.canWriteStore) return
   if (cart.value.length === 0) return
 
   checkoutLoading.value = true
@@ -313,7 +316,7 @@ onMounted(loadProducts)
         </div>
         <button
           class="primary-button checkout-button"
-          :disabled="cart.length === 0 || checkoutLoading || previewLoading"
+          :disabled="!storeScope.canWriteStore || cart.length === 0 || checkoutLoading || previewLoading"
           @click="checkout"
         >
           <ReceiptText :size="18" />

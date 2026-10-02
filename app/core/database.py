@@ -48,6 +48,9 @@ async_session_factory = async_sessionmaker(
     expire_on_commit=False,
 )
 
+# 注册统一门店隔离策略；后台任务按来源记录显式指定写入门店。
+from app.core import store_policy as _store_policy
+
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:
     """为一次请求提供独立的异步数据库会话。

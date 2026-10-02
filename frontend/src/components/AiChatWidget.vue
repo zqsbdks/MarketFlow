@@ -4,10 +4,10 @@ import { Bot, KeyRound, RotateCcw, Send, Settings, Sparkles, X } from '@lucide/v
 
 import {
   cancelAiAction, confirmAiAction, deleteAiCredential, getAiCredentialStatus,
-  saveAiCredential, sendAiChat,
+  saveAiCredential, sendAiChat, getAiConversations, getAiConversation,
 } from '../api'
 import { getErrorMessage } from '../api/http'
-import type { AiChatMessage, AiPendingAction, AiProvider } from '../types/api'
+import type { AiChatMessage, AiPendingAction, AiProvider, AiConversationSummary } from '../types/api'
 
 const PROVIDER_STORAGE_KEY = 'marketflow_ai_provider'
 const PROVIDER_DEFAULT_MODELS: Record<AiProvider, string> = {
@@ -49,6 +49,9 @@ const model = ref(
 const modelDraft = ref(model.value)
 const messageList = ref<HTMLElement | null>(null)
 const pendingActions = ref<AiPendingAction[]>([])
+const conversations = ref<AiConversationSummary[]>([])
+const conversationId = ref<number | undefined>()
+const olderBeforeId = ref<number | null>(null)
 const actionBusyId = ref<number | null>(null)
 let nextMessageId = 2
 
@@ -74,6 +77,8 @@ async function refreshCredentialStatus(selectedProvider: AiProvider) {
 
 async function openWidget() {
   isOpen.value = true
+  try { conversations.value = await getAiConversations() }
+  catch (error) { settingsError.value = getErrorMessage(error) }
   keyConfigured.value = await refreshCredentialStatus(provider.value)
   draftKeyConfigured.value = keyConfigured.value
   if (!keyConfigured.value) showSettings.value = true
@@ -129,6 +134,8 @@ async function loadProviderSettings() {
 }
 
 function clearConversation() {
+  conversationId.value = undefined
+  olderBeforeId.value = null
   messages.value = [
     {
       id: nextMessageId++,
@@ -138,6 +145,26 @@ function clearConversation() {
     },
   ]
   pendingActions.value = []
+}
+
+async function restoreConversation(id: number, beforeId?: number) {
+  try {
+    const history = await getAiConversation(id, beforeId)
+    const restored = history.messages.map((item) => ({ id: item.id, role: item.role, content: item.content }))
+    for (const item of restored) {
+      if (item.id >= nextMessageId) nextMessageId = item.id + 1
+    }
+    messages.value = beforeId ? [...restored, ...messages.value] : restored
+    pendingActions.value = beforeId
+      ? [...history.messages.flatMap((item) => item.actions), ...pendingActions.value]
+      : history.messages.flatMap((item) => item.actions)
+    conversationId.value = id
+    olderBeforeId.value = history.next_before_id
+    provider.value = history.provider
+    model.value = history.model || PROVIDER_DEFAULT_MODELS[history.provider]
+    keyConfigured.value = await refreshCredentialStatus(history.provider)
+    await scrollToBottom()
+  } catch (error) { settingsError.value = getErrorMessage(error) }
 }
 
 async function scrollToBottom() {
@@ -159,15 +186,11 @@ async function submitMessage() {
   await scrollToBottom()
 
   try {
-    const history: AiChatMessage[] = []
-    const actualMessages = messages.value.filter((message) => !message.localOnly).slice(-12)
-    for (const message of actualMessages) {
-      history.push({ role: message.role, content: message.content })
-    }
-
-    const result = await sendAiChat(provider.value, model.value, history)
+    const result = await sendAiChat(provider.value, model.value, [{ role: 'user', content }], conversationId.value)
+    if (result.conversation_id) conversationId.value = result.conversation_id
     messages.value.push({ id: nextMessageId++, role: 'model', content: result.message })
     pendingActions.value.push(...result.pending_actions)
+    conversations.value = await getAiConversations()
   } catch (error) {
     messages.value.push({
       id: nextMessageId++,
@@ -248,6 +271,14 @@ function handleEnter(event: KeyboardEvent) {
             </button>
           </div>
         </header>
+
+        <div class="ai-conversation-picker">
+          <select :value="conversationId ?? ''" aria-label="AI历史会话" @change="($event.target as HTMLSelectElement).value ? restoreConversation(Number(($event.target as HTMLSelectElement).value)) : clearConversation()">
+            <option value="">新对话</option>
+            <option v-for="conversation in conversations" :key="conversation.id" :value="conversation.id">{{ conversation.title }}</option>
+          </select>
+          <button v-if="olderBeforeId && conversationId" type="button" @click="restoreConversation(conversationId, olderBeforeId)">加载更早消息</button>
+        </div>
 
         <div v-if="showSettings" class="ai-settings">
           <div class="settings-title"><KeyRound :size="17" /><strong>连接设置</strong></div>

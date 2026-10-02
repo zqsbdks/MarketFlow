@@ -64,6 +64,7 @@ async def ai_chat_service(
     api_key: str,
     current_employee_id: int,
     db: AsyncSession,
+    memory_context: str = "",
 ) -> AiChatResponse:
     """调用所选模型，执行受控只读工具，并把修改请求保存为待确认操作。"""
 
@@ -80,7 +81,7 @@ async def ai_chat_service(
         current_turn = await provider.request_initial(
             api_key=api_key,
             model=model,
-            system_instruction=MARKETFLOW_SYSTEM_INSTRUCTION,
+            system_instruction=MARKETFLOW_SYSTEM_INSTRUCTION + memory_context,
             messages=request.messages,
             tools=selected_tools,
         )

@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin
+from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import DiscountScopeType
 
 if TYPE_CHECKING:
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 
 
 # region 折扣规则适用范围模型
-class DiscountRuleScope(CreatedAtMixin, Base):
+class DiscountRuleScope(StoreScopedMixin, CreatedAtMixin, Base):
     """把一条折扣规则关联到某个商品、分类或部门。"""
 
     __tablename__ = "discount_rule_scope"

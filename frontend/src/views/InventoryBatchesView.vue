@@ -14,6 +14,7 @@ import { getErrorMessage } from '../api/http'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
+import { useStoreScope } from '../stores/storeScope'
 import type {
   Department,
   InventoryBatchDetail,
@@ -25,6 +26,7 @@ import { formatDateTime, formatMoney } from '../utils'
 import { confirmTranslated, promptTranslated } from '../i18n'
 
 const auth = useAuthStore()
+const storeScope = useStoreScope()
 const batches = ref<InventoryBatchListItem[]>([])
 const departments = ref<Department[]>([])
 const suppliers = ref<Supplier[]>([])
@@ -50,7 +52,7 @@ const filters = reactive({
 const quantityForm = reactive({ remaining_quantity: 0, reason: '' })
 
 const canEditDetail = computed(() => {
-  if (!detail.value) return false
+  if (!detail.value || !storeScope.canWriteStore) return false
   return (
     auth.isManager ||
     (auth.employee?.role === '正式员工' &&

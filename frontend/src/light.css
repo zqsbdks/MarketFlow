@@ -161,6 +161,18 @@ html[data-theme="light"] body .modal-backdrop .credential-card dl div {
   color: var(--ink);
   background: #fff;
 }
+/* 弹窗通过 Teleport 挂在 body 下，需要独立提供日间模式变量。 */
+html[data-theme="light"] body .modal-backdrop .modal-panel {
+  --ink: #202a23;
+  --muted: #56645a;
+  --line: #cbd5c9;
+  --paper: #fff;
+}
+html[data-theme="light"] body .modal-backdrop .planner-table td strong { color: var(--ink); }
+html[data-theme="light"] body .modal-backdrop .planner-table td { color: var(--ink); }
+html[data-theme="light"] body .modal-backdrop .planner-table tbody tr:hover { background: #edf3e8; }
+html[data-theme="light"] body .modal-backdrop .planner-table td.locked-day,
+html[data-theme="light"] body .modal-backdrop .planner-table th.locked-day { color: #f3f5f0; background: #343940; }
 html[data-theme="light"] body .modal-backdrop .modal-panel > header,
 html[data-theme="light"] body .modal-backdrop .detail-hero,
 html[data-theme="light"] body .modal-backdrop .receipt-lines > div,

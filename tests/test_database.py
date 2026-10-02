@@ -33,3 +33,4 @@ async def test_mysql_connection() -> None:
     # scalar_one 同时验证查询有且只有一个结果。
     assert result.scalar_one() == 1
     assert detail_count == employee_count
+    await async_engine.dispose()

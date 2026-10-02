@@ -465,6 +465,11 @@ async def execute_marketflow_tool(
     """仅执行白名单工具；所有查询和修改继续复用现有 Service 权限逻辑。"""
 
     try:
+        if name in WRITE_TOOL_NAMES and db.info.get("store_context"):
+            if db.info.get("actor_role") == EmployeeRole.HEADQUARTERS:
+                raise HTTPException(403, "总部不能修改门店业务数据")
+            if db.info.get("read_store_id") != db.info.get("own_store_id"):
+                raise HTTPException(403, "跨店查询仅供查看，不能准备修改操作")
         if name == "search_products":
             product_values = ProductSearchArguments.model_validate(arguments)
             product_response = await get_products_list_service(

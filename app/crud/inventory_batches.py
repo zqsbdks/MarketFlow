@@ -127,6 +127,7 @@ async def refresh_inventory_batch_statuses(
                 before_data={"status": previous_status},
                 after_data={"status": new_status},
                 reason="系统根据库存数量和到期日期自动刷新批次状态",
+                store_id=batch.store_id,
                 db=db,
             )
 

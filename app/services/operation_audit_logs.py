@@ -67,7 +67,7 @@ async def get_operation_audit_logs_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
-    if current_employee.role != EmployeeRole.STORE_MANAGER:
+    if current_employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只有店长可以查看操作审计记录",
@@ -154,7 +154,7 @@ async def get_inventory_movements_service(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="请先修改初始密码",
         )
-    if current_employee.role != EmployeeRole.STORE_MANAGER:
+    if current_employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只有店长可以查看库存变动流水",

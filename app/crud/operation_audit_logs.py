@@ -34,10 +34,12 @@ async def create_operation_audit_log(
     after_data: dict[str, Any] | None,
     reason: str | None,
     db: AsyncSession,
+    store_id: int | None = None,
 ) -> OperationAuditLog:
     """把一次数据变更加入当前事务；系统自动任务的员工 ID 可以为空。"""
 
     log = OperationAuditLog(
+        store_id=store_id if store_id is not None else db.info.get("write_store_id"),
         employee_id=employee_id,
         module=module,
         action=action,

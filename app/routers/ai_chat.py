@@ -12,7 +12,7 @@ from app.schemas.ai_chat_requests import AiChatRequest, AiProviderName
 from app.schemas.ai_chat_responses import AiActionExecutionResponse, AiChatResponse
 from app.schemas.base import ResponseModel
 from app.services.ai_actions import cancel_ai_action_service, confirm_ai_action_service
-from app.services.ai_chat import ai_chat_service
+from app.services.ai_memory import persistent_ai_chat_service as ai_chat_service
 from app.services.ai_credentials import (
     delete_ai_credential,
     has_ai_credential,

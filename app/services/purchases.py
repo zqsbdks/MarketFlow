@@ -1,6 +1,6 @@
 """进货管理的业务逻辑。"""
 
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from fastapi import HTTPException
 from fastapi import status as http_status
@@ -224,15 +224,19 @@ async def create_purchase_service(
             detail="请先修改初始密码",
         )
 
-    # 模拟系统规定每天中午统一处理进货，因此 12:00 起不再接收当天的新进货单。
-    # datetime.now().time() 只取当前时间中的“时、分、秒”，方便与 12:00 比较。
+    # 当天的进货须在 12:00 前提交；未来到货日不受今天中午的截止时间影响。
     purchase_cutoff_time = time(hour=12)
-    current_time = business_now().time()
-    if current_time >= purchase_cutoff_time:
+    now = business_now()
+    if purchase.expected_arrival_date == now.date() and now.time() >= purchase_cutoff_time:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail="每天12:00后不能创建进货单，请于次日12:00前提交",
+            detail="当天的进货单须在12:00前提交",
         )
+    if purchase.expected_arrival_date is not None:
+        earliest = now.date()
+        latest = now.date() + timedelta(days=30)
+        if not earliest <= purchase.expected_arrival_date <= latest:
+            raise HTTPException(400, "预计到货日期须在今天至30天内")
 
     # 只有店长和正式员工可以创建进货单，契约工不能创建。
     if current_employee.role not in (
@@ -418,9 +422,53 @@ async def auto_receive_purchases_service(
 # endregion
 
 
+# region 单张进货单手动签收
+async def receive_purchase_service(
+    purchase_id: int, current_employee_id: int, db: AsyncSession
+) -> PurchaseDetailResponse:
+    """只签收指定待到货订单；库存、批次、审计与状态在同一事务提交。"""
+    employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+    if employee is None:
+        raise HTTPException(401, "当前登录员工不存在")
+    if not employee.is_active or employee.must_change_password:
+        raise HTTPException(403, "当前账号不可签收")
+    if employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.REGULAR_EMPLOYEE):
+        raise HTTPException(403, "只有店长或正式员工可以签收")
+    purchase = await get_purchase_by_id(purchase_id=purchase_id, db=db)
+    if purchase is None:
+        raise HTTPException(404, "进货单不存在")
+    if purchase.store_id != employee.store_id:
+        raise HTTPException(403, "只能签收所属门店的进货单")
+    if (
+        employee.role == EmployeeRole.REGULAR_EMPLOYEE
+        and employee.department_id != purchase.department_id
+    ):
+        raise HTTPException(403, "只能签收所属部门的进货单")
+    if purchase.status != PurchaseStatus.PENDING:
+        raise HTTPException(409, "进货单已经签收")
+    try:
+        received = await auto_receive_due_purchases(
+            arrived_at=business_now(), employee_id=current_employee_id,
+            db=db, only_purchase_id=purchase_id,
+        )
+        if not received:
+            raise HTTPException(409, "进货单已被其他人签收")
+        response = await get_purchase_detail_service(purchase_id, current_employee_id, db)
+        await db.commit()
+        return response
+    except ValueError as error:
+        await db.rollback()
+        raise HTTPException(400, str(error)) from error
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(409, "签收入库时发生数据冲突") from error
+# endregion
+
+
 __all__ = [
     "auto_receive_purchases_service",
     "create_purchase_service",
     "get_purchase_detail_service",
     "get_purchases_list_service",
+    "receive_purchase_service",
 ]

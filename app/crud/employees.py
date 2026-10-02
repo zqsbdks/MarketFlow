@@ -34,6 +34,7 @@ async def create_employee(
     department_id: int | None,
     password_hash: str,
     db: AsyncSession,
+    store_id: int | None = None,
 ) -> Employee:
     """创建一个新的员工记录。"""
 
@@ -43,6 +44,7 @@ async def create_employee(
         employee_no=temporary_employee_no,
         name=name,
         role=role,
+        store_id=store_id if store_id is not None else db.info.get("own_store_id"),
         department_id=department_id,
         password_hash=password_hash,
         must_change_password=True,
@@ -87,7 +89,7 @@ async def get_list_employees(
     offset = (page - 1) * page_size
     list_stmt = (
         select(Employee)
-        .options(selectinload(Employee.department))
+        .options(selectinload(Employee.department), selectinload(Employee.store))
         .where(*conditions)
         .order_by(Employee.id)
         .offset(offset)
@@ -153,6 +155,7 @@ async def get_employee_detail_by_id(
         .options(
             # 使用额外 SELECT 提前加载员工及部门关系，供 Service 读取。
             selectinload(EmployeeDetail.employee).selectinload(Employee.department),
+            selectinload(EmployeeDetail.employee).selectinload(Employee.store),
         )
         .where(EmployeeDetail.employee_id == employee_id)
         # 修改后复用本查询时，刷新会话中已有对象及数据库生成的更新时间。

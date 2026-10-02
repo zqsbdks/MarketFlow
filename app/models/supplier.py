@@ -8,21 +8,22 @@ from sqlalchemy import BigInteger, Boolean, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.purchase_item import PurchaseItem
     from app.models.supplier_product import SupplierProduct
 
 
-class Supplier(TimestampMixin, Base):
+class Supplier(StoreScopedMixin, TimestampMixin, Base):
     """保存供货商的基础资料以及当前合作状态。"""
 
     # SQLAlchemy会把这个模型映射到MySQL中的supplier表。
     __tablename__ = "supplier"
     # 编号和名称都不能重复；表使用utf8mb4并附加中文说明。
     __table_args__ = (
-        UniqueConstraint("supplier_no", name="uq_supplier_supplier_no"),
-        UniqueConstraint("name", name="uq_supplier_name"),
+        UniqueConstraint("store_id", "supplier_no", name="uq_supplier_supplier_no"),
+        UniqueConstraint("store_id", "name", name="uq_supplier_name"),
         {"mysql_charset": "utf8mb4", "comment": "供货商表"},
     )
 

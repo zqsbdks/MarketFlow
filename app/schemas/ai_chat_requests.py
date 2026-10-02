@@ -18,6 +18,7 @@ class AiChatMessageRequest(BaseModel):
 
 
 class AiChatRequest(BaseModel):
+    conversation_id: int | None = Field(None, ge=1, description="继续已保存的会话；不传则新建")
     """一次支持工具调用的多轮 AI 聊天请求。"""
 
     provider: AiProviderName = Field("gemini", description="模型供应商")
@@ -31,7 +32,7 @@ class AiChatRequest(BaseModel):
     messages: list[AiChatMessageRequest] = Field(
         ...,
         min_length=1,
-        max_length=12,
+        max_length=40,
         description="最近12条聊天记录；最后一条必须来自用户",
     )
 

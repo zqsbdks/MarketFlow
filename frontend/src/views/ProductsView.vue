@@ -14,12 +14,14 @@ import { getErrorMessage } from '../api/http'
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
+import { useStoreScope } from '../stores/storeScope'
 import type { Category, Department, ProductDetail, ProductListItem, ProductStatus } from '../types/api'
 import { formatMoney } from '../utils'
 import { promptTranslated } from '../i18n'
 
 const products = ref<ProductListItem[]>([])
 const auth = useAuthStore()
+const storeScope = useStoreScope()
 const departments = ref<Department[]>([])
 const categories = ref<Category[]>([])
 const detail = ref<ProductDetail | null>(null)
@@ -49,7 +51,7 @@ const total = ref(0)
 const totalPages = ref(0)
 const canEditDetail = computed(() =>
   Boolean(
-    detail.value &&
+    detail.value && storeScope.canWriteStore &&
       (auth.isManager ||
         (auth.employee?.role === '正式员工' &&
           auth.employee.department?.id === detail.value.department.id)),

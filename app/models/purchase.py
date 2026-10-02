@@ -10,6 +10,7 @@ from sqlalchemy import BigInteger, CheckConstraint, DateTime, Enum, ForeignKey, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import PurchaseStatus
 
 if TYPE_CHECKING:
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     from app.models.purchase_item import PurchaseItem
 
 
-class Purchase(TimestampMixin, Base):
+class Purchase(StoreScopedMixin, TimestampMixin, Base):
     """保存一次部门进货的汇总信息、到货时间和签收员工。"""
 
     # SQLAlchemy会把这个模型映射到MySQL中的purchase表。

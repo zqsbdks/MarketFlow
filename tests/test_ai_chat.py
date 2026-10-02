@@ -3,6 +3,7 @@
 from copy import deepcopy
 from datetime import timedelta
 from typing import Any
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -19,6 +20,7 @@ from app.ai.providers.openai import OpenAiProvider
 from app.ai.tools import MARKETFLOW_TOOL_DEFINITIONS, ToolExecutionResult, select_marketflow_tools
 from app.core.business_time import business_now
 from app.models.ai_pending_action import AiPendingAction
+from app.models.enums import EmployeeRole
 from app.schemas.ai_chat_requests import AiChatMessageRequest, AiChatRequest
 from app.services.ai_actions import confirm_ai_action_service
 from app.services.ai_chat import ai_chat_service
@@ -176,6 +178,7 @@ def _pending_inventory_action(employee_id: int = 7) -> AiPendingAction:
 
     return AiPendingAction(
         id=10,
+        store_id=1,
         employee_id=employee_id,
         provider="gemini",
         action_type="update_inventory_batch_quantity",
@@ -234,7 +237,8 @@ async def test_confirm_ai_action_executes_existing_inventory_service(
         AsyncMock(),
     )
     db = AsyncMock()
-    db.info = {}
+    db.info = {"read_store_id": 1}
+    db.get.return_value = SimpleNamespace(role=EmployeeRole.STORE_MANAGER, store_id=1)
 
     response = await confirm_ai_action_service(action_id=10, employee_id=7, db=db)
 
@@ -251,6 +255,7 @@ async def test_confirm_ai_action_executes_discount_product_service(
 
     action = AiPendingAction(
         id=11,
+        store_id=1,
         employee_id=7,
         provider="gemini",
         action_type="add_discount_products",
@@ -280,7 +285,8 @@ async def test_confirm_ai_action_executes_discount_product_service(
     monkeypatch.setattr(ai_actions_module, "create_operation_audit_log", AsyncMock())
 
     db = AsyncMock()
-    db.info = {}
+    db.info = {"read_store_id": 1}
+    db.get.return_value = SimpleNamespace(role=EmployeeRole.STORE_MANAGER, store_id=1)
     response = await confirm_ai_action_service(
         action_id=11,
         employee_id=7,

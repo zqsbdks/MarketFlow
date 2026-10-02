@@ -9,6 +9,17 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
+  const identity = localStorage.getItem('marketflow_employee')
+  if (identity) {
+    try {
+      const employee = JSON.parse(identity) as { id?: number; store_id?: number | null }
+      const saved = localStorage.getItem(`marketflow_selected_store_${employee.id}`)
+      const selected = saved ? Number(saved) : employee.store_id
+      if (selected && Number.isInteger(selected)) config.headers['X-Store-ID'] = String(selected)
+    } catch {
+      // 无效的本地展示数据不作为权限凭据，服务端始终重新验证登录状态。
+    }
+  }
   const csrf = document.cookie.split('; ').find((part) => part.startsWith('marketflow_csrf='))
   if (csrf) config.headers['X-CSRF-Token'] = decodeURIComponent(csrf.split('=')[1] || '')
   return config

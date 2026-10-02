@@ -61,6 +61,7 @@ class CreatePurchaseRequest(BaseModel):
     """创建进货单的请求。"""
 
     department_id: int = Field(..., description="进货所属部门ID", ge=1)
+    expected_arrival_date: date | None = Field(None, description="预计到货日期；默认下单两天后")
     items: list[CreatePurchaseItemRequest] = Field(
         ...,
         description="进货商品明细，至少包含一项",

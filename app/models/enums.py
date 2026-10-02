@@ -7,6 +7,7 @@ class EmployeeRole(StrEnum):
     """员工账号角色。"""
 
     STORE_MANAGER = "店长"  # 管理门店并维护员工账号。
+    HEADQUARTERS = "总部"  # 管理门店、统一目录、调店及总部联络，不执行门店业务。
     REGULAR_EMPLOYEE = "正式员工"  # 绑定部门的正式雇员。
     CONTRACT_WORKER = "契约工"  # 绑定部门的契约雇员。
 

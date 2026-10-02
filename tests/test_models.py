@@ -29,6 +29,32 @@ from app.models import (
 )
 
 EXPECTED_COLUMNS = {
+    "contact_notice": {
+        "id",
+        "title",
+        "content",
+        "priority",
+        "target_type",
+        "department_id",
+        "publisher_id",
+        "starts_at",
+        "deadline_at",
+        "close_on_all_confirmed",
+        "status",
+        "closed_at",
+        "close_reason",
+        "version",
+        "created_at",
+        "updated_at",
+    },
+    "contact_notice_recipient": {
+        "id",
+        "notice_id",
+        "employee_id",
+        "read_at",
+        "confirmed_at",
+        "created_at",
+    },
     "department": {"id", "code", "name", "is_active", "created_at", "updated_at"},
     "employee": {
         "id",
@@ -243,7 +269,26 @@ EXPECTED_COLUMNS = {
     },
 }
 
+for table_name in (
+    "product", "purchase", "purchase_item", "sale", "sale_item", "inventory_batch",
+    "discount_rule", "discount_rule_scope", "supplier", "supplier_product",
+    "employee", "operation_audit_log", "contact_notice", "contact_notice_recipient",
+    "ai_pending_action",
+):
+    EXPECTED_COLUMNS[table_name].add("store_id")
+EXPECTED_COLUMNS["contact_notice"].update({"source", "target_store_ids"})
+EXPECTED_COLUMNS["store"] = {"id", "store_no", "name", "address", "phone", "timezone", "is_active", "created_at", "updated_at"}
+EXPECTED_COLUMNS["store_department"] = {"store_id", "department_id", "is_active", "created_at", "updated_at"}
+EXPECTED_COLUMNS["ai_conversation"] = {"id", "employee_id", "store_id", "home_store_id", "title", "provider", "model", "summary", "summary_through_id", "created_at", "updated_at"}
+EXPECTED_COLUMNS["ai_message"] = {"id", "conversation_id", "role", "content", "actions", "created_at"}
+
 EXPECTED_TABLE_COMMENTS = {
+    "store": "门店表",
+    "store_department": "门店部门启用配置表",
+    "ai_conversation": "员工AI会话表",
+    "ai_message": "AI完整历史消息表",
+    "contact_notice": "联络事项表",
+    "contact_notice_recipient": "联络事项员工确认表",
     "department": "部门表",
     "employee": "员工表",
     "employee_detail": "员工详情表",
@@ -428,7 +473,7 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """AI待确认操作表迁移是当前唯一的Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20261001_0021"]
+    assert script.get_heads() == ["20261002_0029"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

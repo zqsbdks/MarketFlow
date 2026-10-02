@@ -120,6 +120,8 @@ def test_detail_route_returns_public_fields(monkeypatch, is_manager):
         role=actor.role,
         department_id=None,
         department=None,
+        store_id=1,
+        store=SimpleNamespace(store_no="DP0001", name="MarketFlow 本店"),
         is_active=not is_manager,
         must_change_password=is_manager,
         last_login_at=None,
@@ -153,6 +155,9 @@ def test_detail_route_returns_public_fields(monkeypatch, is_manager):
     data = response.json()["data"]
     assert data["id"] == target_id
     assert data["department_name"] is None
+    assert data["store_id"] == 1
+    assert data["store_no"] == "DP0001"
+    assert data["store_name"] == "MarketFlow 本店"
     assert data["hire_date"] == "2026-09-01"
     assert data["is_active"] is (not is_manager)
     assert "password_hash" not in data

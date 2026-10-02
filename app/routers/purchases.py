@@ -1,6 +1,8 @@
 """进货管理 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
+from datetime import date
+
+from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -11,11 +13,13 @@ from app.schemas.purchases_responses import (
     PurchaseDetailResponse,
     PurchaseListResponse,
 )
+from app.services.purchase_planning import get_purchase_planning
 from app.services.purchases import (
     auto_receive_purchases_service,
     create_purchase_service,
     get_purchase_detail_service,
     get_purchases_list_service,
+    receive_purchase_service,
 )
 
 # 最终接口地址统一以 /api/v1/purchases 开头。
@@ -29,10 +33,37 @@ purchases_router = APIRouter(
 # 1. GET /list：获取进货单列表
 # 2. GET /{purchase_id}：获取进货单详情
 # 3. POST /：创建进货单
-# 4. PUT /{purchase_id}/receive：签收到货
+# 4. PUT /{purchase_id}/receive：手动签收到货
+
+
+# region 手动签收单张进货单
+@purchases_router.put(
+    "/{purchase_id}/receive",
+    response_model=ResponseModel[PurchaseDetailResponse],
+    summary="手动签收进货单",
+)
+async def receive_purchase(
+    purchase_id: int = Path(..., ge=1),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[PurchaseDetailResponse]:
+    result = await receive_purchase_service(purchase_id, current_employee_id, db)
+    return ResponseModel[PurchaseDetailResponse](message="进货单签收成功", data=result)
+# endregion
 
 
 # region 获取进货单列表
+@purchases_router.get("/planning", summary="获取七天进货计划参考")
+async def purchase_planning(
+    department_id: int = Query(..., ge=1),
+    arrival_date: date | None = Query(None),
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """展示已有预计到货、上周同曜日销量与可售库存，不修改业务数据。"""
+    return ResponseModel(data=await get_purchase_planning(department_id, arrival_date, db))
+
+
 @purchases_router.get(
     "/list",
     response_model=ResponseModel[PurchaseListResponse],

@@ -61,6 +61,7 @@ async def auth_login_service(
         )
 
     employee_response = AuthLoginEmployee(
+        store_id=employee.store_id,
         id=employee.id,
         employee_no=employee.employee_no,
         name=employee.name,
@@ -98,6 +99,7 @@ async def get_current_employee_info_service(employee_id: int, db: AsyncSession) 
         )
 
     return AuthMeResponse(
+        store_id=employee.store_id,
         id=employee.id,
         employee_no=employee.employee_no,
         name=employee.name,

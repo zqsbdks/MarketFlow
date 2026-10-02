@@ -17,6 +17,8 @@ from app.core.cache import (
 from app.crud.ai_pending_actions import get_ai_pending_action_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.ai_pending_action import AiPendingAction
+from app.models.employee import Employee
+from app.models.enums import EmployeeRole
 from app.schemas.ai_chat_responses import (
     AiActionExecutionResponse,
     AiPendingActionResponse,
@@ -108,6 +110,15 @@ async def confirm_ai_action_service(
     if action is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="AI操作不存在")
     _validate_pending_action(action, employee_id)
+
+    employee = await db.get(Employee, employee_id)
+    if (
+        employee is None
+        or employee.role == EmployeeRole.HEADQUARTERS
+        or action.store_id != employee.store_id
+        or db.info.get("read_store_id") != employee.store_id
+    ):
+        raise HTTPException(403, "门店已切换或员工已异动，请在所属门店重新发起操作")
 
     if action.expires_at <= business_now():
         action.status = "expired"

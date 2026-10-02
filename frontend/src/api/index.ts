@@ -1,6 +1,8 @@
 import { http, unwrap } from './http'
 import type {
   AiChatMessage,
+  AiConversationSummary,
+  AiConversationDetail,
   AiChatResult,
   AiActionExecutionResult,
   AiProvider,
@@ -41,6 +43,7 @@ import type {
   Supplier,
   SupplierProduct,
   Purchase,
+  PurchasePlanning,
 } from '../types/api'
 
 // region AI 聊天
@@ -49,14 +52,27 @@ export async function sendAiChat(
   provider: AiProvider,
   model: string,
   messages: AiChatMessage[],
+  conversationId?: number,
 ) {
   const response = await http.post<ApiResponse<AiChatResult>>(
     '/ai-chat',
-    { provider, model: model || undefined, messages },
+    { provider, model: model || undefined, messages, conversation_id: conversationId },
     {
       timeout: 45_000,
     },
   )
+  return unwrap(response.data)
+}
+
+export async function getAiConversations() {
+  const response = await http.get<ApiResponse<AiConversationSummary[]>>('/ai-conversations')
+  return unwrap(response.data)
+}
+
+export async function getAiConversation(id: number, beforeId?: number) {
+  const response = await http.get<ApiResponse<AiConversationDetail>>(`/ai-conversations/${id}`, {
+    params: beforeId ? { before_id: beforeId } : undefined,
+  })
   return unwrap(response.data)
 }
 
@@ -470,6 +486,16 @@ export async function getPurchases(params: Record<string, unknown> = {}) {
 
 export async function getPurchase(id: number) {
   return unwrap((await http.get<ApiResponse<Purchase>>(`/purchases/${id}`)).data)
+}
+
+export async function getPurchasePlanning(departmentId: number, arrivalDate?: string) {
+  return unwrap((await http.get<ApiResponse<PurchasePlanning>>('/purchases/planning', {
+    params: { department_id: departmentId, arrival_date: arrivalDate },
+  })).data)
+}
+
+export async function receivePurchase(id: number) {
+  return unwrap((await http.put<ApiResponse<Purchase>>(`/purchases/${id}/receive`)).data)
 }
 
 export async function createPurchase(payload: Record<string, unknown>) {

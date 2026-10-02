@@ -19,13 +19,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin
+from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import SaleSource
 
 if TYPE_CHECKING:
     from app.models.sale_item import SaleItem
 
 
-class Sale(CreatedAtMixin, Base):
+class Sale(StoreScopedMixin, CreatedAtMixin, Base):
     """一次销售的金额、成本和毛利润汇总。"""
 
     __tablename__ = "sale"

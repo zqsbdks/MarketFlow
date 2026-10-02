@@ -128,10 +128,10 @@ onMounted(async () => {
     <section class="panel table-panel">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>员工</th><th>编号</th><th>角色</th><th>所属部门</th><th>账号状态</th><th>操作</th></tr></thead>
+          <thead><tr><th>员工</th><th>编号</th><th>角色</th><th>所属门店</th><th>所属部门</th><th>账号状态</th><th>操作</th></tr></thead>
           <tbody>
-            <tr v-for="item in employees" :key="item.id"><td><div class="employee-cell"><span>{{ item.name.slice(0, 1) }}</span><RouterLink class="text-button" :to="`/employees/${item.id}`" :aria-label="`查看${item.name}的档案`"><strong>{{ item.name }}</strong><span aria-hidden="true">↗</span></RouterLink></div></td><td class="mono">{{ item.employee_no }}</td><td>{{ item.role }}</td><td>{{ item.department_name || '全店' }}</td><td><span :class="['status-badge', item.is_active ? 'on_sale' : 'stopped']">{{ item.is_active ? '已启用' : '已停用' }}</span></td><td><div v-if="item.id !== authStore.employee?.id" class="row-actions"><button class="text-button" @click="resetPassword(item)"><KeyRound :size="15" />重置密码</button><button class="text-button muted" @click="toggleStatus(item)">{{ item.is_active ? '停用' : '启用' }}</button></div><span v-else class="record-count">当前账号</span></td></tr>
-            <tr v-if="!loading && !employees.length"><td colspan="6" class="empty-cell">没有符合条件的员工</td></tr>
+            <tr v-for="item in employees" :key="item.id"><td><div class="employee-cell"><span>{{ item.name.slice(0, 1) }}</span><RouterLink class="text-button" :to="`/employees/${item.id}`" :aria-label="`查看${item.name}的档案`"><strong>{{ item.name }}</strong><span aria-hidden="true">↗</span></RouterLink></div></td><td class="mono">{{ item.employee_no }}</td><td>{{ item.role }}</td><td>{{ item.store_no && item.store_name ? `${item.store_no} · ${item.store_name}` : '总部（无所属门店）' }}</td><td>{{ item.department_name || '全店' }}</td><td><span :class="['status-badge', item.is_active ? 'on_sale' : 'stopped']">{{ item.is_active ? '已启用' : '已停用' }}</span></td><td><div v-if="item.id !== authStore.employee?.id" class="row-actions"><button class="text-button" @click="resetPassword(item)"><KeyRound :size="15" />重置密码</button><button class="text-button muted" @click="toggleStatus(item)">{{ item.is_active ? '停用' : '启用' }}</button></div><span v-else class="record-count">当前账号</span></td></tr>
+            <tr v-if="!loading && !employees.length"><td colspan="7" class="empty-cell">没有符合条件的员工</td></tr>
           </tbody>
         </table>
       </div>

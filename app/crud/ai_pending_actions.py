@@ -24,6 +24,7 @@ async def create_ai_pending_action(
 
     action = AiPendingAction(
         employee_id=employee_id,
+        store_id=db.info.get("read_store_id"),
         provider=provider,
         action_type=action_type,
         arguments=arguments,

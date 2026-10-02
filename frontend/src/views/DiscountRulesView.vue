@@ -32,6 +32,7 @@ import { confirmTranslated, language, promptTranslated, translate } from '../i18
 import ModalPanel from '../components/ModalPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
+import { useStoreScope } from '../stores/storeScope'
 import type {
   Department,
   DiscountComputedStatus,
@@ -45,6 +46,7 @@ import type {
 import { apiDateTime, formatDateTime, formatMoney } from '../utils'
 
 const auth = useAuthStore()
+const storeScope = useStoreScope()
 
 // region 页面列表、筛选与权限状态
 const rules = ref<DiscountRule[]>([])
@@ -65,10 +67,10 @@ const totalPages = ref(0)
 
 // 店长可以管理全部部门，正式员工只管理本部门；契约工仅查看。
 const canMaintain = computed(
-  () => auth.employee?.role === '店长' || auth.employee?.role === '正式员工',
+  () => storeScope.canWriteStore && (auth.employee?.role === '店长' || auth.employee?.role === '正式员工'),
 )
 function canMaintainRule(rule: DiscountRule | null) {
-  if (rule === null) return false
+  if (rule === null || !storeScope.canWriteStore) return false
   if (auth.isManager) return true
   return (
     auth.employee?.role === '正式员工' &&

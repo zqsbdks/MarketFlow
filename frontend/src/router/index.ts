@@ -23,6 +23,8 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
+        { path: 'stores', name: 'stores', component: () => import('../views/StoresView.vue'), meta: { title: '门店与总部', headquartersOnly: true } },
+        { path: 'contact-notices', name: 'contact-notices', component: () => import('../views/ContactNoticesView.vue'), meta: { title: '联络事项' } },
         { path: '', redirect: '/dashboard' },
         {
           path: 'dashboard',
@@ -119,6 +121,7 @@ router.beforeEach((to) => {
   if (to.meta.managerOnly && !auth.isManager) {
     return '/dashboard'
   }
+  if (to.meta.headquartersOnly && !auth.isHeadquarters) return '/dashboard'
   if (
     auth.employee?.must_change_password &&
     to.name !== 'change-password' &&

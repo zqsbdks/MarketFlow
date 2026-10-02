@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from app.core.token import create_access_token
-from app.dependencies.auth import get_current_token_payload
+from app.dependencies.auth import get_current_token_payload, get_current_employee_id
 from app.dependencies.db import get_db
 from app.main import create_app
 from app.models.department import Department
@@ -96,6 +96,7 @@ def test_login_returns_documented_response(monkeypatch) -> None:
         "employee_no": "E00001",
         "name": "店长",
         "role": "店长",
+        "store_id": None,
         "department": None,
         "must_change_password": True,
     }
@@ -268,6 +269,7 @@ def test_get_current_employee_info_returns_documented_response(monkeypatch) -> N
     application = create_app()
     application.dependency_overrides[get_db] = override_db
     application.dependency_overrides[get_current_token_payload] = current_token_payload
+    application.dependency_overrides[get_current_employee_id] = lambda: 1
 
     with TestClient(application) as client:
         response = client.get("/api/v1/auth/me")
@@ -281,6 +283,7 @@ def test_get_current_employee_info_returns_documented_response(monkeypatch) -> N
             "employee_no": "E00001",
             "name": "店长",
             "role": "店长",
+            "store_id": None,
             "department": {"id": 1, "name": "精肉部"},
             "is_active": True,
         },
@@ -354,6 +357,7 @@ def test_change_password_returns_unified_response(monkeypatch) -> None:
     application = create_app()
     application.dependency_overrides[get_db] = override_db
     application.dependency_overrides[get_current_token_payload] = current_token_payload
+    application.dependency_overrides[get_current_employee_id] = lambda: 1
 
     with TestClient(application) as client:
         response = client.post(

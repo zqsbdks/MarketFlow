@@ -21,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   const employee = ref<EmployeeIdentity | null>(readEmployee())
   const isAuthenticated = computed(() => Boolean(employee.value))
   const isManager = computed(() => employee.value?.role === '店长')
+  const isHeadquarters = computed(() => employee.value?.role === '总部')
 
   function saveEmployee(value: EmployeeIdentity) {
     employee.value = value
@@ -53,6 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
     employee,
     isAuthenticated,
     isManager,
+    isHeadquarters,
     signIn,
     refreshEmployee,
     signOut,

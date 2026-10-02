@@ -9,6 +9,7 @@ from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.department import Department
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from app.models.sale import Sale
 
 
-class SaleItem(Base):
+class SaleItem(StoreScopedMixin, Base):
     """保留成交时商品信息和价格成本快照的销售行。"""
 
     __tablename__ = "sale_item"

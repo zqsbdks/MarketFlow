@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import InventoryBatchStatus
 
 if TYPE_CHECKING:
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     from app.models.purchase_item import PurchaseItem
 
 
-class InventoryBatch(TimestampMixin, Base):
+class InventoryBatch(StoreScopedMixin, TimestampMixin, Base):
     """保存每条已到货进货明细对应的批次库存及到期日期。"""
 
     # SQLAlchemy会把这个模型映射到MySQL中的inventory_batch表。

@@ -2,14 +2,15 @@
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.core.business_time import business_now
 from app.core.business_sequence import next_business_sequence
+from app.core.business_time import business_now
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole, InventoryBatchStatus, ProductStatus, PurchaseStatus
@@ -142,9 +143,11 @@ async def create_purchase(
 ) -> Purchase:
     """创建一张进货单及其全部进货明细，并发送到当前数据库事务。"""
 
-    # 创建时间由后端统一确定；预计到货时间固定为下单时间的两天后。
+    # 创建时间由后端统一确定；未指定日期时预计两天后到货。
     ordered_at = business_now()
     expected_arrival_at = ordered_at + timedelta(days=2)
+    if purchase.expected_arrival_date is not None:
+        expected_arrival_at = datetime.combine(purchase.expected_arrival_date, time(hour=12))
 
     # 进货单号格式为 PUR + 下单日期 + 当天四位流水号，例如 PUR202609130001。
     # 计数器行会被数据库锁定，因此多人同时创建也不会取得重复编号。
@@ -158,7 +161,7 @@ async def create_purchase(
         select(SupplierProduct)
         .options(
             selectinload(SupplierProduct.supplier),
-            selectinload(SupplierProduct.product),
+            selectinload(SupplierProduct.products),
         )
         .where(SupplierProduct.id.in_(supplier_product_ids))
     )
@@ -204,9 +207,11 @@ async def create_purchase(
         # 正式商品可能尚未生成，因此 product_id 和商品编号快照允许为空。
         product_id = None
         product_no_snapshot = None
-        if catalog_product.product is not None:
-            product_id = catalog_product.product.id
-            product_no_snapshot = catalog_product.product.product_no
+        for existing_product in catalog_product.products:
+            if existing_product.store_id == db.info.get("write_store_id", 1):
+                product_id = existing_product.id
+                product_no_snapshot = existing_product.product_no
+                break
 
         purchase_items.append(
             PurchaseItem(
@@ -253,23 +258,26 @@ async def auto_receive_due_purchases(
     arrived_at: datetime,
     employee_id: int | None,
     db: AsyncSession,
+    only_purchase_id: int | None = None,
 ) -> list[Purchase]:
     """签收所有达到预计到货时间的待到货进货单，并同步商品与批次库存。"""
 
+    conditions = [Purchase.status == PurchaseStatus.PENDING]
+    if only_purchase_id is None:
+        conditions.append(Purchase.expected_arrival_at <= arrived_at)
+    else:
+        conditions.append(Purchase.id == only_purchase_id)
     statement = (
         select(Purchase)
         .options(
             selectinload(Purchase.items)
             .selectinload(PurchaseItem.supplier_product)
-            .selectinload(SupplierProduct.product),
+            .selectinload(SupplierProduct.products),
             selectinload(Purchase.items)
             .selectinload(PurchaseItem.supplier_product)
             .selectinload(SupplierProduct.category),
         )
-        .where(
-            Purchase.status == PurchaseStatus.PENDING,
-            Purchase.expected_arrival_at <= arrived_at,
-        )
+        .where(*conditions)
         .order_by(Purchase.id.asc())
         .with_for_update()
     )
@@ -291,23 +299,31 @@ async def auto_receive_due_purchases(
     )
 
     for purchase in due_purchases:
-        # 模拟自动签收：选择该部门 ID 最小的一名启用正式员工作为签收人。
-        receiver = await db.scalar(
-            select(Employee)
-            .where(
-                Employee.department_id == purchase.department_id,
-                Employee.role == EmployeeRole.REGULAR_EMPLOYEE,
-                Employee.is_active.is_(True),
+        db.info["write_store_id"] = purchase.store_id
+        if only_purchase_id is None:
+            # 定时任务代签：选择本店本部门最早的一名启用正式员工。
+            receiver = await db.scalar(
+                select(Employee)
+                .where(
+                    Employee.department_id == purchase.department_id,
+                    Employee.store_id == purchase.store_id,
+                    Employee.role == EmployeeRole.REGULAR_EMPLOYEE,
+                    Employee.is_active.is_(True),
+                )
+                .order_by(Employee.id.asc())
+                .limit(1)
             )
-            .order_by(Employee.id.asc())
-            .limit(1)
-        )
+        else:
+            # 单张手动签收保留真正点击按钮的员工身份。
+            receiver = await db.get(Employee, employee_id)
         if receiver is None:
             raise ValueError(f"部门ID {purchase.department_id} 没有可用的正式员工")
 
         for purchase_item in purchase.items:
             catalog_product = purchase_item.supplier_product
-            product = catalog_product.product
+            product = await db.scalar(select(Product).where(
+                Product.supplier_product_id == catalog_product.id,
+                Product.store_id == purchase.store_id).with_for_update())
             product_was_created = product is None
             if product is None:
                 if catalog_product.category_id is None or catalog_product.category is None:
@@ -316,7 +332,8 @@ async def auto_receive_due_purchases(
                     raise ValueError(f"供应商商品目录ID {catalog_product.id} 的分类不属于进货部门")
                 product_number += 1
                 product = Product(
-                    product_no=f"P{product_number:05d}",
+                    store_id=purchase.store_id,
+                    product_no="NEW" + uuid4().hex[:16],
                     name=catalog_product.name,
                     supplier_product_id=catalog_product.id,
                     department_id=purchase.department_id,
@@ -329,6 +346,7 @@ async def auto_receive_due_purchases(
                 )
                 db.add(product)
                 await db.flush()
+                product.product_no = f"P{product.id:05d}"
 
             before_product_stock = product.stock_quantity
             before_purchase_price = product.purchase_price
@@ -338,7 +356,8 @@ async def auto_receive_due_purchases(
 
             batch_number += 1
             inventory_batch = InventoryBatch(
-                batch_no=f"BAT{arrived_at:%Y%m%d}{batch_number:04d}",
+                store_id=purchase.store_id,
+                batch_no="NEW" + uuid4().hex[:16],
                 product_id=product.id,
                 purchase_item_id=purchase_item.id,
                 production_date=purchase_item.production_date,
@@ -350,6 +369,7 @@ async def auto_receive_due_purchases(
             )
             db.add(inventory_batch)
             await db.flush()
+            inventory_batch.batch_no = f"BAT{arrived_at:%Y%m%d}{inventory_batch.id:06d}"
 
             # 首次到货会生成正式商品；后续到货则只增加已有商品的汇总库存。
             await create_operation_audit_log(
@@ -395,6 +415,8 @@ async def auto_receive_due_purchases(
         purchase.received_by = receiver.id
         purchase.arrived_at = arrived_at
         purchase.status = PurchaseStatus.ARRIVED
+        # 单张手动签收可能已预加载“签收人=None”，详情重查前使关系失效。
+        db.expire(purchase, ["received_by_employee"])
 
         await create_operation_audit_log(
             employee_id=employee_id,
@@ -408,7 +430,9 @@ async def auto_receive_due_purchases(
                 "received_by": purchase.received_by,
                 "arrived_at": purchase.arrived_at,
             },
-            reason="系统按预计到货时间自动签收" if employee_id is None else "店长手动补执行签收",
+            reason="单张进货单手动签收" if only_purchase_id is not None else (
+                "系统按预计到货时间自动签收" if employee_id is None else "店长手动补执行签收"
+            ),
             db=db,
         )
 

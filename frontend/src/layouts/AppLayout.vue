@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   BarChart3,
@@ -21,6 +21,7 @@ import {
 } from '@lucide/vue'
 
 import { useAuthStore } from '../stores/auth'
+import { useStoreScope } from '../stores/storeScope'
 import AiChatWidget from '../components/AiChatWidget.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
@@ -28,24 +29,47 @@ import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const scope = useStoreScope()
 const sidebarOpen = ref(false)
+let employeeRefresh: ReturnType<typeof setInterval> | undefined
+
+async function refreshAssignment() {
+  const previous = auth.employee?.store_id
+  try {
+    await auth.refreshEmployee()
+    if (previous !== auth.employee?.store_id) {
+      await scope.load()
+      if (auth.employee?.store_id) scope.choose(auth.employee.store_id)
+    }
+  } catch {
+    // 路由和服务端会继续检查登录状态。
+  }
+}
+
+onMounted(async () => {
+  try { await scope.load() } catch { /* 页面其他查询会显示具体错误。 */ }
+  employeeRefresh = setInterval(() => { void refreshAssignment() }, 60_000)
+})
+onUnmounted(() => { if (employeeRefresh) clearInterval(employeeRefresh) })
 
 const navItems = computed(() => {
   const items = [
     { to: '/dashboard', label: '店铺总览', icon: LayoutDashboard },
+    { to: '/contact-notices', label: '联络事项', icon: ReceiptText },
     { to: '/departments/1', label: '部门经营', icon: BarChart3 },
     { to: '/analytics', label: '经营分析', icon: ChartNoAxesCombined },
     { to: '/products', label: '商品查询', icon: Boxes },
     { to: '/discount-rules', label: '折扣管理', icon: BadgePercent },
-    { to: '/shopping', label: '模拟购物', icon: ScanLine },
     { to: '/sales', label: '销售记录', icon: ReceiptText },
     { to: '/procurement', label: '进货管理', icon: Truck },
     { to: '/inventory-batches', label: '库存批次', icon: Layers3 },
   ]
-  if (auth.isManager) {
+  if (scope.canWriteStore) items.push({ to: '/shopping', label: '模拟购物', icon: ScanLine })
+  if (auth.isManager && scope.canWriteStore) {
     items.push({ to: '/inventory-movements', label: '库存流水', icon: History })
     items.push({ to: '/employees', label: '员工管理', icon: Users })
   }
+  if (auth.isHeadquarters) items.push({ to: '/stores', label: '门店与总部', icon: Store })
   if (auth.employee) items.push({ to: `/employees/${auth.employee.id}`, label: '我的档案', icon: Users })
   return items
 })
@@ -57,6 +81,7 @@ function isActive(path: string) {
 
 async function logout() {
   await auth.signOut()
+  scope.clear()
   router.push('/login')
 }
 </script>
@@ -78,7 +103,10 @@ async function logout() {
 
       <div class="store-chip">
         <span class="live-dot" />
-        <div><small>当前门店</small><strong>MarketFlow 本店</strong></div>
+        <div><small>查询门店</small><strong>{{ scope.selected?.store_no }} {{ scope.selected?.name || '加载中' }}</strong></div>
+        <select :value="scope.selectedId ?? ''" aria-label="选择查询门店" @change="scope.choose(Number(($event.target as HTMLSelectElement).value))">
+          <option v-for="store in scope.stores.filter((item) => item.is_active)" :key="store.id" :value="store.id">{{ store.store_no }} {{ store.name }}</option>
+        </select>
         <ChevronDown :size="16" />
       </div>
 
@@ -121,9 +149,10 @@ async function logout() {
         <ThemeSwitcher />
       </header>
       <div class="page-container">
-        <RouterView />
+        <p v-if="!scope.canWriteStore" class="store-readonly-banner">{{ auth.isHeadquarters ? '总部账号：门店业务仅供查看' : '正在查看其他门店：不能修改该店业务数据' }}</p>
+        <RouterView :key="`${route.fullPath}:${scope.selectedId}`" />
       </div>
     </main>
-    <AiChatWidget v-if="auth.isAuthenticated && !auth.employee?.must_change_password" />
+    <AiChatWidget v-if="auth.isAuthenticated && !auth.employee?.must_change_password" :key="`${auth.employee?.id}:${scope.selectedId}`" />
   </div>
 </template>

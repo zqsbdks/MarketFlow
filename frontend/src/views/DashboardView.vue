@@ -18,6 +18,7 @@ import {
 import { getDepartmentReports, getOverview, getRankings } from '../api'
 import { getErrorMessage } from '../api/http'
 import LoadingBlock from '../components/LoadingBlock.vue'
+import NoticeReminder from '../components/NoticeReminder.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
 import type { DepartmentReport, OverviewReport, RankingItem } from '../types/api'
@@ -126,6 +127,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
+    <NoticeReminder />
     <PageHeader eyebrow="STORE PULSE" title="店铺总览" description="把销售、利润与部门表现放在同一张经营地图上。">
       <div class="date-filter">
         <CalendarDays :size="17" />

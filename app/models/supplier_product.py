@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.category import Category
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from app.models.supplier import Supplier
 
 
-class SupplierProduct(TimestampMixin, Base):
+class SupplierProduct(StoreScopedMixin, TimestampMixin, Base):
     """保存供应商提供的商品、当前报价以及默认保质期。"""
 
     __tablename__ = "supplier_product"
@@ -75,7 +76,7 @@ class SupplierProduct(TimestampMixin, Base):
 
     supplier: Mapped[Supplier] = relationship(back_populates="catalog_products")
     category: Mapped[Category | None] = relationship()
-    product: Mapped[Product | None] = relationship(back_populates="supplier_product", uselist=False)
+    products: Mapped[list[Product]] = relationship(back_populates="supplier_product")
     purchase_items: Mapped[list[PurchaseItem]] = relationship(back_populates="supplier_product")
 
 
