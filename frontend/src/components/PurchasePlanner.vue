@@ -5,6 +5,7 @@ import { getErrorMessage } from '../api/http'
 import { confirmTranslated } from '../i18n'
 import type { Department, PurchasePlanning, PurchasePlanningItem } from '../types/api'
 import { formatMoney } from '../utils'
+import { isPurchaseDayLocked } from '../utils/purchaseOrdering'
 
 const props = defineProps<{ departments: Department[]; ownDepartmentId: number | null; isManager: boolean }>()
 const emit = defineEmits<{ created: [] }>()
@@ -20,7 +21,7 @@ const error = ref('')
 const requestIds = ref<Record<string, string>>({})
 const now = ref(new Date())
 let clock: ReturnType<typeof setInterval> | undefined
-onMounted(() => { clock = setInterval(() => { now.value = new Date() }, 30_000) })
+onMounted(() => { clock = setInterval(() => { now.value = new Date() }, 1_000) })
 onUnmounted(() => { if (clock) clearInterval(clock) })
 
 const suppliers = computed(() => [...new Set(planning.value?.items.map((item) => item.supplier_name) || [])])
@@ -37,11 +38,18 @@ const totalAmount = computed(() => selected.value.reduce((sum, item) => sum + it
 
 function quantity(item: PurchasePlanningItem, date: string) { return quantities.value[`${date}:${item.supplier_product_id}`] || 0 }
 function dayLocked(date: string) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now.value)
-  const value = (type: string) => parts.find((part) => part.type === type)?.value || ''
-  const today = `${value('year')}-${value('month')}-${value('day')}`
-  return date < today || (date === today && Number(value('hour')) >= 12)
+  return isPurchaseDayLocked(date, now.value)
 }
+watch(now, () => {
+  for (const key of Object.keys(quantities.value)) {
+    const date = key.split(':')[0]!
+    if (dayLocked(date)) {
+      if (quantities.value[key]) error.value = '已到订货截止时间，过期日期的待提交数量已清除'
+      delete quantities.value[key]
+      delete requestIds.value[date]
+    }
+  }
+})
 function setQuantity(item: PurchasePlanningItem, date: string, value: number) {
   if (dayLocked(date)) return
   quantities.value[`${date}:${item.supplier_product_id}`] = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
@@ -65,6 +73,7 @@ async function loadPlanning() {
 watch(departmentId, () => { void loadPlanning() }, { immediate: true })
 
 async function submit() {
+  now.value = new Date()
   if (!planning.value || !selected.value.length || saving.value) return
   const days = planning.value.days.filter((date) => planning.value?.items.some((item) => quantity(item, date) > 0))
   if (days.some(dayLocked)) { error.value = '有日期已过订货截止时间，请清除该日数量后重试'; return }
@@ -74,6 +83,8 @@ async function submit() {
   const completed: string[] = []
   try {
     for (const date of days) {
+      now.value = new Date()
+      if (dayLocked(date)) throw new Error('该到货日已过订货截止时间')
       const items = selected.value.filter((item) => quantity(item, date) > 0).map((item) => ({
         supplier_product_id: item.supplier_product_id,
         quantity: quantity(item, date),
@@ -100,7 +111,7 @@ async function submit() {
   <div class="planner">
     <div class="planner-top">
       <label>进货部门<select v-model.number="departmentId" :disabled="!isManager"><option :value="0" disabled>请选择</option><option v-for="item in departments.filter((row) => isManager || row.id === ownDepartmentId)" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
-      <small>默认两天后；从到货日起显示七天。每日格子可直接填写订货数量，当天 12:00 后锁定。</small>
+      <small>默认两天后；从到货日起显示七天。到货日前两天的 12:00 截止订货（日本时间）。</small>
     </div>
     <div class="planner-filters">
       <button v-for="option in ([['all', '全部商品'], ['selected', '只看已选'], ['expiring', '只看临期']] as const)" :key="option[0]" type="button" :class="{ active: display === option[0] }" @click="display = option[0]">{{ option[1] }}</button>
@@ -124,7 +135,7 @@ async function submit() {
     </div>
     <p class="planner-note">日期格上方输入本次订货数量；黑色文字为已有订单到货量，蓝色为上周同曜日销量。深灰色日期已过截止时间。</p>
     <div class="planner-bottom"><span>已选 {{ selected.length }} 种 · {{ totalQuantity }} 件 · 预计金额 {{ formatMoney(totalAmount) }}</span><button class="primary-button" :disabled="saving || loading || !selected.length" @click="submit">提交进货单</button></div>
-    <small>同一日期的商品组成一张进货单；当天 12:00 后不可再订当天到货的商品。提交前会再次确认。</small>
+    <small>同一日期的商品组成一张进货单；到货日前两天的 12:00 后不可再订该日到货的商品。提交前会再次确认。</small>
   </div>
 </template>
 

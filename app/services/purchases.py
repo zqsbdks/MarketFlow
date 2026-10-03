@@ -1,6 +1,6 @@
 """进货管理的业务逻辑。"""
 
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import HTTPException
 from fastapi import status as http_status
@@ -224,13 +224,13 @@ async def create_purchase_service(
             detail="请先修改初始密码",
         )
 
-    # 当天的进货须在 12:00 前提交；未来到货日不受今天中午的截止时间影响。
-    purchase_cutoff_time = time(hour=12)
     now = business_now()
-    if purchase.expected_arrival_date == now.date() and now.time() >= purchase_cutoff_time:
+    arrival_date = purchase.expected_arrival_date or now.date() + timedelta(days=2)
+    cutoff = datetime.combine(arrival_date - timedelta(days=2), time(hour=12))
+    if now >= cutoff:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail="当天的进货单须在12:00前提交",
+            detail="进货单须在到货日前两天的12:00前提交（日本时间）",
         )
     if purchase.expected_arrival_date is not None:
         earliest = now.date()

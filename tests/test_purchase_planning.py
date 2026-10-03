@@ -1,7 +1,7 @@
 """七天进货计划表与单张手动签收接口的回归检查。"""
 
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -36,6 +36,43 @@ def test_purchase_creation_accepts_expected_arrival_date():
         }
     )
     assert payload.expected_arrival_date == requested
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("now", "arrival", "locked"),
+    [
+        (datetime(2026, 10, 4, 11, 59, 59), date(2026, 10, 6), False),
+        (datetime(2026, 10, 4, 12), date(2026, 10, 6), True),
+        (datetime(2026, 10, 4, 13), date(2026, 10, 7), False),
+        (datetime(2026, 10, 4, 9), date(2026, 10, 5), True),
+        (datetime(2026, 10, 4, 12), None, True),
+        (datetime(2026, 10, 4, 11), None, False),
+    ],
+)
+async def test_order_cutoff_is_two_days_before_arrival(monkeypatch, now, arrival, locked):
+    employee = SimpleNamespace(
+        is_active=True, must_change_password=False, role=EmployeeRole.STORE_MANAGER
+    )
+    monkeypatch.setattr(purchase_service, "business_now", lambda: now)
+    monkeypatch.setattr(purchase_service, "get_employee_by_id", AsyncMock(return_value=employee))
+    department_lookup = AsyncMock(return_value=None)
+    monkeypatch.setattr(purchase_service, "get_department_by_id", department_lookup)
+    payload = CreatePurchaseRequest(
+        department_id=1,
+        expected_arrival_date=arrival,
+        items=[{"supplier_product_id": 1, "quantity": 2}],
+    )
+    with pytest.raises(HTTPException) as error:
+        await purchase_service.create_purchase_service(payload, 1, AsyncMock())
+    if locked:
+        assert error.value.status_code == 400
+        assert "到货日前两天" in error.value.detail
+        department_lookup.assert_not_awaited()
+    else:
+        # 有效时段进入下一项校验；不写入测试数据库。
+        assert error.value.status_code == 404
+        department_lookup.assert_awaited_once()
 
 
 @pytest.mark.asyncio
