@@ -51,7 +51,10 @@ def request_cache_key_builder(
     sorted_query_items = sorted(request.query_params.multi_items())
     normalized_query = urlencode(sorted_query_items, doseq=True)
     base_key = f"{namespace}:{request.method}:{request.url.path}"
-    base_key += f":store={getattr(request.state, 'store_id', None)}:employee={getattr(request.state, 'employee_id', None)}"
+    base_key += (
+        f":store={getattr(request.state, 'store_id', None)}"
+        f":employee={getattr(request.state, 'employee_id', None)}"
+    )
     if normalized_query:
         return f"{base_key}?{normalized_query}"
     return base_key

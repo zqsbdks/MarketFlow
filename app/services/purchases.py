@@ -448,8 +448,10 @@ async def receive_purchase_service(
         raise HTTPException(409, "进货单已经签收")
     try:
         received = await auto_receive_due_purchases(
-            arrived_at=business_now(), employee_id=current_employee_id,
-            db=db, only_purchase_id=purchase_id,
+            arrived_at=business_now(),
+            employee_id=current_employee_id,
+            db=db,
+            only_purchase_id=purchase_id,
         )
         if not received:
             raise HTTPException(409, "进货单已被其他人签收")
@@ -462,6 +464,8 @@ async def receive_purchase_service(
     except IntegrityError as error:
         await db.rollback()
         raise HTTPException(409, "签收入库时发生数据冲突") from error
+
+
 # endregion
 
 

@@ -19,8 +19,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import InventoryBatchStatus
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.product import Product

@@ -13,7 +13,9 @@ class AiPendingAction(TimestampMixin, Base):
     """保存 AI 提议但尚未由当前员工确认执行的数据修改。"""
 
     __tablename__ = "ai_pending_action"
-    store_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("store.id"), nullable=True, comment="操作准备时的目标门店")
+    store_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("store.id"), nullable=True, comment="操作准备时的目标门店"
+    )
     __table_args__ = (
         CheckConstraint(
             "status IN ('pending', 'processing', 'executed', 'cancelled', 'expired', 'failed')",

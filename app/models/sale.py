@@ -19,8 +19,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin
-from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import SaleSource
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.sale_item import SaleItem

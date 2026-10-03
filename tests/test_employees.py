@@ -20,8 +20,8 @@ from app.dependencies.db import get_db
 from app.main import create_app
 from app.models.department import Department
 from app.models.employee import Employee
-from app.models.store import Store
 from app.models.enums import EmployeeRole
+from app.models.store import Store
 from app.schemas.employees_requests import EmployeesCreateRequest
 from app.schemas.employees_responses import (
     EmployeesCreateResponse,

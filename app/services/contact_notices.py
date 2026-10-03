@@ -41,7 +41,9 @@ def can_manage(notice, employee):
     """店长可管理所有事项，其他员工只能管理自己发布的事项。"""
     if employee.role == EmployeeRole.HEADQUARTERS:
         return notice.source == "headquarters"
-    return notice.store_id == employee.store_id and (employee.role == EmployeeRole.STORE_MANAGER or notice.publisher_id == employee.id)
+    return notice.store_id == employee.store_id and (
+        employee.role == EmployeeRole.STORE_MANAGER or notice.publisher_id == employee.id
+    )
 
 
 def check_version(notice, version):
@@ -92,20 +94,25 @@ async def close_if_due(notice, db):
             await db.scalar(
                 select(func.count())
                 .select_from(ContactNoticeRecipient)
-                    .join(Employee, Employee.id == ContactNoticeRecipient.employee_id)
-                    .where(ContactNoticeRecipient.notice_id == notice.id, Employee.is_active.is_(True), Employee.store_id == ContactNoticeRecipient.store_id)
+                .join(Employee, Employee.id == ContactNoticeRecipient.employee_id)
+                .where(
+                    ContactNoticeRecipient.notice_id == notice.id,
+                    Employee.is_active.is_(True),
+                    Employee.store_id == ContactNoticeRecipient.store_id,
+                )
             )
             or 0
         )
         pending = int(
             await db.scalar(
-                    select(func.count())
+                select(func.count())
                 .select_from(ContactNoticeRecipient)
-                    .join(Employee, Employee.id == ContactNoticeRecipient.employee_id)
+                .join(Employee, Employee.id == ContactNoticeRecipient.employee_id)
                 .where(
                     ContactNoticeRecipient.notice_id == notice.id,
                     ContactNoticeRecipient.confirmed_at.is_(None),
-                        Employee.is_active.is_(True), Employee.store_id == ContactNoticeRecipient.store_id,
+                    Employee.is_active.is_(True),
+                    Employee.store_id == ContactNoticeRecipient.store_id,
                 )
             )
             or 0
@@ -145,8 +152,11 @@ async def resolve_recipients(request, employee, db):
     if request.store_ids and not headquarters:
         raise HTTPException(403, "只有总部可以指定目标门店")
     if headquarters and request.store_ids:
-        selected_stores = (await db.scalars(select(Store).where(
-            Store.id.in_(request.store_ids), Store.is_active.is_(True)))).all()
+        selected_stores = (
+            await db.scalars(
+                select(Store).where(Store.id.in_(request.store_ids), Store.is_active.is_(True))
+            )
+        ).all()
         if len(selected_stores) != len(set(request.store_ids)):
             raise HTTPException(400, "目标门店不存在或已停用")
     manager = employee.role in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS)
@@ -208,7 +218,9 @@ async def resolve_recipients(request, employee, db):
 async def build_response(notice, employee, db, *, detail=False):
     """组装确认统计；只有发布者和店长得到完整接收员工名单。"""
     rows = await get_recipients(notice.id, db)
-    view_recipients = can_manage(notice, employee) or (employee.role == EmployeeRole.STORE_MANAGER and notice.source == "headquarters")
+    view_recipients = can_manage(notice, employee) or (
+        employee.role == EmployeeRole.STORE_MANAGER and notice.source == "headquarters"
+    )
     if employee.role == EmployeeRole.STORE_MANAGER and notice.source == "headquarters":
         rows = [row for row in rows if row[0].store_id == employee.store_id]
     mine = None
@@ -258,8 +270,10 @@ async def build_response(notice, employee, db, *, detail=False):
     ):
         data[field] = getattr(notice, field)
     data.update(
-        source=notice.source or "store", store_id=notice.store_id,
-        target_store_ids=notice.target_store_ids or [], can_view_recipients=view_recipients,
+        source=notice.source or "store",
+        store_id=notice.store_id,
+        target_store_ids=notice.target_store_ids or [],
+        can_view_recipients=view_recipients,
         publisher_name=publisher.name,
         department_name=department.name if department else None,
         read_at=mine.read_at if mine else None,
@@ -267,7 +281,8 @@ async def build_response(notice, employee, db, *, detail=False):
         recipient_count=len(rows),
         confirmed_count=confirmed_count,
         can_manage=can_manage(notice, employee),
-        can_confirm=mine is not None and mine.store_id == employee.store_id
+        can_confirm=mine is not None
+        and mine.store_id == employee.store_id
         and mine.confirmed_at is None
         and notice.status in ("published", "closed")
         and notice.starts_at <= business_now(),
@@ -289,7 +304,10 @@ async def list_notices(request, employee_id, db):
     for value in (request.start_time, request.end_time):
         if value and value.tzinfo is not None:
             raise HTTPException(400, "请使用门店本地时间")
-    if request.view == "management" and employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS):
+    if request.view == "management" and employee.role not in (
+        EmployeeRole.STORE_MANAGER,
+        EmployeeRole.HEADQUARTERS,
+    ):
         raise HTTPException(403, "只有店长可以查看全部事项")
     await refresh_expired_notices(db)
     notices, total = await get_notices(request, employee, business_now(), db)
@@ -317,11 +335,29 @@ async def detail_notice(notice_id, employee_id, db):
             ContactNoticeRecipient.employee_id == employee.id,
         )
     )
-    manager_hq_view = employee.role == EmployeeRole.STORE_MANAGER and notice.source == "headquarters" and bool(await db.scalar(select(ContactNoticeRecipient.id).where(ContactNoticeRecipient.notice_id == notice.id, ContactNoticeRecipient.store_id == employee.store_id).limit(1)))
-    if not can_manage(notice, employee) and not manager_hq_view and (
-        mine is None or mine.store_id != employee.store_id
-        or notice.status not in ("published", "closed")
-        or notice.starts_at > business_now()
+    manager_hq_view = (
+        employee.role == EmployeeRole.STORE_MANAGER
+        and notice.source == "headquarters"
+        and bool(
+            await db.scalar(
+                select(ContactNoticeRecipient.id)
+                .where(
+                    ContactNoticeRecipient.notice_id == notice.id,
+                    ContactNoticeRecipient.store_id == employee.store_id,
+                )
+                .limit(1)
+            )
+        )
+    )
+    if (
+        not can_manage(notice, employee)
+        and not manager_hq_view
+        and (
+            mine is None
+            or mine.store_id != employee.store_id
+            or notice.status not in ("published", "closed")
+            or notice.starts_at > business_now()
+        )
     ):
         raise HTTPException(403, "无权查看此事项")
     await close_if_due(notice, db)
@@ -349,8 +385,13 @@ async def save_notice(request, employee_id, db, notice_id=None):
     recipients, department_id, starts_at = await resolve_recipients(request, employee, db)
     before = None
     if notice_id is None:
-        notice = ContactNotice(publisher_id=employee.id, status="draft", version=1,
-            store_id=employee.store_id, source="headquarters" if employee.role == EmployeeRole.HEADQUARTERS else "store")
+        notice = ContactNotice(
+            publisher_id=employee.id,
+            status="draft",
+            version=1,
+            store_id=employee.store_id,
+            source="headquarters" if employee.role == EmployeeRole.HEADQUARTERS else "store",
+        )
         db.add(notice)
     else:
         notice = await get_notice(notice_id, db, lock=True)
@@ -383,7 +424,11 @@ async def save_notice(request, employee_id, db, notice_id=None):
     notice.target_store_ids = request.store_ids if notice.source == "headquarters" else []
     await db.flush()
     for recipient in recipients:
-        db.add(ContactNoticeRecipient(notice_id=notice.id, employee_id=recipient.id, store_id=recipient.store_id))
+        db.add(
+            ContactNoticeRecipient(
+                notice_id=notice.id, employee_id=recipient.id, store_id=recipient.store_id
+            )
+        )
     await audit(
         notice, "create" if notice_id is None else "update", employee.id, db, request.reason, before
     )
@@ -406,7 +451,8 @@ async def action_notice(notice_id, action, request, employee_id, db):
             )
         )
         if (
-            record is None or record.store_id != employee.store_id
+            record is None
+            or record.store_id != employee.store_id
             or notice.status not in ("published", "closed")
             or notice.starts_at > business_now()
         ):
@@ -449,7 +495,11 @@ async def action_notice(notice_id, action, request, employee_id, db):
                 delete(ContactNoticeRecipient).where(ContactNoticeRecipient.notice_id == notice.id)
             )
             for recipient in recipients:
-                db.add(ContactNoticeRecipient(notice_id=notice.id, employee_id=recipient.id, store_id=recipient.store_id))
+                db.add(
+                    ContactNoticeRecipient(
+                        notice_id=notice.id, employee_id=recipient.id, store_id=recipient.store_id
+                    )
+                )
             notice.status = "published"
             notice.closed_at = None
             notice.close_reason = None

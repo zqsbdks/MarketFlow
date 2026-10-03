@@ -2,8 +2,8 @@
 
 from copy import deepcopy
 from datetime import timedelta
-from typing import Any
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest

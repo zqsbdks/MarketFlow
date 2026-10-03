@@ -12,7 +12,13 @@ class OperationAuditLog(CreatedAtMixin, Base):
     """保存重要修改操作的目标、修改前后数据、操作人及可选理由。"""
 
     __tablename__ = "operation_audit_log"
-    store_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("store.id"), nullable=True, index=True, comment="操作所属门店；总部操作为空")
+    store_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("store.id"),
+        nullable=True,
+        index=True,
+        comment="操作所属门店；总部操作为空",
+    )
     __table_args__ = {"mysql_charset": "utf8mb4", "comment": "操作审计记录表"}
 
     id: Mapped[int] = mapped_column(

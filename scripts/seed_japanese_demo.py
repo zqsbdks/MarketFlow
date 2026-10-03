@@ -30,6 +30,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.business_time import business_now
 from app.core.database import async_engine, async_session_factory
 from app.core.redis import close_redis, get_redis_client
 from app.core.security import hash_password
@@ -58,6 +59,7 @@ from app.models.purchase import Purchase
 from app.models.purchase_item import PurchaseItem
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.models.store import Store, StoreDepartment
 from app.models.supplier import Supplier
 from app.models.supplier_product import SupplierProduct
 
@@ -67,7 +69,7 @@ RANDOM_SEED = 20260930
 DEMO_DAYS = 60
 # 新增员工共用的演示登录密码；已有店长账号及密码不会被修改。
 DEMO_EMPLOYEE_PASSWORD = "MarketFlow2026!"
-MONEY_STEP = Decimal("0.01")
+MONEY_STEP = Decimal("1")
 
 # Windows 控制台可能使用 cp932，显式切换成 UTF-8，避免日语输出乱码。
 if isinstance(sys.stdout, TextIOWrapper):
@@ -230,7 +232,6 @@ async def assert_business_tables_are_empty(db: AsyncSession) -> None:
         SaleItem,
         DiscountRule,
         DiscountRuleScope,
-        OperationAuditLog,
     ]
     occupied_tables: list[str] = []
     for model in models:
@@ -267,12 +268,25 @@ async def create_master_data(
     if manager is None:
         raise RuntimeError("没有找到店长账号，请先运行 scripts/bootstrap_manager.py")
 
+    if manager.store_id is None:
+        raise RuntimeError("店长账号没有归属门店，请先配置门店")
+    store = await db.get(Store, manager.store_id)
+    if store is None:
+        raise RuntimeError("店长归属门店不存在")
+    store.name = "MarketFlow 高円寺店"
+
     # 创建四个日语部门及其商品分类。
     departments: dict[str, Department] = {}
     for code, name in DEPARTMENT_SEEDS:
         department = Department(code=code, name=name, is_active=True)
         departments[code] = department
         db.add(department)
+    await db.flush()
+
+    for department in departments.values():
+        db.add(
+            StoreDepartment(store_id=manager.store_id, department_id=department.id, is_active=True)
+        )
     await db.flush()
 
     categories: dict[tuple[str, str], Category] = {}
@@ -293,6 +307,7 @@ async def create_master_data(
     for index, (employee_no, name, role, department_code, gender) in enumerate(EMPLOYEE_SEEDS):
         employee = Employee(
             employee_no=employee_no,
+            store_id=manager.store_id,
             name=name,
             password_hash=shared_password_hash,
             role=role,
@@ -509,6 +524,9 @@ async def create_purchases_and_batches(
     employees: list[Employee],
     suppliers: list[Supplier],
     products: list[Product],
+    *,
+    interval_days: int = 3,
+    number_prefix: str = "",
 ) -> tuple[list[Purchase], list[BatchLedger]]:
     """创建两个月进货历史，并为已到货明细生成库存批次。"""
 
@@ -542,7 +560,7 @@ async def create_purchases_and_batches(
                 order_date + timedelta(days=2),
                 time(12),
             )
-            arrived = expected_arrival_at.date() <= end_date
+            arrived = expected_arrival_at <= business_now()
             receiver = employee_by_department[department.id]
 
             # 每次轮换选择四种商品，确保全部商品在两个月内都有多个批次。
@@ -555,7 +573,7 @@ async def create_purchases_and_batches(
             ]
 
             purchase = Purchase(
-                purchase_no=f"PO{order_date:%Y%m%d}-{purchase_counter:04d}",
+                purchase_no=f"{number_prefix}PO{order_date:%Y%m%d}-{purchase_counter:04d}",
                 department_id=department.id,
                 created_by=receiver.id,
                 received_by=receiver.id if arrived else None,
@@ -604,7 +622,7 @@ async def create_purchases_and_batches(
 
                 if arrived:
                     batch = InventoryBatch(
-                        batch_no=f"LOT{expected_arrival_at:%Y%m%d}-{batch_counter:05d}",
+                        batch_no=f"{number_prefix}LOT{expected_arrival_at:%Y%m%d}-{batch_counter:05d}",
                         product_id=product.id,
                         purchase_item_id=purchase_item.id,
                         production_date=production_date,
@@ -625,7 +643,7 @@ async def create_purchases_and_batches(
             purchase_counter += 1
 
         # 每三天集中补货一次，便于前端趋势图呈现稳定但不完全均匀的变化。
-        order_date += timedelta(days=3)
+        order_date += timedelta(days=interval_days)
 
     await db.flush()
     return purchases, ledgers
@@ -683,6 +701,9 @@ async def create_sales(
     products: list[Product],
     ledgers: list[BatchLedger],
     rules: dict[str, DiscountRule],
+    *,
+    volume_multiplier: int = 1,
+    number_prefix: str = "",
 ) -> list[Sale]:
     """按批次先进先出扣减库存，并创建约两个月的销售小票。"""
 
@@ -699,6 +720,20 @@ async def create_sales(
     active_products = [item for item in products if item.status == ProductStatus.ON_SALE]
 
     while current_date <= end_date:
+        # 半年数据只扫描当天可用的批次，避免每笔销售遍历全部历史库存。
+        day_end = datetime.combine(current_date, time.max)
+        daily_ledgers = {
+            product_id: [
+                ledger
+                for ledger in product_ledgers
+                if ledger.batch.arrived_at <= day_end
+                and (
+                    ledger.batch.expiration_date is None
+                    or ledger.batch.expiration_date >= current_date
+                )
+            ]
+            for product_id, product_ledgers in ledgers_by_product.items()
+        }
         # 周末客流高于工作日；月底最后一天数据保持较少，便于现场继续扫码演示。
         if current_date == end_date:
             daily_sale_count = 12
@@ -707,7 +742,7 @@ async def create_sales(
         else:
             daily_sale_count = rng.randint(23, 29)
 
-        for _sale_index in range(daily_sale_count):
+        for _sale_index in range(daily_sale_count * volume_multiplier):
             sold_at = datetime.combine(
                 current_date,
                 time(
@@ -721,7 +756,7 @@ async def create_sales(
             available_products: list[Product] = []
             for product in active_products:
                 has_available_batch = False
-                for ledger in ledgers_by_product[product.id]:
+                for ledger in daily_ledgers[product.id]:
                     batch = ledger.batch
                     if (
                         batch.arrived_at <= sold_at
@@ -752,7 +787,7 @@ async def create_sales(
                 unit_price = discounted_unit_price(product, rule)
 
                 # 一次商品购买可能跨越两个批次，因此每个实际扣减批次生成一条销售明细。
-                for ledger in ledgers_by_product[product.id]:
+                for ledger in daily_ledgers[product.id]:
                     batch = ledger.batch
                     if remaining_request == 0:
                         break
@@ -807,7 +842,7 @@ async def create_sales(
             total_amount = money(sum(item.subtotal for item in sale_items))
             total_cost = money(sum(item.cost_subtotal for item in sale_items))
             sale = Sale(
-                sale_no=f"S{current_date:%Y%m%d}-{sale_counter:06d}",
+                sale_no=f"{number_prefix}S{current_date:%Y%m%d}-{sale_counter:06d}",
                 sold_at=sold_at,
                 total_amount=total_amount,
                 original_total_amount=original_total,
@@ -862,7 +897,7 @@ async def create_audit_logs(
     """为主要新增操作创建可供审计页面展示的记录。"""
 
     audit_logs: list[OperationAuditLog] = []
-    master_data_created_at = datetime.now() - timedelta(days=DEMO_DAYS + 14)
+    master_data_created_at = business_now() - timedelta(days=DEMO_DAYS + 14)
     for employee_index, employee in enumerate(employees):
         audit_logs.append(
             OperationAuditLog(
@@ -1200,7 +1235,7 @@ async def seed_japanese_demo_data() -> None:
     """在一个事务中生成并提交全部日语演示数据。"""
 
     rng = random.Random(RANDOM_SEED)
-    end_date = datetime.now().date()
+    end_date = business_now().date()
     start_date = end_date - timedelta(days=DEMO_DAYS)
 
     async with async_session_factory() as db:
@@ -1285,6 +1320,9 @@ async def main() -> None:
             print(f"已补充销售出库流水：{deduction_count} 条")
         else:
             await seed_japanese_demo_data()
+            from scripts.normalize_demo_data import normalize
+
+            await normalize()
     finally:
         await async_engine.dispose()
         await close_redis()

@@ -1,4 +1,5 @@
 """供应商编号允许不同门店分别从 SUP00001 起使用。"""
+
 from alembic import op
 
 revision = "20261002_0029"

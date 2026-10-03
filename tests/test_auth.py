@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from app.core.token import create_access_token
-from app.dependencies.auth import get_current_token_payload, get_current_employee_id
+from app.dependencies.auth import get_current_employee_id, get_current_token_payload
 from app.dependencies.db import get_db
 from app.main import create_app
 from app.models.department import Department

@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -11,7 +12,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    JSON,
     UniqueConstraint,
     text,
 )
@@ -25,9 +25,15 @@ class ContactNotice(TimestampMixin, Base):
     """保存正文、接收范围和关闭条件；关闭后保留历史。"""
 
     __tablename__ = "contact_notice"
-    store_id: Mapped[int | None] = mapped_column(ForeignKey("store.id"), nullable=True, index=True, comment="发布门店；总部为空")
-    source: Mapped[str] = mapped_column(String(20), default="store", server_default="store", comment="发布来源：门店或总部")
-    target_store_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True, comment="总部指定门店；空列表表示全部门店")
+    store_id: Mapped[int | None] = mapped_column(
+        ForeignKey("store.id"), nullable=True, index=True, comment="发布门店；总部为空"
+    )
+    source: Mapped[str] = mapped_column(
+        String(20), default="store", server_default="store", comment="发布来源：门店或总部"
+    )
+    target_store_ids: Mapped[list[int] | None] = mapped_column(
+        JSON, nullable=True, comment="总部指定门店；空列表表示全部门店"
+    )
     __table_args__ = (
         CheckConstraint(
             "target_type IN ('all', 'department', 'personal')", name="ck_notice_target"
@@ -78,7 +84,9 @@ class ContactNoticeRecipient(CreatedAtMixin, Base):
     """发布时生成名单，查看与确认不会改变接收范围。"""
 
     __tablename__ = "contact_notice_recipient"
-    store_id: Mapped[int | None] = mapped_column(ForeignKey("store.id"), nullable=True, index=True, comment="发布时接收员工所属门店快照")
+    store_id: Mapped[int | None] = mapped_column(
+        ForeignKey("store.id"), nullable=True, index=True, comment="发布时接收员工所属门店快照"
+    )
     __table_args__ = (
         UniqueConstraint("notice_id", "employee_id", name="uq_notice_recipient"),
         {"mysql_charset": "utf8mb4", "comment": "联络事项员工确认表"},

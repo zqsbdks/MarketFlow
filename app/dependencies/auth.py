@@ -109,6 +109,7 @@ async def get_current_employee_id(
     if employee is None or not employee.is_active:
         raise HTTPException(401, "账号不存在或已停用")
     from app.core.store_policy import configure_store_context
+
     await configure_store_context(request, employee, db)
     return employee_id
 

@@ -47,10 +47,23 @@ async def get_notices(request, employee, now, db: AsyncSession):
         conditions.append(ContactNotice.publisher_id == employee.id)
     if employee.role != EmployeeRole.HEADQUARTERS:
         if request.view == "management":
-            own_recipients = exists().where(ContactNoticeRecipient.notice_id == ContactNotice.id, ContactNoticeRecipient.store_id == employee.store_id)
-            conditions.append(or_(ContactNotice.store_id == employee.store_id, (ContactNotice.source == "headquarters") & own_recipients))
+            own_recipients = exists().where(
+                ContactNoticeRecipient.notice_id == ContactNotice.id,
+                ContactNoticeRecipient.store_id == employee.store_id,
+            )
+            conditions.append(
+                or_(
+                    ContactNotice.store_id == employee.store_id,
+                    (ContactNotice.source == "headquarters") & own_recipients,
+                )
+            )
         else:
-            conditions.append(or_(ContactNotice.store_id == employee.store_id, ContactNotice.source == "headquarters"))
+            conditions.append(
+                or_(
+                    ContactNotice.store_id == employee.store_id,
+                    ContactNotice.source == "headquarters",
+                )
+            )
     if request.source:
         conditions.append(ContactNotice.source == request.source)
     if request.target_type:

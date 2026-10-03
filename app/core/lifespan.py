@@ -13,9 +13,9 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.backends.redis import RedisBackend
 
 from app.core.config import settings
+from app.core.contact_notice_scheduler import run_contact_notice_scheduler
 from app.core.database import async_engine
 from app.core.purchase_scheduler import run_purchase_scheduler
-from app.core.contact_notice_scheduler import run_contact_notice_scheduler
 from app.core.redis import close_redis, get_redis_client
 
 
@@ -54,7 +54,9 @@ async def lifespan(app: FastAPI):
     scheduler_task = None
     notice_scheduler_task = None
     if settings.run_scheduler:
-        notice_scheduler_task = asyncio.create_task(run_contact_notice_scheduler(scheduler_stop_event), name="contact-notice-close")
+        notice_scheduler_task = asyncio.create_task(
+            run_contact_notice_scheduler(scheduler_stop_event), name="contact-notice-close"
+        )
         scheduler_task = asyncio.create_task(
             run_purchase_scheduler(scheduler_stop_event),
             name="purchase-auto-receive",

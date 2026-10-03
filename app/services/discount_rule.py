@@ -1092,9 +1092,7 @@ async def update_discount_rule_service(
             )
 
     # exclude_unset=True只保留前端实际传入的字段；reason只写入审计表，不更新规则表。
-    requested_data = request.model_dump(
-        exclude_unset=True, exclude={"reason", "expected_version"}
-    )
+    requested_data = request.model_dump(exclude_unset=True, exclude={"reason", "expected_version"})
     if not requested_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,

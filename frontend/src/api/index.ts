@@ -181,7 +181,9 @@ export async function getReportAnalytics(params: {
 }
 
 export async function getDepartments() {
-  const response = await http.get<ApiResponse<Department[]>>('/departments')
+  const response = await http.get<ApiResponse<Department[]>>('/departments', {
+    headers: { 'Cache-Control': 'no-cache' },
+  })
   return unwrap(response.data)
 }
 

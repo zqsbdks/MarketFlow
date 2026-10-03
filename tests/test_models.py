@@ -270,17 +270,63 @@ EXPECTED_COLUMNS = {
 }
 
 for table_name in (
-    "product", "purchase", "purchase_item", "sale", "sale_item", "inventory_batch",
-    "discount_rule", "discount_rule_scope", "supplier", "supplier_product",
-    "employee", "operation_audit_log", "contact_notice", "contact_notice_recipient",
+    "product",
+    "purchase",
+    "purchase_item",
+    "sale",
+    "sale_item",
+    "inventory_batch",
+    "discount_rule",
+    "discount_rule_scope",
+    "supplier",
+    "supplier_product",
+    "employee",
+    "operation_audit_log",
+    "contact_notice",
+    "contact_notice_recipient",
     "ai_pending_action",
 ):
     EXPECTED_COLUMNS[table_name].add("store_id")
 EXPECTED_COLUMNS["contact_notice"].update({"source", "target_store_ids"})
-EXPECTED_COLUMNS["store"] = {"id", "store_no", "name", "address", "phone", "timezone", "is_active", "created_at", "updated_at"}
-EXPECTED_COLUMNS["store_department"] = {"store_id", "department_id", "is_active", "created_at", "updated_at"}
-EXPECTED_COLUMNS["ai_conversation"] = {"id", "employee_id", "store_id", "home_store_id", "title", "provider", "model", "summary", "summary_through_id", "created_at", "updated_at"}
-EXPECTED_COLUMNS["ai_message"] = {"id", "conversation_id", "role", "content", "actions", "created_at"}
+EXPECTED_COLUMNS["store"] = {
+    "id",
+    "store_no",
+    "name",
+    "address",
+    "phone",
+    "timezone",
+    "is_active",
+    "created_at",
+    "updated_at",
+}
+EXPECTED_COLUMNS["store_department"] = {
+    "store_id",
+    "department_id",
+    "is_active",
+    "created_at",
+    "updated_at",
+}
+EXPECTED_COLUMNS["ai_conversation"] = {
+    "id",
+    "employee_id",
+    "store_id",
+    "home_store_id",
+    "title",
+    "provider",
+    "model",
+    "summary",
+    "summary_through_id",
+    "created_at",
+    "updated_at",
+}
+EXPECTED_COLUMNS["ai_message"] = {
+    "id",
+    "conversation_id",
+    "role",
+    "content",
+    "actions",
+    "created_at",
+}
 
 EXPECTED_TABLE_COMMENTS = {
     "store": "门店表",

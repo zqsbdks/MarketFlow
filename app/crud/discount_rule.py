@@ -2,14 +2,15 @@
 
 from datetime import datetime, time
 from decimal import Decimal
+from typing import Any, cast
 
 from sqlalchemy import and_, delete, func, not_, or_, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.exceptions import ConcurrentUpdateError
-
 from app.models.discount_rule import DiscountRule
 from app.models.discount_rule_scope import DiscountRuleScope
 from app.models.enums import (
@@ -534,7 +535,7 @@ async def update_discount_rule_status(
         .values(is_active=is_active, version=DiscountRule.version + 1)
     )
     result = await db.execute(statement)
-    if result.rowcount != 1:
+    if cast(CursorResult[Any], result).rowcount != 1:
         raise ConcurrentUpdateError("折扣规则已被其他员工修改，请刷新后重试")
     await db.flush()
 
@@ -557,7 +558,7 @@ async def update_discount_rule(
         .values(**update_data, version=DiscountRule.version + 1)
     )
     result = await db.execute(statement)
-    if result.rowcount != 1:
+    if cast(CursorResult[Any], result).rowcount != 1:
         raise ConcurrentUpdateError("折扣规则已被其他员工修改，请刷新后重试")
     await db.flush()
 

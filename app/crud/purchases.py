@@ -321,9 +321,14 @@ async def auto_receive_due_purchases(
 
         for purchase_item in purchase.items:
             catalog_product = purchase_item.supplier_product
-            product = await db.scalar(select(Product).where(
-                Product.supplier_product_id == catalog_product.id,
-                Product.store_id == purchase.store_id).with_for_update())
+            product = await db.scalar(
+                select(Product)
+                .where(
+                    Product.supplier_product_id == catalog_product.id,
+                    Product.store_id == purchase.store_id,
+                )
+                .with_for_update()
+            )
             product_was_created = product is None
             if product is None:
                 if catalog_product.category_id is None or catalog_product.category is None:
@@ -430,9 +435,9 @@ async def auto_receive_due_purchases(
                 "received_by": purchase.received_by,
                 "arrived_at": purchase.arrived_at,
             },
-            reason="单张进货单手动签收" if only_purchase_id is not None else (
-                "系统按预计到货时间自动签收" if employee_id is None else "店长手动补执行签收"
-            ),
+            reason="单张进货单手动签收"
+            if only_purchase_id is not None
+            else ("系统按预计到货时间自动签收" if employee_id is None else "店长手动补执行签收"),
             db=db,
         )
 

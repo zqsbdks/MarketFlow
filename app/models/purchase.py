@@ -10,8 +10,8 @@ from sqlalchemy import BigInteger, CheckConstraint, DateTime, Enum, ForeignKey, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.store_scoped import StoreScopedMixin
 from app.models.enums import PurchaseStatus
+from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
     from app.models.department import Department

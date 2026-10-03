@@ -105,7 +105,7 @@ async def get_products_list_service(
                 low_stock_threshold=product.low_stock_threshold,
                 is_low_stock=is_low_stock,
                 status=product.status,
-                    version=product.version or 1,
+                version=product.version or 1,
             )
         )
 
@@ -345,9 +345,7 @@ async def update_product_service(
 
     # 第五步：把 Pydantic 请求模型转换成字典。
     # exclude_unset=True 表示只保留前端实际传入的字段，未传字段不会覆盖数据库原值。
-    update_data = request.model_dump(
-        exclude_unset=True, exclude={"reason", "expected_version"}
-    )
+    update_data = request.model_dump(exclude_unset=True, exclude={"reason", "expected_version"})
     if not update_data:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,

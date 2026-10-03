@@ -28,22 +28,31 @@ def test_purchase_planning_and_manual_receive_routes_exist():
 
 def test_purchase_creation_accepts_expected_arrival_date():
     requested = date.today() + timedelta(days=2)
-    payload = CreatePurchaseRequest.model_validate({
-        "department_id": 1,
-        "expected_arrival_date": requested.isoformat(),
-        "items": [{"supplier_product_id": 1, "quantity": 2}],
-    })
+    payload = CreatePurchaseRequest.model_validate(
+        {
+            "department_id": 1,
+            "expected_arrival_date": requested.isoformat(),
+            "items": [{"supplier_product_id": 1, "quantity": 2}],
+        }
+    )
     assert payload.expected_arrival_date == requested
 
 
 @pytest.mark.asyncio
 async def test_manual_receive_targets_one_order_and_checks_department(monkeypatch):
     employee = SimpleNamespace(
-        id=7, store_id=1, department_id=2, role=EmployeeRole.REGULAR_EMPLOYEE,
-        is_active=True, must_change_password=False,
+        id=7,
+        store_id=1,
+        department_id=2,
+        role=EmployeeRole.REGULAR_EMPLOYEE,
+        is_active=True,
+        must_change_password=False,
     )
     purchase = SimpleNamespace(
-        id=9, store_id=1, department_id=2, status=PurchaseStatus.PENDING,
+        id=9,
+        store_id=1,
+        department_id=2,
+        status=PurchaseStatus.PENDING,
     )
     receive = AsyncMock(return_value=[purchase])
     detail = object()

@@ -1,5 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+cache_dir = ".cache/pytest"
 addopts = "-ra"
 asyncio_mode = "auto"
 markers = [
@@ -14,6 +15,7 @@ line-length = 100
 select = ["E", "F", "I", "UP"]
 
 [tool.mypy]
+cache_dir = ".cache/mypy"
 python_version = "3.11"
 plugins = ["pydantic.mypy"]
 check_untyped_defs = true

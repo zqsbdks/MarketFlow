@@ -81,7 +81,10 @@ class Employee(TimestampMixin, Base):
         comment="所属部门",
     )
     store_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("store.id"), nullable=True, index=True,
+        BigInteger,
+        ForeignKey("store.id"),
+        nullable=True,
+        index=True,
         comment="员工归属门店；总部为空",
     )
     is_active: Mapped[bool] = mapped_column(

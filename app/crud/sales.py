@@ -7,8 +7,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.business_time import business_now
 from app.core.business_sequence import next_business_sequence
+from app.core.business_time import business_now
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.models.discount_rule import DiscountRule
 from app.models.enums import InventoryBatchStatus, ProductStatus, SaleSource
@@ -326,9 +326,7 @@ async def get_sales_detail(
     return detail_result
 
 
-async def get_sale_by_client_request_id(
-    client_request_id: str, db: AsyncSession
-) -> Sale | None:
+async def get_sale_by_client_request_id(client_request_id: str, db: AsyncSession) -> Sale | None:
     """按客户端幂等ID查询已完成的销售单。"""
 
     statement = (

@@ -1,13 +1,15 @@
 """商品查询的数据访问函数。"""
 
+from typing import Any, cast
+
 from sqlalchemy import and_, case, func, or_, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
-
-from app.core.exceptions import ConcurrentUpdateError
 from sqlalchemy.sql.selectable import Subquery
 
+from app.core.exceptions import ConcurrentUpdateError
 from app.models.enums import InventoryBatchStatus, ProductStatus
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
@@ -341,7 +343,7 @@ async def update_product(
     # 第二步：把 UPDATE 语句发送给数据库。
     # 此处不调用 commit，由 Service 在全部业务操作成功后统一提交。
     result = await db.execute(update_statement)
-    if result.rowcount != 1:
+    if cast(CursorResult[Any], result).rowcount != 1:
         raise ConcurrentUpdateError("商品资料已被其他员工修改，请刷新后重试")
 
     # 第三步：重新查询修改后的商品。

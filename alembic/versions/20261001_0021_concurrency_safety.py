@@ -7,6 +7,7 @@ Revises: 20261001_0020
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "20261001_0021"
@@ -26,8 +27,18 @@ def upgrade() -> None:
             "business_sequence",
             sa.Column("sequence_key", sa.String(64), nullable=False, comment="业务计数器键"),
             sa.Column("current_value", sa.BigInteger(), nullable=False, comment="最后已分配流水号"),
-            sa.Column("created_at", sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=False),
-            sa.Column("updated_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"), nullable=False),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                server_default=sa.func.current_timestamp(),
+                nullable=False,
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                server_default=sa.text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+                nullable=False,
+            ),
             sa.PrimaryKeyConstraint("sequence_key"),
             mysql_charset="utf8mb4",
             comment="业务编号计数器表",
@@ -37,38 +48,70 @@ def upgrade() -> None:
         return {column["name"] for column in sa.inspect(connection).get_columns(table_name)}
 
     if "version" not in column_names("product"):
-        op.add_column("product", sa.Column("version", sa.Integer(), server_default="1", nullable=False, comment="乐观锁版本号"))
+        op.add_column(
+            "product",
+            sa.Column(
+                "version", sa.Integer(), server_default="1", nullable=False, comment="乐观锁版本号"
+            ),
+        )
     if "version" not in column_names("discount_rule"):
-        op.add_column("discount_rule", sa.Column("version", sa.Integer(), server_default="1", nullable=False, comment="乐观锁版本号"))
+        op.add_column(
+            "discount_rule",
+            sa.Column(
+                "version", sa.Integer(), server_default="1", nullable=False, comment="乐观锁版本号"
+            ),
+        )
     if "client_request_id" not in column_names("sale"):
-        op.add_column("sale", sa.Column("client_request_id", sa.String(36), nullable=True, comment="客户端幂等请求ID"))
-    sale_unique_names = {item["name"] for item in sa.inspect(connection).get_unique_constraints("sale")}
+        op.add_column(
+            "sale",
+            sa.Column(
+                "client_request_id", sa.String(36), nullable=True, comment="客户端幂等请求ID"
+            ),
+        )
+    sale_unique_names = {
+        item["name"] for item in sa.inspect(connection).get_unique_constraints("sale")
+    }
     if "uq_sale_client_request_id" not in sale_unique_names:
         op.create_unique_constraint("uq_sale_client_request_id", "sale", ["client_request_id"])
     if "client_request_id" not in column_names("purchase"):
-        op.add_column("purchase", sa.Column("client_request_id", sa.String(36), nullable=True, comment="客户端幂等请求ID"))
-    purchase_unique_names = {item["name"] for item in sa.inspect(connection).get_unique_constraints("purchase")}
+        op.add_column(
+            "purchase",
+            sa.Column(
+                "client_request_id", sa.String(36), nullable=True, comment="客户端幂等请求ID"
+            ),
+        )
+    purchase_unique_names = {
+        item["name"] for item in sa.inspect(connection).get_unique_constraints("purchase")
+    }
     if "uq_purchase_client_request_id" not in purchase_unique_names:
-        op.create_unique_constraint("uq_purchase_client_request_id", "purchase", ["client_request_id"])
+        op.create_unique_constraint(
+            "uq_purchase_client_request_id", "purchase", ["client_request_id"]
+        )
 
     # 从既有编号初始化计数器，升级后继续递增，不会重新从1开始造成唯一键冲突。
-    op.execute(sa.text(
-        "INSERT IGNORE INTO business_sequence (sequence_key, current_value) "
-        "SELECT 'supplier', COALESCE(MAX(CAST(SUBSTRING(supplier_no, 4) AS UNSIGNED)), 0) "
-        "FROM supplier"
-    ))
-    op.execute(sa.text(
-        "INSERT IGNORE INTO business_sequence (sequence_key, current_value) "
-        "SELECT CONCAT('purchase:', SUBSTRING(purchase_no, 4, 8)), "
-        "MAX(CAST(SUBSTRING(purchase_no, 12) AS UNSIGNED)) FROM purchase "
-        "GROUP BY CONCAT('purchase:', SUBSTRING(purchase_no, 4, 8))"
-    ))
-    op.execute(sa.text(
-        "INSERT IGNORE INTO business_sequence (sequence_key, current_value) "
-        "SELECT CONCAT('sale:', SUBSTRING(sale_no, 2, 8)), "
-        "MAX(CAST(SUBSTRING(sale_no, 10) AS UNSIGNED)) FROM sale "
-        "GROUP BY CONCAT('sale:', SUBSTRING(sale_no, 2, 8))"
-    ))
+    op.execute(
+        sa.text(
+            "INSERT IGNORE INTO business_sequence (sequence_key, current_value) "
+            "SELECT 'supplier', COALESCE(MAX(CAST(SUBSTRING(supplier_no, 4) AS UNSIGNED)), 0) "
+            "FROM supplier"
+        )
+    )
+    op.execute(
+        sa.text(
+            "INSERT IGNORE INTO business_sequence (sequence_key, current_value) "
+            "SELECT CONCAT('purchase:', SUBSTRING(purchase_no, 4, 8)), "
+            "MAX(CAST(SUBSTRING(purchase_no, 12) AS UNSIGNED)) FROM purchase "
+            "GROUP BY CONCAT('purchase:', SUBSTRING(purchase_no, 4, 8))"
+        )
+    )
+    op.execute(
+        sa.text(
+            "INSERT IGNORE INTO business_sequence (sequence_key, current_value) "
+            "SELECT CONCAT('sale:', SUBSTRING(sale_no, 2, 8)), "
+            "MAX(CAST(SUBSTRING(sale_no, 10) AS UNSIGNED)) FROM sale "
+            "GROUP BY CONCAT('sale:', SUBSTRING(sale_no, 2, 8))"
+        )
+    )
 
 
 def downgrade() -> None:

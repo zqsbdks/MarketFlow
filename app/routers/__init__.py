@@ -11,7 +11,6 @@ from app.routers.ai_conversations import ai_conversations_router
 from app.routers.auth import auth_router
 from app.routers.categories import categories_router
 from app.routers.contact_notices import contact_notices_router
-from app.routers.stores import stores_router
 from app.routers.departments import departments_router
 from app.routers.discount_rule import discount_rules_router
 from app.routers.employees import employees_router
@@ -21,6 +20,7 @@ from app.routers.products import products_router
 from app.routers.purchases import purchases_router
 from app.routers.reports import reports_router
 from app.routers.sales import sales_router
+from app.routers.stores import stores_router
 from app.routers.supplier_products import supplier_products_router
 from app.routers.suppliers import suppliers_router
 

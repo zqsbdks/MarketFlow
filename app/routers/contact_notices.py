@@ -79,7 +79,10 @@ async def get_audience(
     db: AsyncSession = Depends(get_db),
 ):
     employee = await current_employee(current_employee_id, db)
-    if employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS) and employee.department_id is None:
+    if (
+        employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS)
+        and employee.department_id is None
+    ):
         return ResponseModel(data={"employees": [], "departments": []})
     employees_query = (
         select(Employee)
@@ -96,10 +99,17 @@ async def get_audience(
         departments_query = departments_query.where(Department.id == employee.department_id)
     employees = []
     for item in (await db.scalars(employees_query)).all():
-        employees.append({"id": item.id, "name": item.name, "department_id": item.department_id, "store_id": item.store_id})
+        employees.append(
+            {
+                "id": item.id,
+                "name": item.name,
+                "department_id": item.department_id,
+                "store_id": item.store_id,
+            }
+        )
     departments = []
-    for item in (await db.scalars(departments_query)).all():
-        departments.append({"id": item.id, "name": item.name})
+    for department in (await db.scalars(departments_query)).all():
+        departments.append({"id": department.id, "name": department.name})
     return ResponseModel(data={"employees": employees, "departments": departments})
 
 

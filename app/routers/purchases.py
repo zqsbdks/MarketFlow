@@ -49,6 +49,8 @@ async def receive_purchase(
 ) -> ResponseModel[PurchaseDetailResponse]:
     result = await receive_purchase_service(purchase_id, current_employee_id, db)
     return ResponseModel[PurchaseDetailResponse](message="进货单签收成功", data=result)
+
+
 # endregion
 
 
