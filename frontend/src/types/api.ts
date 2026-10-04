@@ -452,13 +452,20 @@ export interface Purchase {
 }
 
 export interface PurchasePlanningDay {
+  suggested_quantity: number
+  is_manual: boolean
+  forecast_sales: number
   date: string
+  planned_quantity: number
   expected_quantity: number
   received_quantity: number
   last_week_sales: number
 }
 
 export interface PurchasePlanningItem {
+  minimum_stock: number
+  previous_expected_quantity: number
+  previous_received_quantity: number
   supplier_product_id: number
   product_id: number | null
   name: string
@@ -470,6 +477,7 @@ export interface PurchasePlanningItem {
 }
 
 export interface PurchasePlanning {
+  previous_arrival_date: string
   arrival_date: string
   days: string[]
   items: PurchasePlanningItem[]

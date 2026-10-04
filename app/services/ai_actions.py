@@ -35,7 +35,6 @@ from app.schemas.inventory_batches_requests import (
     InventoryBatchQuantityUpdateRequest,
 )
 from app.schemas.products_requests import ProductStatusUpdateRequest, UpdateProductRequest
-from app.schemas.purchases_requests import CreatePurchaseRequest
 from app.schemas.sales_requests import CreateSaleRequest
 from app.schemas.supplier_products_requests import (
     SupplierProductCreateRequest,
@@ -62,7 +61,6 @@ from app.services.inventory_batches import (
     update_inventory_batch_quantity_service,
 )
 from app.services.products import update_product_service, update_product_status_service
-from app.services.purchases import create_purchase_service
 from app.services.sales import create_sale_service
 from app.services.supplier_products import (
     create_supplier_product_service,
@@ -230,13 +228,7 @@ async def confirm_ai_action_service(
             )
             result = status_updated_supplier_product.model_dump(mode="json")
         elif action.action_type == "create_purchase":
-            purchase_request = CreatePurchaseRequest.model_validate(action.arguments)
-            purchase = await create_purchase_service(
-                purchase=purchase_request,
-                current_employee_id=employee_id,
-                db=db,
-            )
-            result = purchase.model_dump(mode="json")
+            raise HTTPException(409, "请保存订货计划，进货单将在截止时间自动生成")
         elif action.action_type == "create_sale":
             sale_request = CreateSaleRequest.model_validate(action.arguments)
             sale = await create_sale_service(

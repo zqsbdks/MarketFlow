@@ -159,6 +159,18 @@ EXPECTED_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "purchase_plan": {
+        "automatic_quantities",
+        "id",
+        "store_id",
+        "department_id",
+        "arrival_date",
+        "quantities",
+        "updated_by",
+        "purchase_id",
+        "created_at",
+        "updated_at",
+    },
     "purchase_item": {
         "id",
         "purchase_id",
@@ -202,6 +214,7 @@ EXPECTED_COLUMNS = {
         "created_at",
     },
     "supplier_product": {
+        "minimum_stock",
         "id",
         "supplier_id",
         "category_id",
@@ -553,7 +566,7 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """AI待确认操作表迁移是当前唯一的Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["428315d374cd"]
+    assert script.get_heads() == ["20261004_0031"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

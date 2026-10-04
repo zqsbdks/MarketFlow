@@ -17,9 +17,13 @@ from app.crud.inventory_batches import refresh_inventory_batch_statuses
 from app.crud.products import StockInconsistency, get_stock_inconsistencies
 from app.crud.purchases import auto_receive_due_purchases
 from app.models.inventory_batch import InventoryBatch
+from app.models.purchase_plan import PurchasePlan
 from app.services.inventory_discards import discard_expired_product
+from app.services.purchase_plan_submission import submit_due_plan
+from app.services.replenishment import refresh_automatic_plans
 
 logger = logging.getLogger(__name__)
+_last_replenishment_hour: datetime | None = None
 AUTO_RECEIVE_TIME = time(hour=12)
 STOCK_CONSISTENCY_CHECK_MINUTES = 30
 BUSINESS_OPENING_TIME = time(hour=9)
@@ -242,6 +246,10 @@ async def run_purchase_scheduler(stop_event: asyncio.Event) -> None:
 
     # 进程曾在计划时间停机时，启动后补处理到期的进货单与批次状态。
     try:
+        await _run_plan_submission_once()
+    except Exception:
+        logger.exception("启动订货计划补提交失败")
+    try:
         await _run_auto_receive_once()
     except Exception:
         logger.exception("启动补签收失败；每日计划任务仍将继续运行")
@@ -250,10 +258,62 @@ async def run_purchase_scheduler(stop_event: asyncio.Event) -> None:
     except Exception:
         logger.exception("启动批次状态补刷新失败；每日计划任务仍将继续运行")
     await asyncio.gather(
+        _run_plan_submission_scheduler(stop_event),
         _run_auto_receive_scheduler(stop_event),
         _run_batch_status_scheduler(stop_event),
         _run_stock_consistency_scheduler(stop_event),
     )
+
+
+async def _run_plan_submission_once() -> int:
+    global _last_replenishment_hour
+    async with distributed_lock("purchase-plan-submit", ttl_seconds=600) as acquired:
+        if not acquired:
+            return 0
+        now = business_now()
+        hour = now.replace(minute=0, second=0, microsecond=0)
+        if hour != _last_replenishment_hour:
+            async with async_session_factory() as db:
+                await refresh_automatic_plans(db, now)
+            _last_replenishment_hour = hour
+        latest = now.date() + timedelta(days=2 if now.time() >= AUTO_RECEIVE_TIME else 1)
+        async with async_session_factory() as db:
+            ids = list(
+                (
+                    await db.scalars(
+                        select(PurchasePlan.id)
+                        .where(
+                            PurchasePlan.purchase_id.is_(None),
+                            PurchasePlan.arrival_date <= latest,
+                        )
+                        .order_by(PurchasePlan.id)
+                    )
+                ).all()
+            )
+        count = 0
+        for plan_id in ids:
+            async with async_session_factory() as db:
+                try:
+                    count += int(await submit_due_plan(plan_id, db, now))
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    logger.exception("订货计划 %s 自动提交失败，下分钟重试", plan_id)
+        return count
+
+
+async def _run_plan_submission_scheduler(stop_event: asyncio.Event) -> None:
+    # 整分钟检查：12:00 提交当天截止的计划，失败和停机后均可补处理。
+    while not stop_event.is_set():
+        next_run = business_now().replace(second=0, microsecond=0) + timedelta(minutes=1)
+        if not await _wait_until(stop_event, next_run):
+            break
+        try:
+            count = await _run_plan_submission_once()
+            if count:
+                logger.info("订货计划自动提交完成，共 %s 张进货单", count)
+        except Exception:
+            logger.exception("订货计划自动提交失败，下分钟重试")
 
 
 __all__ = ["run_purchase_scheduler"]

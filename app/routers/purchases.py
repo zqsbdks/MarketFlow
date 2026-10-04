@@ -2,21 +2,22 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
+from app.schemas.purchase_plan import SaveMinimumStock, SavePurchasePlan
 from app.schemas.purchases_requests import CreatePurchaseRequest, PurchasesListRequest
 from app.schemas.purchases_responses import (
     PurchaseDetailResponse,
     PurchaseListResponse,
 )
+from app.services.purchase_plan_submission import save_minimum_stock, save_purchase_plan
 from app.services.purchase_planning import get_purchase_planning
 from app.services.purchases import (
     auto_receive_purchases_service,
-    create_purchase_service,
     get_purchase_detail_service,
     get_purchases_list_service,
     receive_purchase_service,
@@ -55,6 +56,24 @@ async def receive_purchase(
 
 
 # region 获取进货单列表
+@purchases_router.put("/minimum-stock", summary="保存自动补货保底库存")
+async def minimum_stock(
+    request: SaveMinimumStock,
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return ResponseModel(data=await save_minimum_stock(request, current_employee_id, db))
+
+
+@purchases_router.put("/planning", summary="保存到货日订货数量")
+async def save_planning(
+    request: SavePurchasePlan,
+    current_employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return ResponseModel(data=await save_purchase_plan(request, current_employee_id, db))
+
+
 @purchases_router.get("/planning", summary="获取七天进货计划参考")
 async def purchase_planning(
     department_id: int = Query(..., ge=1),
@@ -62,7 +81,7 @@ async def purchase_planning(
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """展示已有预计到货、上周同曜日销量与可售库存，不修改业务数据。"""
+    """展示持久化订货计划、已有到货、上周销量与可售库存。"""
     return ResponseModel(data=await get_purchase_planning(department_id, arrival_date, db))
 
 
@@ -157,8 +176,9 @@ async def get_purchase_detail(
 @purchases_router.post(
     "/",
     response_model=ResponseModel[PurchaseDetailResponse],
-    summary="创建进货单",
-    description="创建进货单。",
+    summary="旧手动创建入口（已停用）",
+    description="请改用 PUT /planning 保存计划，截止后由后台自动生成进货单。",
+    deprecated=True,
 )
 async def create_purchase(
     request: CreatePurchaseRequest,
@@ -167,12 +187,7 @@ async def create_purchase(
 ) -> ResponseModel[PurchaseDetailResponse]:
     """接收进货单汇总及商品明细，并返回进货单汇总及商品明细。"""
 
-    purchase = await create_purchase_service(
-        purchase=request,
-        current_employee_id=current_employee_id,
-        db=db,
-    )
-    return ResponseModel[PurchaseDetailResponse](message="创建进货单成功", data=purchase)
+    raise HTTPException(409, "请保存订货计划，进货单将在截止时间自动生成")
 
 
 # endregion

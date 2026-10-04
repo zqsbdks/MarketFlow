@@ -66,6 +66,9 @@ class SupplierProduct(StoreScopedMixin, TimestampMixin, Base):
     shelf_life_days: Mapped[int | None] = mapped_column(
         Integer, nullable=True, comment="默认保质期天数"
     )
+    minimum_stock: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0"), comment="自动补货保底库存"
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

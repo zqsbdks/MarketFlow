@@ -140,11 +140,13 @@ async def create_purchase(
     purchase: CreatePurchaseRequest,
     created_by: int,
     db: AsyncSession,
+    *,
+    ordered_at_override: datetime | None = None,
 ) -> Purchase:
     """创建一张进货单及其全部进货明细，并发送到当前数据库事务。"""
 
     # 创建时间由后端统一确定；未指定日期时预计两天后到货。
-    ordered_at = business_now()
+    ordered_at = ordered_at_override or business_now()
     expected_arrival_at = ordered_at + timedelta(days=2)
     if purchase.expected_arrival_date is not None:
         expected_arrival_at = datetime.combine(purchase.expected_arrival_date, time(hour=12))
@@ -215,6 +217,7 @@ async def create_purchase(
 
         purchase_items.append(
             PurchaseItem(
+                store_id=db.info.get("write_store_id", 1),
                 product_id=product_id,
                 supplier_product_id=catalog_product.id,
                 supplier_id=catalog_product.supplier_id,
@@ -231,6 +234,7 @@ async def create_purchase(
 
     # 将明细对象放入 relationship，SQLAlchemy 会在写入主表后自动填写 purchase_id。
     new_purchase = Purchase(
+        store_id=db.info.get("write_store_id", 1),
         purchase_no=purchase_no,
         client_request_id=(str(purchase.client_request_id) if purchase.client_request_id else None),
         department_id=purchase.department_id,

@@ -40,6 +40,7 @@ from app.models.operation_audit_log import OperationAuditLog
 from app.models.product import Product
 from app.models.purchase import Purchase
 from app.models.purchase_item import PurchaseItem
+from app.models.purchase_plan import PurchasePlan
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.store import Store, StoreDepartment
@@ -80,6 +81,7 @@ __all__ = [
     "ProductStatus",
     "Purchase",
     "PurchaseItem",
+    "PurchasePlan",
     "PurchaseStatus",
     "RankingGroupBy",
     "RankingSortBy",

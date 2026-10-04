@@ -13,9 +13,12 @@ from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
 from app.models.purchase import Purchase
 from app.models.purchase_item import PurchaseItem
+from app.models.purchase_plan import PurchasePlan
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
 from app.models.supplier_product import SupplierProduct
+from app.services.purchase_plan_submission import plan_cutoff
+from app.services.replenishment import calculate_replenishment
 
 
 # region 组装七天计划表
@@ -31,8 +34,20 @@ async def get_purchase_planning(
     if store_id is None:
         raise HTTPException(400, "请先选择门店")
     days = [first_day + timedelta(days=offset) for offset in range(7)]
+    previous_arrival_date = first_day - timedelta(days=1)
+    plans = (
+        await db.scalars(
+            select(PurchasePlan).where(
+                PurchasePlan.store_id == store_id,
+                PurchasePlan.department_id == department_id,
+                PurchasePlan.arrival_date.in_(days),
+            )
+        )
+    ).all()
+    planned = {plan.arrival_date: plan for plan in plans}
     day_keys = {day.isoformat() for day in days}
-    range_start = datetime.combine(first_day, time.min)
+    day_keys.add(previous_arrival_date.isoformat())
+    range_start = datetime.combine(previous_arrival_date, time.min)
     range_end = datetime.combine(days[-1] + timedelta(days=1), time.min)
     catalog = (
         await db.scalars(
@@ -45,8 +60,16 @@ async def get_purchase_planning(
     ).all()
     catalog = [item for item in catalog if item.supplier is not None and item.supplier.is_active]
     if not catalog:
-        return {"arrival_date": first_day, "days": days, "items": []}
+        return {
+            "arrival_date": first_day,
+            "previous_arrival_date": previous_arrival_date,
+            "days": days,
+            "items": [],
+        }
     catalog_ids = [item.id for item in catalog]
+    recommendations = await calculate_replenishment(
+        store_id, department_id, days, catalog, db, business_now()
+    )
     products = (
         await db.scalars(
             select(Product).where(
@@ -143,9 +166,22 @@ async def get_purchase_planning(
         daily = []
         for day in days:
             arrival = arrivals.get((catalog_item.id, day.isoformat()), {})
+            recommendation = recommendations.get(catalog_item.id, {}).get(day, {})
+            stored = planned.get(day)
+            quantity = recommendation.get("planned_quantity", 0)
+            if stored is not None and (
+                stored.purchase_id is not None or business_now() >= plan_cutoff(day)
+            ):
+                quantity = (stored.automatic_quantities | stored.quantities).get(
+                    str(catalog_item.id), 0
+                )
             daily.append(
                 {
                     "date": day,
+                    "planned_quantity": quantity,
+                    "suggested_quantity": recommendation.get("suggested_quantity", 0),
+                    "is_manual": stored is not None and str(catalog_item.id) in stored.quantities,
+                    "forecast_sales": recommendation.get("forecast_sales", 0),
                     "expected_quantity": arrival.get("expected", 0),
                     "received_quantity": arrival.get("received", 0),
                     "last_week_sales": sold.get(
@@ -157,7 +193,14 @@ async def get_purchase_planning(
             )
         items.append(
             {
+                "previous_expected_quantity": arrivals.get(
+                    (catalog_item.id, previous_arrival_date.isoformat()), {}
+                ).get("expected", 0),
+                "previous_received_quantity": arrivals.get(
+                    (catalog_item.id, previous_arrival_date.isoformat()), {}
+                ).get("received", 0),
                 "supplier_product_id": catalog_item.id,
+                "minimum_stock": catalog_item.minimum_stock,
                 "product_id": product_id,
                 "name": catalog_item.name,
                 "supplier_name": catalog_item.supplier.name,
@@ -169,7 +212,12 @@ async def get_purchase_planning(
                 "days": daily,
             }
         )
-    return {"arrival_date": first_day, "days": days, "items": items}
+    return {
+        "arrival_date": first_day,
+        "previous_arrival_date": previous_arrival_date,
+        "days": days,
+        "items": items,
+    }
 
 
 # endregion

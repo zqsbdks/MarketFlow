@@ -500,6 +500,14 @@ export async function receivePurchase(id: number) {
   return unwrap((await http.put<ApiResponse<Purchase>>(`/purchases/${id}/receive`)).data)
 }
 
+export async function savePurchasePlan(payload: { department_id: number; arrival_date: string; supplier_product_id: number; quantity: number | null }) {
+  return unwrap((await http.put<ApiResponse<{ quantity: number }>>('/purchases/planning', payload)).data)
+}
+
+export async function saveMinimumStock(payload: { department_id: number; supplier_product_id: number; minimum_stock: number }) {
+  return unwrap((await http.put<ApiResponse<{ minimum_stock: number }>>('/purchases/minimum-stock', payload)).data)
+}
+
 export async function createPurchase(payload: Record<string, unknown>) {
   return unwrap((await http.post<ApiResponse<Purchase>>('/purchases/', payload)).data)
 }
