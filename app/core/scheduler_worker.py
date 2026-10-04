@@ -3,8 +3,10 @@
 import asyncio
 import signal
 
+from app.core.cache import initialize_business_cache
 from app.core.database import async_engine
 from app.core.purchase_scheduler import run_purchase_scheduler
+from app.core.redis import close_redis
 
 
 async def main() -> None:
@@ -15,8 +17,10 @@ async def main() -> None:
     for signum in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(signum, stop_event.set)
     try:
+        await initialize_business_cache()
         await run_purchase_scheduler(stop_event)
     finally:
+        await close_redis()
         await async_engine.dispose()
 
 

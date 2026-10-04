@@ -9,14 +9,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi_cache import FastAPICache
-from fastapi_cache.backends.inmemory import InMemoryBackend
-from fastapi_cache.backends.redis import RedisBackend
 
+from app.core.cache import initialize_business_cache
 from app.core.config import settings
 from app.core.contact_notice_scheduler import run_contact_notice_scheduler
 from app.core.database import async_engine
 from app.core.purchase_scheduler import run_purchase_scheduler
-from app.core.redis import close_redis, get_redis_client
+from app.core.redis import close_redis
 
 
 @asynccontextmanager
@@ -33,21 +32,7 @@ async def lifespan(app: FastAPI):
     FastAPICache.reset()
 
     # 未配置 APP_REDIS_URL 时返回 None，应用可以在无 Redis 环境下启动。
-    client = get_redis_client()
-    if client is not None:
-        try:
-            # 先验证连接，再把同一客户端交给 fastapi-cache，避免重复连接池。
-            await client.ping()
-            FastAPICache.init(RedisBackend(client), prefix="fastapi-cache")
-        except Exception:
-            # Redis 暂时不可用时退回单进程内存缓存，保证带缓存装饰器的接口仍可使用。
-            import logging
-
-            logging.getLogger(__name__).exception("Redis initialization failed")
-            FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
-    else:
-        # 本地未启用 Redis 时使用内存缓存；部署后配置 Redis 即可跨请求共享缓存。
-        FastAPICache.init(InMemoryBackend(), prefix="fastapi-cache")
+    await initialize_business_cache()
 
     # 后台任务使用独立数据库会话，每天12点签收进货单并刷新库存批次状态。
     scheduler_stop_event = asyncio.Event()

@@ -6,6 +6,7 @@ from math import ceil
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import FORECAST_CACHE_NAMESPACE, FORECAST_CACHE_SECONDS, business_cache
 from app.models.inventory_batch import InventoryBatch
 from app.models.product import Product
 from app.models.purchase import Purchase
@@ -13,6 +14,29 @@ from app.models.purchase_item import PurchaseItem
 from app.models.purchase_plan import PurchasePlan
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+
+
+@business_cache(FORECAST_CACHE_NAMESPACE, FORECAST_CACHE_SECONDS, shared_forecast=True)
+async def weekday_sales_forecast(
+    store_id: int, product_ids: tuple[int, ...], today: date, db: AsyncSession
+) -> dict[str, list[int]]:
+    rows = (
+        await db.execute(
+            select(SaleItem.product_id, func.date(Sale.sold_at), func.sum(SaleItem.quantity))
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(
+                Sale.store_id == store_id,
+                Sale.sold_at >= datetime.combine(today - timedelta(days=28), time.min),
+                Sale.sold_at < datetime.combine(today, time.min),
+                SaleItem.product_id.in_(product_ids),
+            )
+            .group_by(SaleItem.product_id, func.date(Sale.sold_at))
+        )
+    ).all()
+    totals = {str(product_id): [0] * 7 for product_id in product_ids}
+    for product_id, sold_date, quantity in rows:
+        totals[str(product_id)][date.fromisoformat(str(sold_date)).weekday()] += int(quantity)
+    return {key: [ceil(quantity / 4) for quantity in values] for key, values in totals.items()}
 
 
 def simulate_replenishment(
@@ -182,23 +206,11 @@ async def calculate_replenishment(
         )
     ).all()
     catalog_by_product = {product.id: product.supplier_product_id for product in products}
-    sales_rows = (
-        await db.execute(
-            select(SaleItem.product_id, func.date(Sale.sold_at), func.sum(SaleItem.quantity))
-            .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(
-                Sale.store_id == store_id,
-                Sale.sold_at >= datetime.combine(today - timedelta(days=28), time.min),
-                Sale.sold_at < datetime.combine(today, time.min),
-                SaleItem.product_id.in_(catalog_by_product),
-            )
-            .group_by(SaleItem.product_id, func.date(Sale.sold_at))
-        )
-    ).all()
-    totals: dict[tuple[int, int], int] = {}
-    for product_id, sold_date, quantity in sales_rows:
-        key = (catalog_by_product[product_id], date.fromisoformat(str(sold_date)).weekday())
-        totals[key] = totals.get(key, 0) + int(quantity)
+    forecasts = await weekday_sales_forecast(store_id, tuple(sorted(catalog_by_product)), today, db)
+    forecast_by_catalog = {
+        catalog_id: forecasts.get(str(product_id), [0] * 7)
+        for product_id, catalog_id in catalog_by_product.items()
+    }
     batch_rows = (
         await db.execute(
             select(
@@ -280,7 +292,7 @@ async def calculate_replenishment(
         result[item.id] = simulate_replenishment(
             now,
             item_days,
-            {weekday: ceil(totals.get((item.id, weekday), 0) / 4) for weekday in range(7)},
+            {weekday: forecast_by_catalog.get(item.id, [0] * 7)[weekday] for weekday in range(7)},
             stocks.get(item.id, []),
             incoming.get(item.id, []),
             item.minimum_stock,

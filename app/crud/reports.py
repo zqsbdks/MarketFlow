@@ -7,6 +7,12 @@ from typing import Literal
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import (
+    REPORTS_CACHE_NAMESPACE,
+    REPORTS_CACHE_SECONDS,
+    business_cache,
+    historical_report,
+)
 from app.models.category import Category
 from app.models.department import Department
 from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
@@ -37,6 +43,7 @@ AnalyticsValues = tuple[
 
 
 # region 获取营业概览
+@business_cache(REPORTS_CACHE_NAMESPACE, REPORTS_CACHE_SECONDS, enabled=historical_report)
 async def get_reports(
     db: AsyncSession,
     start_time: datetime | None,
@@ -118,6 +125,7 @@ async def get_reports(
 
 
 # region 获取部门营业对比
+@business_cache(REPORTS_CACHE_NAMESPACE, REPORTS_CACHE_SECONDS, enabled=historical_report)
 async def get_departments_reports(
     db: AsyncSession,
     start_time: datetime | None = None,
@@ -183,6 +191,7 @@ async def get_departments_reports(
 
 
 # region 获取销售排行
+@business_cache(REPORTS_CACHE_NAMESPACE, REPORTS_CACHE_SECONDS, enabled=historical_report)
 async def get_rankings(
     db: AsyncSession,
     start_date: datetime | None,
@@ -291,6 +300,7 @@ async def get_rankings(
 
 
 # region 获取营业分析
+@business_cache(REPORTS_CACHE_NAMESPACE, REPORTS_CACHE_SECONDS, enabled=historical_report)
 async def get_report_analytics(
     db: AsyncSession,
     start_time: datetime,
