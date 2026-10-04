@@ -16,11 +16,14 @@ from app.crud.purchases import create_purchase
 from app.models.category import Category
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole
+from app.models.product import Product
 from app.models.purchase_plan import PurchasePlan
 from app.models.store import StoreDepartment
 from app.models.supplier_product import SupplierProduct
 from app.schemas.purchase_plan import SaveMinimumStock, SavePurchasePlan
 from app.schemas.purchases_requests import CreatePurchaseRequest
+from app.services.quantity_confirmation import check_confirmation
+from app.services.replenishment import calculate_replenishment, weekday_sales_forecast
 
 
 def plan_cutoff(arrival: date) -> datetime:
@@ -72,6 +75,24 @@ async def save_minimum_stock(request: SaveMinimumStock, actor_id: int, db: Async
     catalog = await validate_plan_writer(request, actor_id, db)
     await db.refresh(catalog, with_for_update=True)
     before = catalog.minimum_stock
+    product_ids = tuple(
+        (
+            await db.scalars(
+                select(Product.id).where(
+                    Product.store_id == catalog.store_id, Product.supplier_product_id == catalog.id
+                )
+            )
+        ).all()
+    )
+    forecast = await weekday_sales_forecast(
+        catalog.store_id, product_ids, business_now().date(), db
+    )
+    reference = max([before, *(max(values) for values in forecast.values())])
+    confirmation = check_confirmation(
+        request, actor_id, catalog.store_id, "minimum", reference, before
+    )
+    if confirmation and confirmation.get("confirmation_required"):
+        return confirmation
     catalog.minimum_stock = request.minimum_stock
     await create_operation_audit_log(
         employee_id=actor_id,
@@ -80,7 +101,7 @@ async def save_minimum_stock(request: SaveMinimumStock, actor_id: int, db: Async
         target_type="supplier_product",
         target_id=catalog.id,
         before_data={"minimum_stock": before},
-        after_data={"minimum_stock": catalog.minimum_stock},
+        after_data={"minimum_stock": catalog.minimum_stock, "confirmation": confirmation},
         reason=None,
         db=db,
     )
@@ -89,7 +110,7 @@ async def save_minimum_stock(request: SaveMinimumStock, actor_id: int, db: Async
 
 
 async def save_purchase_plan(request: SavePurchasePlan, actor_id: int, db: AsyncSession) -> dict:
-    await validate_plan_writer(request, actor_id, db)
+    catalog = await validate_plan_writer(request, actor_id, db)
     store_id = db.info.get("write_store_id")
     now = business_now()
     if now >= plan_cutoff(request.arrival_date):
@@ -131,7 +152,22 @@ async def save_purchase_plan(request: SavePurchasePlan, actor_id: int, db: Async
     if business_now() >= plan_cutoff(request.arrival_date) or plan.purchase_id is not None:
         raise HTTPException(400, "该到货日已截止，订货计划不可修改")
     before = dict(plan.quantities)
+    recommendations = await calculate_replenishment(
+        store_id, request.department_id, [request.arrival_date], [catalog], db, business_now()
+    )
+    recommendation = recommendations.get(catalog.id, {}).get(request.arrival_date, {})
+    previous = (plan.automatic_quantities | before).get(str(catalog.id), 0)
+    reference = max(
+        recommendation.get("suggested_quantity", 0),
+        recommendation.get("forecast_sales", 0),
+        catalog.minimum_stock,
+    )
+    confirmation = check_confirmation(request, actor_id, store_id, "order", reference, previous)
+    if confirmation and confirmation.get("confirmation_required"):
+        return confirmation
     quantities = dict(before)
+    if business_now() >= plan_cutoff(request.arrival_date):
+        raise HTTPException(400, "该到货日已截止，订货计划不可修改")
     if request.quantity is None:
         quantities.pop(str(request.supplier_product_id), None)
     else:
@@ -146,7 +182,11 @@ async def save_purchase_plan(request: SavePurchasePlan, actor_id: int, db: Async
         target_type="purchase_plan",
         target_id=plan.id,
         before_data={"quantities": before},
-        after_data={"quantities": quantities, "arrival_date": plan.arrival_date},
+        after_data={
+            "quantities": quantities,
+            "arrival_date": plan.arrival_date,
+            "confirmation": confirmation,
+        },
         reason=None,
         db=db,
     )

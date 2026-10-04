@@ -11,6 +11,17 @@ export const language = ref<Language>(
 
 // 中文是原始文案；日语和英语只用于界面，不改变后端业务枚举与数据库数据。
 const translations: Record<string, [string, string]> = {
+  '自动建议明显超过近期销量；仍会按时提交。': ['自動提案が最近の販売数を大幅に超えています。予定どおり自動発注されます。', 'Automatic quantity is far above recent sales; it will still be submitted on schedule.'],
+  '请确认异常数量': ['通常と異なる数量を確認', 'Confirm unusual quantity'],
+  '参考数量': ['参考数量', 'Reference quantity'],
+  '修改前数量': ['変更前の数量', 'Previous quantity'],
+  '数量明显超过正常需求': ['数量が通常の需要を大幅に上回っています', 'Quantity is far above normal demand'],
+  '可能多输入了一个0': ['0を一つ多く入力した可能性があります', 'An extra zero may have been entered'],
+  '可能重复按键': ['キーを重複して押した可能性があります', 'A key may have been pressed repeatedly'],
+  '确认前不会保存该数量，请检查是否输入正确。': ['確認するまで数量は保存されません。入力内容をご確認ください。', 'This quantity will not be saved until confirmed. Please check your input.'],
+  '返回修改': ['戻って修正', 'Go back and edit'],
+  '确认使用此数量': ['この数量で確定', 'Confirm this quantity'],
+  '请输入0至1000000之间的整数': ['0から1000000までの整数を入力してください', 'Enter a whole number between 0 and 1000000'],
   '保底库存': ['最低在庫', 'Minimum stock'],
   '人工调整': ['手動調整', 'Manual adjustment'],
   '自动建议': ['自動提案', 'Automatic suggestion'],
