@@ -1,7 +1,7 @@
 import { language } from './i18n'
 import { businessDateRange } from './utils/businessDates'
 
-function displayLocale(): string {
+export function displayLocale(): string {
   return language.value === 'ja' ? 'ja-JP' : language.value === 'en' ? 'en-US' : 'zh-CN'
 }
 

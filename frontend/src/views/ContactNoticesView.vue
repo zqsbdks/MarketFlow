@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, onMounted, ref } from "vue";
 import { useAuthStore } from "../stores/auth";
 import { useStoreScope } from "../stores/storeScope";
@@ -335,8 +336,8 @@ onMounted(async () => {
             >{{ t(notice.priority) }}</strong
           >
         </div>
-        <h2>{{ notice.title }}</h2>
-        <p class="notice-preview">{{ notice.content }}</p>
+        <h2 data-no-translate>{{ notice.title }}</h2>
+        <p class="notice-preview" data-no-translate>{{ notice.content }}</p>
         <div class="notice-row">
           <span
             >{{ notice.publisher_name }} · {{ date(notice.created_at) }}</span
@@ -391,7 +392,7 @@ onMounted(async () => {
           }}</span
           ><button @click="selected = null">×</button>
         </div>
-        <h2>{{ selected.title }}</h2>
+        <h2 data-no-translate>{{ selected.title }}</h2>
         <p v-if="error" role="alert" class="notice-error">{{ error }}</p>
         <p>
           {{ selected.publisher_name }} · {{ statusText(selected) }} ·
@@ -544,10 +545,10 @@ onMounted(async () => {
         </fieldset>
         <label
           >{{ t("start")
-          }}<input v-model="form.starts_at" type="datetime-local" /></label
+          }}<LocalizedDateInput v-model="form.starts_at" type="datetime-local" /></label
         ><label
           >{{ t("deadline")
-          }}<input v-model="form.deadline_at" type="datetime-local" /></label
+          }}<LocalizedDateInput v-model="form.deadline_at" type="datetime-local" /></label
         ><label class="checkbox"
           ><input v-model="form.close_on_all_confirmed" type="checkbox" />{{
             t("autoClose")

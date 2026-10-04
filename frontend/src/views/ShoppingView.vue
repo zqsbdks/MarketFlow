@@ -231,7 +231,7 @@ onMounted(loadProducts)
           <div class="scan-row">
             <select v-model="selectedProductId" :disabled="loadingProducts" @keyup.enter="scanSelectedProduct">
               <option value="">{{ loadingProducts ? '正在加载商品…' : '选择商品编号或名称' }}</option>
-              <option v-for="product in products" :key="product.id" :value="product.id">
+              <option v-for="product in products" :key="product.id" :value="product.id" data-no-translate>
                 {{ product.product_no }} · {{ product.name }} · {{ formatMoney(product.sale_price) }} · 库存 {{ product.batch_stock_quantity }}
               </option>
             </select>
@@ -256,9 +256,9 @@ onMounted(loadProducts)
           <div v-if="cart.length" class="cart-lines">
             <article v-for="item in cart" :key="item.product.id">
               <div class="cart-product">
-                <span>{{ item.product.name.slice(0, 1) }}</span>
+                <span data-no-translate>{{ item.product.name.slice(0, 1) }}</span>
                 <div>
-                  <strong>{{ item.product.name }}</strong>
+                  <strong data-no-translate>{{ item.product.name }}</strong>
                   <small>{{ item.product.product_no }} · 可售库存 {{ item.product.batch_stock_quantity }}</small>
                   <small v-if="previewItems.get(item.product.id)?.discount_rule_name" class="discount-name">
                     {{ previewItems.get(item.product.id)?.discount_rule_name }}
@@ -337,7 +337,7 @@ onMounted(loadProducts)
         <div class="receipt-lines">
           <div v-for="item in completedSale.items" :key="`${item.product_id}-${item.unit_price}-${item.discount_rule_id}`">
             <div>
-              <strong>{{ item.product_name }}</strong>
+              <strong data-no-translate>{{ item.product_name }}</strong>
               <span><s v-if="Number(item.discount_amount) > 0">{{ formatMoney(item.original_unit_price) }}</s> {{ formatMoney(item.unit_price) }} × {{ item.quantity }}</span>
               <small v-if="item.discount_rule_name" class="discount-name">{{ item.discount_rule_name }}</small>
             </div>

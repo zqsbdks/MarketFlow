@@ -11,6 +11,55 @@ export const language = ref<Language>(
 
 // 中文是原始文案；日语和英语只用于界面，不改变后端业务枚举与数据库数据。
 const translations: Record<string, [string, string]> = {
+  '打开菜单': ['メニューを開く', 'Open menu'],
+  '关闭菜单': ['メニューを閉じる', 'Close menu'],
+  '· 可售库存': ['· 販売可能在庫', '· Sellable stock'],
+  '· 实时业务助手': ['· 業務アシスタント', '· Live business assistant'],
+  '· 库存': ['· 在庫', '· Stock'],
+  '· 毛利润 ¥': ['· 粗利益 ¥', '· Gross profit ¥'],
+  '营业额 ¥': ['売上 ¥', 'Revenue ¥'],
+  '件 /': ['点 /', 'items /'],
+  '件 · 预计金额': ['点 · 見積金額', 'items · Estimated amount'],
+  '件 ×': ['点 ×', 'items ×'],
+  '件商品': ['点の商品', 'products'],
+  '种 /': ['種類 /', 'types /'],
+  '种 ·': ['種類 ·', 'types ·'],
+  '条 · 第': ['件 · ページ', 'records · Page'],
+  '加载更早消息': ['以前のメッセージを読み込む', 'Load earlier messages'],
+  '售出': ['販売数', 'Sold'],
+  '商品名': ['商品名', 'Product name'],
+  '已添加': ['追加済み', 'Added'],
+  '已选': ['選択済み', 'Selected'],
+  '添加选中的': ['選択した商品を追加', 'Add selected'],
+  '订货当天临期数量': ['発注日の期限間近数量', 'Near-expiry quantity on order date'],
+  '订货金额': ['発注金額', 'Order amount'],
+  '门店（': ['店舗（', 'Stores ('],
+  '日期格上方输入本次订货数量；黑色文字为已有订单到货量，蓝色为上周同曜日销量。深灰色日期已过截止时间。': ['日付欄に発注数量を入力してください。通常文字は既存注文の入荷量、青は先週同曜日の販売数、灰色は締切済みです。', 'Enter order quantities above each date cell. Standard text shows existing orders, blue shows sales on the same weekday last week, and dark grey dates are closed.'],
+  '总部账号：门店业务仅供查看': ['本部アカウント：店舗業務は閲覧のみ', 'Headquarters account: store operations are read-only'],
+  '正在查看其他门店：不能修改该店业务数据': ['他店舗を閲覧中：店舗データは変更できません', 'Viewing another store: its business data is read-only'],
+  '查询门店': ['照会店舗', 'Viewing store'],
+  '选择查询门店': ['照会する店舗を選択', 'Select a store to view'],
+  '加载中': ['読み込み中', 'Loading'],
+  '待签收': ['入荷待ち', 'Awaiting receipt'],
+  '签收': ['入荷確認', 'Receive'],
+  '商品数': ['商品数', 'Product count'],
+  '新对话': ['新しい会話', 'New conversation'],
+  'AI历史会话': ['AI会話履歴', 'AI conversation history'],
+  '返回员工管理': ['従業員管理に戻る', 'Back to employees'],
+  '移除商品': ['商品を削除', 'Remove product'],
+  '已截止': ['締切済み', 'Closed'],
+  '可订货': ['発注可能', 'Open for ordering'],
+  '补货': ['補充', 'Restock'],
+  '只看临期': ['期限間近のみ', 'Near expiry only'],
+  '重新加载部门信息': ['部門情報を再読み込み', 'Reload department information'],
+  '有日期已过订货截止时间，请清除该日数量后重试': ['締切を過ぎた日の数量を削除して再試行してください', 'Remove quantities for dates past the ordering cutoff, then try again'],
+  '在日期格上填写本次订货数量。绿色数字为当前订货数量；蓝色为上周同曜日销量；灰色日期已过截止时间。': ['日付欄に発注数量を入力してください。緑は発注数量、青は先週同曜日の販売数、灰色は締切済みです。', 'Enter quantities in the date cells. Green shows order quantities, blue shows sales on the same weekday last week, and grey dates are closed.'],
+  '离职或解雇日期不能早于入职日期': ['退職・解雇日は入社日以降にしてください', 'The separation date cannot be before the hire date'],
+  '保存成功': ['保存しました', 'Saved successfully'],
+  '已开启': ['有効', 'Enabled'],
+  '已关闭': ['無効', 'Disabled'],
+  '适用商品': ['対象商品', 'Applicable products'],
+  '你好，我是 MarketFlow 助手。可以查询实时业务数据，也可以协助处理商品、库存、供应商、进货、销售、员工和折扣；所有修改都要由你确认。': ['MarketFlow アシスタントです。最新の業務データを照会し、商品・在庫・仕入先・発注・販売・従業員・割引を支援します。変更はすべて確認が必要です。', 'I am the MarketFlow assistant. I can look up live business data and help with products, inventory, suppliers, purchases, sales, employees and discounts. All changes require your confirmation.'],
   '门店与总部': ['店舗・本部管理', 'Stores & headquarters'],
   '预计到货日': ['入荷予定日', 'Expected arrival date'],
   '全部商品': ['すべての商品', 'All products'],
@@ -585,7 +634,7 @@ const translations: Record<string, [string, string]> = {
   '个批次': ['ロット', 'batches'],
   '条流水': ['件の在庫移動', 'movements'],
   '张销售单': ['件の販売伝票', 'sales receipts'],
-  '张进货单': ['件の仕入伝票', 'purchase orders'],
+  '张进货单': ['枚の仕入伝票', 'purchase orders'],
   '批次ID': ['ロットID', 'Batch ID'],
   '员工ID': ['従業員ID', 'Employee ID'],
   '库存': ['在庫', 'Stock'],
@@ -604,6 +653,62 @@ const translations: Record<string, [string, string]> = {
 }
 
 const textSources = new WeakMap<Text, { source: string; last: string }>()
+const interfaceLabels: Record<string, [string, string, string]> = {
+  '本部': ['总部', '本部', 'Headquarters'],
+  '（空欄＝全店舗）': ['（留空表示全部门店）', '（空欄＝全店舗）', '(Blank = all stores)'],
+  'BARCODE SCANNER': ['扫码收银', 'バーコード読取', 'BARCODE SCANNER'],
+  'BUSINESS INTELLIGENCE': ['经营分析', '経営分析', 'BUSINESS INTELLIGENCE'],
+  'CURRENT RECEIPT': ['当前小票', '現在の伝票', 'CURRENT RECEIPT'],
+  'DEPARTMENT DATA': ['部门数据', '部門データ', 'DEPARTMENT DATA'],
+  'DEPARTMENT SHARE': ['部门占比', '部門構成比', 'DEPARTMENT SHARE'],
+  'DEPARTMENT VIEW': ['部门经营', '部門運営', 'DEPARTMENT VIEW'],
+  'DISCOUNT CONTROL': ['折扣管理', '割引管理', 'DISCOUNT CONTROL'],
+  'DISCOUNT TREND': ['折扣趋势', '割引推移', 'DISCOUNT TREND'],
+  'FINANCIAL TREND': ['经营趋势', '業績推移', 'FINANCIAL TREND'],
+  'FIRST LOGIN SECURITY': ['首次登录', '初回ログイン', 'FIRST LOGIN SECURITY'],
+  'HEADQUARTERS': ['总部管理', '本部管理', 'HEADQUARTERS'],
+  'INVENTORY LEDGER': ['库存流水', '在庫履歴', 'INVENTORY LEDGER'],
+  'INVENTORY LOTS': ['库存批次', '在庫ロット', 'INVENTORY LOTS'],
+  'MARGIN TREND': ['毛利趋势', '粗利益推移', 'MARGIN TREND'],
+  'METRICS': ['经营指标', '業績指標', 'METRICS'],
+  'ORDER EFFICIENCY': ['订单效率', '伝票効率', 'ORDER EFFICIENCY'],
+  'PARTNERS': ['合作供应商', '取引先', 'PARTNERS'],
+  'PERIOD GROWTH': ['期间增长', '期間成長率', 'PERIOD GROWTH'],
+  'PRODUCT CATALOG': ['商品目录', '商品一覧', 'PRODUCT CATALOG'],
+  'SALES RANKING': ['销售排行', '売上ランキング', 'SALES RANKING'],
+  'SALES RECORDS': ['销售记录', '販売履歴', 'SALES RECORDS'],
+  'SECURE ACCESS': ['账号登录', 'アカウントログイン', 'SECURE ACCESS'],
+  'SHOPPING CART': ['购物车', '買い物かご', 'SHOPPING CART'],
+  'SIMULATED SHOPPING': ['模拟购物', '買い物シミュレーション', 'SIMULATED SHOPPING'],
+  'SUMMARY DATA': ['汇总数据', '集計データ', 'SUMMARY DATA'],
+  'SUPPLIER CATALOG': ['供应商目录', '仕入先カタログ', 'SUPPLIER CATALOG'],
+  'TEAM DIRECTORY': ['员工管理', '従業員管理', 'TEAM DIRECTORY'],
+  'TRAFFIC & VOLUME': ['客流与销量', '客数と販売数', 'TRAFFIC & VOLUME'],
+  'TREND DATA': ['趋势数据', '推移データ', 'TREND DATA'],
+  'STORE OPERATIONS': ['门店运营', '店舗運営', 'STORE OPERATIONS'],
+  'STORE PULSE': ['经营概览', '店舗の業績', 'STORE PULSE'],
+  'DEPARTMENT MIX': ['部门对比', '部門比較', 'DEPARTMENT MIX'],
+  'TOP PRODUCTS': ['畅销商品', '人気商品', 'TOP PRODUCTS'],
+  'OPERATING NOTE': ['经营提示', '運営メモ', 'OPERATING NOTE'],
+  'PROCUREMENT DESK': ['采购工作台', '仕入ワークスペース', 'PROCUREMENT DESK'],
+  'ARRIVAL QUEUE': ['到货队列', '入荷一覧', 'ARRIVAL QUEUE'],
+  'EMPLOYEE PROFILE': ['员工档案', '従業員情報', 'EMPLOYEE PROFILE'],
+  'PERSONAL INFORMATION': ['基本资料', '個人情報', 'PERSONAL INFORMATION'],
+  'EMPLOYMENT RECORD': ['任职记录', '勤務記録', 'EMPLOYMENT RECORD'],
+  'EDIT PROFILE': ['编辑档案', 'プロフィール編集', 'EDIT PROFILE'],
+  '青果部': ['青果部', '青果部', 'Produce'],
+  '精肉部': ['精肉部', '精肉部', 'Meat'],
+  '鮮魚部': ['鲜鱼部', '鮮魚部', 'Seafood'],
+  '鲜鱼部': ['鲜鱼部', '鮮魚部', 'Seafood'],
+  '惣菜部': ['熟食部', '惣菜部', 'Deli'],
+  '周一': ['周一', '月', 'Mon'], '月': ['周一', '月', 'Mon'],
+  '周二': ['周二', '火', 'Tue'], '火': ['周二', '火', 'Tue'],
+  '周三': ['周三', '水', 'Wed'], '水': ['周三', '水', 'Wed'],
+  '周四': ['周四', '木', 'Thu'], '木': ['周四', '木', 'Thu'],
+  '周五': ['周五', '金', 'Fri'], '金': ['周五', '金', 'Fri'],
+  '周六': ['周六', '土', 'Sat'], '土': ['周六', '土', 'Sat'],
+  '周日': ['周日', '日', 'Sun'], '日': ['周日', '日', 'Sun'],
+}
 const attributeSources = new WeakMap<Element, Map<string, { source: string; last: string }>>()
 const translatableAttributes = ['placeholder', 'title', 'aria-label']
 const translationEntries = Object.entries(translations).sort((a, b) => b[0].length - a[0].length)
@@ -617,9 +722,20 @@ const phrasePattern = new RegExp(
 let originalPageTitle = 'MarketFlow'
 
 export function translate(source: string): string {
-  if (language.value === 'zh' || !/[\u3400-\u9fff]/u.test(source)) return source
+  const bareSource = source.trim()
+  const label = interfaceLabels[bareSource]
+  if (label) return source.replace(bareSource, label[language.value === 'zh' ? 0 : language.value === 'ja' ? 1 : 2])
+  if (language.value === 'zh') return source
   const index = language.value === 'ja' ? 0 : 1
+  const exact = translations[bareSource]
+  if (exact) return source.replace(bareSource, exact[index])
+  if (bareSource.endsWith(' *')) return translate(source.slice(0, -2)) + ' *'
+  if (!/[\u3400-\u9fff]/u.test(source)) return source
   const dynamicConfirmations: [RegExp, (...values: string[]) => [string, string]][] = [
+    [/^查看(.+)的档案$/u, (name) => [`${name} のプロフィールを表示`, `View ${name}'s profile`]],
+    [/^确认已收到进货单 (.+) 的全部商品并立即入库吗？$/u, (number) => [`発注 ${number} の全商品を受領し、在庫に追加しますか？`, `Confirm receipt of all items in order ${number} and add them to inventory?`]],
+    [/^(.+) 已签收，库存和批次已更新$/u, (number) => [`${number} を受領しました。在庫とロットを更新しました`, `${number} received. Inventory and batches have been updated`]],
+    [/^自动签收完成，共签收 (\d+) 张进货单$/u, (count) => [`自動受領が完了しました。${count} 枚の発注書を受領しました`, `Automatic receipt completed: ${count} purchase orders received`]],
     [/^确认废弃批次 (.+) 的全部剩余库存吗？$/u, (name) => [`ロット ${name} の残在庫をすべて廃棄しますか？`, `Discard all remaining stock in batch ${name}?`]],
     [/^确定要(停用|启用) (.+) 的账号吗？$/u, (action, name) => [`${name} のアカウントを${action === '停用' ? '無効' : '有効'}にしますか？`, `${action === '停用' ? 'Disable' : 'Enable'} ${name}'s account?`]],
     [/^确定重置 (.+) 的密码吗？$/u, (name) => [`${name} のパスワードをリセットしますか？`, `Reset ${name}'s password?`]],
@@ -649,7 +765,7 @@ export function translate(source: string): string {
     张: ['枚', 'orders'], 单: ['件', 'orders'], 天: ['日', 'days'], 页: ['ページ', 'pages'],
     种: ['種類', 'types'],
   }
-  result = result.replace(/(\d+)\s*(件|批|条|张|单|天|页|种)(?![\u3400-\u9fff])/gu, (_, count: string, unit: string) => {
+  result = result.replace(/(\d+)\s*(件|批|条|张|单|天|页|种)(?![\u3400-\u9fff\u3040-\u30ff])/gu, (_, count: string, unit: string) => {
     return `${count} ${units[unit]![index]}`
   })
   result = result.replace(/共\s*(\d+)/gu, (_, count: string) => index === 0 ? `合計 ${count}` : `Total ${count}`)
@@ -736,4 +852,5 @@ export function startTranslation() {
     childList: true, subtree: true, characterData: true,
     attributes: true, attributeFilter: translatableAttributes,
   })
+  return () => observer.disconnect()
 }

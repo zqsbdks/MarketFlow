@@ -31,6 +31,12 @@ const router = useRouter()
 const auth = useAuthStore()
 const scope = useStoreScope()
 const sidebarOpen = ref(false)
+const navigationMedia = window.matchMedia('(max-width: 1000px)')
+const compactNavigation = ref(navigationMedia.matches)
+function updateNavigationSize() {
+  compactNavigation.value = navigationMedia.matches
+  if (!compactNavigation.value) sidebarOpen.value = false
+}
 let employeeRefresh: ReturnType<typeof setInterval> | undefined
 
 async function refreshAssignment() {
@@ -47,10 +53,14 @@ async function refreshAssignment() {
 }
 
 onMounted(async () => {
+  navigationMedia.addEventListener('change', updateNavigationSize)
   try { await scope.load() } catch { /* 页面其他查询会显示具体错误。 */ }
   employeeRefresh = setInterval(() => { void refreshAssignment() }, 60_000)
 })
-onUnmounted(() => { if (employeeRefresh) clearInterval(employeeRefresh) })
+onUnmounted(() => {
+  if (employeeRefresh) clearInterval(employeeRefresh)
+  navigationMedia.removeEventListener('change', updateNavigationSize)
+})
 
 const navItems = computed(() => {
   const items = [
@@ -89,28 +99,28 @@ async function logout() {
 <template>
   <div class="app-shell">
     <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
-    <aside class="sidebar" :class="{ open: sidebarOpen }">
+    <aside class="sidebar" :class="{ open: sidebarOpen }" :inert="compactNavigation && !sidebarOpen" @keydown.esc="sidebarOpen = false">
       <div class="brand-block">
         <div class="brand-mark"><Store :size="22" /></div>
         <div>
           <strong>MarketFlow</strong>
           <span>STORE OPERATIONS</span>
         </div>
-        <button class="sidebar-close" type="button" @click="sidebarOpen = false">
+        <button class="sidebar-close" type="button" aria-label="关闭菜单" @click="sidebarOpen = false">
           <X :size="20" />
         </button>
       </div>
 
       <div class="store-chip">
         <span class="live-dot" />
-        <div><small>查询门店</small><strong>{{ scope.selected?.store_no }} {{ scope.selected?.name || '加载中' }}</strong></div>
+        <div><small>查询门店</small><strong :data-no-translate="scope.selected?.name ? '' : undefined">{{ scope.selected?.store_no }} {{ scope.selected?.name || '加载中' }}</strong></div>
         <select :value="scope.selectedId ?? ''" aria-label="选择查询门店" @change="scope.choose(Number(($event.target as HTMLSelectElement).value))">
           <option v-for="store in scope.stores.filter((item) => item.is_active)" :key="store.id" :value="store.id">{{ store.store_no }} {{ store.name }}</option>
         </select>
         <ChevronDown :size="16" />
       </div>
 
-      <nav class="main-nav">
+      <nav id="main-navigation" class="main-nav">
         <p>经营工作台</p>
         <RouterLink
           v-for="item in navItems"
@@ -141,7 +151,7 @@ async function logout() {
 
     <main class="main-area">
       <header class="mobile-bar">
-        <button class="icon-button" type="button" @click="sidebarOpen = true">
+        <button class="icon-button" type="button" aria-label="打开菜单" :aria-expanded="sidebarOpen" aria-controls="main-navigation" @click="sidebarOpen = true">
           <Menu :size="21" />
         </button>
         <strong>MarketFlow</strong>

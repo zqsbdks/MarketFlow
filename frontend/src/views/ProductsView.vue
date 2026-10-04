@@ -178,7 +178,7 @@ onMounted(async () => {
     <section class="panel filter-panel">
       <div class="search-field"><Search :size="18" /><input v-model="keyword" placeholder="搜索商品名称" @keyup.enter="search" /></div>
       <select v-model="departmentId" @change="changeDepartment"><option value="">全部部门</option><option v-for="item in departments" :key="item.id" :value="item.id">{{ item.name }}</option></select>
-      <select v-model="categoryId" @change="search"><option value="">全部分类</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select>
+      <select v-model="categoryId" @change="search"><option value="">全部分类</option><option v-for="item in categories" :key="item.id" :value="item.id" data-no-translate>{{ item.name }}</option></select>
       <select v-model="status" @change="search"><option value="">全部状态</option><option value="on_sale">在售</option><option value="stopped">停售</option></select>
       <select v-model="stockConsistent" @change="search"><option value="">全部库存</option><option value="true">库存一致</option><option value="false">库存不一致</option></select>
       <select v-model="lowStock" @change="search"><option value="">全部预警状态</option><option value="true">仅低库存</option><option value="false">未触发低库存</option></select>
@@ -193,7 +193,7 @@ onMounted(async () => {
           <thead><tr><th>商品</th><th>部门 / 分类</th><th>进货价</th><th>销售价</th><th>库存概览</th><th>临期 / 过期</th><th>库存校验</th><th>状态</th><th></th></tr></thead>
           <tbody>
             <tr v-for="item in products" :key="item.id">
-              <td><div class="product-cell"><span>{{ item.name.slice(0, 1) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.product_no }}</small></div></div></td>
+              <td><div class="product-cell"><span data-no-translate>{{ item.name.slice(0, 1) }}</span><div><strong data-no-translate>{{ item.name }}</strong><small>{{ item.product_no }}</small></div></div></td>
               <td><strong class="plain">{{ item.department_name }}</strong><small class="block">{{ item.category_name }}</small></td>
               <td>{{ formatMoney(item.purchase_price) }}</td><td><strong>{{ formatMoney(item.sale_price) }}</strong></td>
               <td>
@@ -221,8 +221,8 @@ onMounted(async () => {
 
     <ModalPanel title="商品详情" :open="detailOpen" @close="detailOpen = false">
       <div v-if="detail" class="detail-sheet">
-        <div class="detail-hero"><span>{{ detail.name.slice(0, 1) }}</span><div><p>{{ detail.product_no }}</p><h3>{{ detail.name }}</h3></div></div>
-        <dl><div><dt>所属部门</dt><dd>{{ detail.department.name }}</dd></div><div><dt>商品分类</dt><dd>{{ detail.category.name }}</dd></div><div><dt>进货价格</dt><dd>{{ formatMoney(detail.purchase_price) }}</dd></div><div><dt>销售价格</dt><dd>{{ formatMoney(detail.sale_price) }}</dd></div><div><dt>当前库存</dt><dd>{{ detail.stock_quantity }} 件</dd></div><div><dt>临期提醒</dt><dd>提前 {{ detail.expiry_warning_days ?? 0 }} 天</dd></div><div><dt>低库存阈值</dt><dd>{{ detail.low_stock_threshold === null ? '未启用' : `${detail.low_stock_threshold} 件` }}</dd></div><div><dt>销售状态</dt><dd>{{ detail.status === 'on_sale' ? '在售' : '停售' }}</dd></div></dl>
+        <div class="detail-hero"><span data-no-translate>{{ detail.name.slice(0, 1) }}</span><div><p>{{ detail.product_no }}</p><h3 data-no-translate>{{ detail.name }}</h3></div></div>
+        <dl><div><dt>所属部门</dt><dd data-no-translate>{{ detail.department.name }}</dd></div><div><dt>商品分类</dt><dd data-no-translate>{{ detail.category.name }}</dd></div><div><dt>进货价格</dt><dd>{{ formatMoney(detail.purchase_price) }}</dd></div><div><dt>销售价格</dt><dd>{{ formatMoney(detail.sale_price) }}</dd></div><div><dt>当前库存</dt><dd>{{ detail.stock_quantity }} 件</dd></div><div><dt>临期提醒</dt><dd>提前 {{ detail.expiry_warning_days ?? 0 }} 天</dd></div><div><dt>低库存阈值</dt><dd>{{ detail.low_stock_threshold === null ? '未启用' : `${detail.low_stock_threshold} 件` }}</dd></div><div><dt>销售状态</dt><dd>{{ detail.status === 'on_sale' ? '在售' : '停售' }}</dd></div></dl>
         <div v-if="canEditDetail" class="detail-actions"><button class="primary-button" @click="openEditor"><Pencil :size="16" />修改资料</button><button class="secondary-button" @click="toggleDetailStatus">{{ detail.status === 'on_sale' ? '设为停售' : '重新上架' }}</button></div>
       </div>
     </ModalPanel>
@@ -230,7 +230,7 @@ onMounted(async () => {
     <ModalPanel title="修改商品资料" :open="editOpen" @close="editOpen = false">
       <form class="stack-form" @submit.prevent="submitEdit">
         <label><span>商品名称</span><input v-model="editForm.name" maxlength="100" required /></label>
-        <label><span>商品分类</span><select v-model.number="editForm.category_id" required><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+        <label><span>商品分类</span><select v-model.number="editForm.category_id" required><option v-for="item in categories" :key="item.id" :value="item.id" data-no-translate>{{ item.name }}</option></select></label>
         <label><span>销售价格</span><input v-model="editForm.sale_price" type="number" min="0" step="0.01" required /></label>
         <label><span>临期提前提醒天数</span><input v-model.number="editForm.expiry_warning_days" type="number" min="0" required /></label>
         <label><span>低库存预警阈值（留空关闭）</span><input v-model.number="editForm.low_stock_threshold" type="number" min="0" placeholder="例如 10" /></label>

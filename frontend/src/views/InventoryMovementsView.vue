@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   ArrowDownToLine,
@@ -133,9 +134,9 @@ onMounted(loadMovements)
         <option value="update_quantity">人工盘点</option>
         <option value="discard_expired">过期废弃</option>
       </select>
-      <input v-model="startTime" type="datetime-local" title="开始时间" />
+      <LocalizedDateInput v-model="startTime" type="datetime-local" title="开始时间" />
       <span class="range-separator">至</span>
-      <input v-model="endTime" type="datetime-local" title="结束时间" />
+      <LocalizedDateInput v-model="endTime" type="datetime-local" title="结束时间" />
       <button class="primary-button" type="button" @click="search">
         <SlidersHorizontal :size="17" />查询
       </button>
@@ -167,9 +168,9 @@ onMounted(loadMovements)
               <td>{{ formatDateTime(item.created_at) }}</td>
               <td>
                 <div class="product-cell">
-                  <span>{{ item.product_name?.slice(0, 1) || '?' }}</span>
+                  <span data-no-translate>{{ item.product_name?.slice(0, 1) || '?' }}</span>
                   <div>
-                    <strong>{{ item.product_name || '商品记录不存在' }}</strong>
+                    <strong :data-no-translate="item.product_name ? '' : undefined">{{ item.product_name || '商品记录不存在' }}</strong>
                     <small>{{ item.product_no || `商品ID ${item.product_id ?? '—'}` }}</small>
                   </div>
                 </div>
@@ -197,7 +198,7 @@ onMounted(loadMovements)
                 <strong class="plain">{{ item.employee_name }}</strong>
                 <small class="block">{{ item.employee_id ? `员工ID ${item.employee_id}` : '自动执行' }}</small>
               </td>
-              <td class="reason-cell">{{ item.reason || '—' }}</td>
+              <td class="reason-cell" :data-no-translate="item.reason ? '' : undefined">{{ item.reason || '—' }}</td>
             </tr>
             <tr v-if="!loading && !movements.length">
               <td colspan="9" class="empty-cell">

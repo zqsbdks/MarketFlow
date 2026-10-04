@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import { ArrowLeft, Pencil, Save, UserRound } from '@lucide/vue'
@@ -120,12 +121,12 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
       <aside class="panel identity-card">
         <div class="profile-avatar">{{ detail.name.slice(0, 1) }}</div>
         <p class="eyebrow">{{ detail.employee_no }}</p>
-        <h2>{{ detail.name }}</h2>
+        <h2 data-no-translate>{{ detail.name }}</h2>
         <p class="muted">{{ detail.department_name || '全店' }} · {{ detail.role }}</p>
         <span :class="['status-badge', detail.employment_status === '在职' ? 'on_sale' : 'stopped']">{{ detail.employment_status }}</span>
         <dl class="identity-facts">
           <div><dt>账号状态</dt><dd>{{ detail.is_active ? '已启用' : '已停用' }}</dd></div>
-          <div><dt>所属门店</dt><dd>{{ detail.store_no && detail.store_name ? `${detail.store_no} · ${detail.store_name}` : '总部（无所属门店）' }}</dd></div>
+          <div><dt>所属门店</dt><dd :data-no-translate="detail.store_name ? '' : undefined">{{ detail.store_no && detail.store_name ? `${detail.store_no} · ${detail.store_name}` : '总部（无所属门店）' }}</dd></div>
           <div><dt>入职日期</dt><dd>{{ detail.hire_date }}</dd></div>
           <div><dt>最后登录</dt><dd>{{ displayTime(detail.last_login_at) }}</dd></div>
         </dl>
@@ -136,13 +137,13 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
         <div><p class="eyebrow">EDIT PROFILE</p><h2>编辑员工资料</h2><p class="form-tip">带 * 的字段必填。姓名、部门和工种在本页仅供查看。</p></div>
         <fieldset :disabled="saving" class="edit-fields">
           <div class="field-grid">
-            <label><span>性别 *</span><select v-model="form.gender" required><option>未填写</option><option>男</option><option>女</option></select></label>
-            <label><span>出生日期 *</span><input v-model="form.birth_date" type="date" :max="today" required /></label>
-            <label><span>入职日期 *</span><input v-model="form.hire_date" type="date" required /></label>
+            <label><span>性别 *</span><select v-model="form.gender" required><option value="未填写">未填写</option><option value="男">男</option><option value="女">女</option></select></label>
+            <label><span>出生日期 *</span><LocalizedDateInput v-model="form.birth_date" type="date" :max="today" required /></label>
+            <label><span>入职日期 *</span><LocalizedDateInput v-model="form.hire_date" type="date" required /></label>
             <label><span>联系电话 *</span><input v-model="form.phone" type="tel" maxlength="30" required autocomplete="tel" /></label>
             <label class="wide"><span>居住地址 *</span><input v-model="form.address" maxlength="255" required autocomplete="street-address" /></label>
-            <label><span>雇佣状态 *</span><select v-model="form.employment_status" required @change="changeStatus"><option>在职</option><option>休假</option><option>离职</option><option>解雇</option></select></label>
-            <label v-if="separated"><span>离职或解雇日期（选填）</span><input v-model="form.separation_date" type="date" :min="form.hire_date" /></label>
+            <label><span>雇佣状态 *</span><select v-model="form.employment_status" required @change="changeStatus"><option value="在职">在职</option><option value="休假">休假</option><option value="离职">离职</option><option value="解雇">解雇</option></select></label>
+            <label v-if="separated"><span>离职或解雇日期（选填）</span><LocalizedDateInput v-model="form.separation_date" type="date" :min="form.hire_date" /></label>
             <label v-if="separated" class="wide"><span>离职或解雇原因（选填）</span><textarea v-model="form.separation_reason" rows="3" maxlength="255" /></label>
           </div>
           <p v-if="separated" class="form-tip">日期留空时，同一离职状态保留原日期；首次离职或解雇默认使用今天。</p>
@@ -157,11 +158,11 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
           <div><dt>出生日期</dt><dd>{{ detail.birth_date || '未填写' }}</dd></div>
           <div><dt>联系电话</dt><dd>{{ detail.phone || '未填写' }}</dd></div>
           <div><dt>工种</dt><dd>{{ detail.role }}</dd></div>
-          <div class="wide"><dt>居住地址</dt><dd>{{ detail.address || '未填写' }}</dd></div>
+          <div class="wide"><dt>居住地址</dt><dd :data-no-translate="detail.address ? '' : undefined">{{ detail.address || '未填写' }}</dd></div>
         </dl>
         <div class="section-divider"><p class="eyebrow">EMPLOYMENT RECORD</p><h2>任职信息</h2></div>
         <dl class="detail-grid">
-          <div><dt>所属门店</dt><dd>{{ detail.store_no && detail.store_name ? `${detail.store_no} · ${detail.store_name}` : '总部（无所属门店）' }}</dd></div>
+          <div><dt>所属门店</dt><dd :data-no-translate="detail.store_name ? '' : undefined">{{ detail.store_no && detail.store_name ? `${detail.store_no} · ${detail.store_name}` : '总部（无所属门店）' }}</dd></div>
           <div><dt>雇佣状态</dt><dd>{{ detail.employment_status }}</dd></div>
           <div><dt>离职或解雇日期</dt><dd>{{ detail.separation_date || '未填写' }}</dd></div>
           <div class="wide"><dt>离职或解雇原因</dt><dd>{{ detail.separation_reason || '未填写' }}</dd></div>

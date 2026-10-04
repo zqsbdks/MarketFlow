@@ -4,6 +4,7 @@ import { http, unwrap, getErrorMessage } from '../api/http'
 import type { ApiResponse } from '../types/api'
 import { useStoreScope } from '../stores/storeScope'
 import { businessDateRange } from '../utils/businessDates'
+import { translate } from '../i18n'
 
 interface Department { id: number; name: string; code: string; is_active: boolean }
 interface Category { id: number; name: string; department_id: number; is_active: boolean }
@@ -123,7 +124,7 @@ onMounted(() => { void load().catch((cause) => { error.value = getErrorMessage(c
       <section class="company-card">
         <h2>门店（{{ scope.stores.length }}）</h2>
         <select :value="selectedStore ?? ''" @change="loadDepartments(Number(($event.target as HTMLSelectElement).value))">
-          <option v-for="store in scope.stores" :key="store.id" :value="store.id">{{ store.store_no }} {{ store.name }}</option>
+          <option v-for="store in scope.stores" :key="store.id" :value="store.id" data-no-translate>{{ store.store_no }} {{ store.name }}</option>
         </select>
         <p v-for="store in scope.stores" :key="store.id">{{ store.store_no }} · {{ store.name }} · {{ store.is_active ? '启用' : '停用' }} <button :disabled="busy" @click="toggleStore(store)">{{ store.is_active ? '停用' : '启用' }}</button></p>
         <h3>新增门店</h3>
@@ -140,7 +141,7 @@ onMounted(() => { void load().catch((cause) => { error.value = getErrorMessage(c
       <section class="company-card">
         <h2>员工调店和任命</h2>
         <form @submit.prevent="transferEmployee">
-          <select v-model.number="transfer.employee_id" required><option :value="0" disabled>选择员工</option><option v-for="employee in company.employees" :key="employee.id" :value="employee.id">{{ employee.employee_no }} {{ employee.name }} · {{ employee.role }}</option></select>
+          <select v-model.number="transfer.employee_id" required><option :value="0" disabled>选择员工</option><option v-for="employee in company.employees" :key="employee.id" :value="employee.id" data-no-translate>{{ employee.employee_no }} {{ employee.name }} · {{ translate(employee.role) }}</option></select>
           <p v-if="selectedEmployee">当前门店：{{ scope.stores.find((item) => item.id === selectedEmployee?.store_id)?.name || '总部' }}</p>
           <select v-model="transfer.role"><option value="总部">总部</option><option value="店长">店长</option><option value="正式员工">正式员工</option><option value="契约工">契约工</option></select>
           <select v-if="transfer.role !== '总部'" v-model.number="transfer.store_id"><option v-for="store in scope.stores.filter((item) => item.is_active)" :key="store.id" :value="store.id">{{ store.store_no }} {{ store.name }}</option></select>

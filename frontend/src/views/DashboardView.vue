@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BarChart } from 'echarts/charts'
@@ -131,9 +132,9 @@ onBeforeUnmount(() => {
     <PageHeader eyebrow="STORE PULSE" title="店铺总览" description="把销售、利润与部门表现放在同一张经营地图上。">
       <div class="date-filter">
         <CalendarDays :size="17" />
-        <input v-model="startTime" type="datetime-local" />
+        <LocalizedDateInput v-model="startTime" type="datetime-local" />
         <span>至</span>
-        <input v-model="endTime" type="datetime-local" />
+        <LocalizedDateInput v-model="endTime" type="datetime-local" />
         <button class="secondary-button" type="button" @click="loadDashboard">更新</button>
       </div>
     </PageHeader>
@@ -171,7 +172,7 @@ onBeforeUnmount(() => {
           <ol class="ranking-list">
             <li v-for="item in rankings" :key="item.id">
               <span class="rank-number">{{ String(item.rank).padStart(2, '0') }}</span>
-              <div><strong>{{ item.name }}</strong><small>售出 {{ item.quantity }} 件</small></div>
+              <div><strong data-no-translate>{{ item.name }}</strong><small>售出 {{ item.quantity }} 件</small></div>
               <b>{{ formatMoney(item.amount) }}</b>
             </li>
             <li v-if="rankings.length === 0" class="empty-row">所选时间内暂无销售排行</li>

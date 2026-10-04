@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { CalendarDays, Layers3, PackageSearch, Pencil, Search, Trash2 } from '@lucide/vue'
 
@@ -194,12 +195,12 @@ onMounted(async () => {
       </select>
       <select v-model="filters.supplier_id">
         <option value="">全部供应商</option>
-        <option v-for="item in suppliers" :key="item.id" :value="item.id">{{ item.name }}</option>
+        <option v-for="item in suppliers" :key="item.id" :value="item.id" data-no-translate>{{ item.name }}</option>
       </select>
       <input v-model="filters.product_id" type="number" min="1" placeholder="商品ID" />
-      <label><CalendarDays :size="15" /><input v-model="filters.expiration_start" type="date" /></label>
+      <label><CalendarDays :size="15" /><LocalizedDateInput v-model="filters.expiration_start" type="date" /></label>
       <span>至</span>
-      <input v-model="filters.expiration_end" type="date" />
+      <LocalizedDateInput v-model="filters.expiration_end" type="date" />
       <button class="primary-button" @click="applyFilters">查询</button>
     </section>
 
@@ -214,7 +215,7 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="item in batches" :key="item.id">
-              <td><strong>{{ item.product_name }}</strong><small class="block">{{ item.batch_no }} · {{ item.product_no }}</small></td>
+              <td><strong data-no-translate>{{ item.product_name }}</strong><small class="block">{{ item.batch_no }} · {{ item.product_no }}</small></td>
               <td>{{ item.department_name }}</td>
               <td><strong>{{ item.remaining_quantity }}</strong> / {{ item.initial_quantity }} 件</td>
               <td>{{ item.production_date || '—' }}<small class="block">{{ item.expiration_date || '未设置' }}</small></td>
@@ -234,10 +235,10 @@ onMounted(async () => {
 
     <ModalPanel title="库存批次详情" :open="detailOpen" @close="detailOpen = false">
       <div v-if="detail" class="detail-sheet">
-        <div class="detail-hero"><span><PackageSearch /></span><div><p>{{ detail.batch_no }}</p><h3>{{ detail.product_name }}</h3></div></div>
+        <div class="detail-hero"><span><PackageSearch /></span><div><p>{{ detail.batch_no }}</p><h3 data-no-translate>{{ detail.product_name }}</h3></div></div>
         <dl>
           <div><dt>商品编号</dt><dd>{{ detail.product_no }}</dd></div><div><dt>部门 / 分类</dt><dd>{{ detail.department_name }} / {{ detail.category_name }}</dd></div>
-          <div><dt>供应商</dt><dd>{{ detail.supplier_name }}</dd></div><div><dt>来源进货单</dt><dd>{{ detail.purchase_no }}</dd></div>
+          <div><dt>供应商</dt><dd data-no-translate>{{ detail.supplier_name }}</dd></div><div><dt>来源进货单</dt><dd>{{ detail.purchase_no }}</dd></div>
           <div><dt>进货明细ID</dt><dd>{{ detail.purchase_item_id }}</dd></div><div><dt>进货单价</dt><dd>{{ formatMoney(detail.unit_cost) }}</dd></div>
           <div><dt>初始数量</dt><dd>{{ detail.initial_quantity }} 件</dd></div><div><dt>剩余数量</dt><dd>{{ detail.remaining_quantity }} 件</dd></div>
           <div><dt>生产日期</dt><dd>{{ detail.production_date || '—' }}</dd></div><div><dt>到期日期</dt><dd>{{ detail.expiration_date || '未设置' }}</dd></div>

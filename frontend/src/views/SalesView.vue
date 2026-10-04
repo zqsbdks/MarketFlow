@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { onMounted, ref, watch } from 'vue'
 import { CalendarDays, ReceiptText, Search } from '@lucide/vue'
 
@@ -88,10 +89,10 @@ onMounted(loadSales)
       </div>
       <div class="field inline">
         <CalendarDays :size="17" />
-        <input v-model="startTime" type="datetime-local" />
+        <LocalizedDateInput v-model="startTime" type="datetime-local" />
       </div>
       <span>至</span>
-      <div class="field inline"><input v-model="endTime" type="datetime-local" /></div>
+      <div class="field inline"><LocalizedDateInput v-model="endTime" type="datetime-local" /></div>
       <button class="primary-button" @click="search">查询记录</button>
     </section>
 
@@ -147,7 +148,7 @@ onMounted(loadSales)
         <div class="receipt-lines">
           <div v-for="item in detail.items" :key="`${item.product_id}-${item.unit_price}-${item.discount_rule_id}`">
             <div>
-              <strong>{{ item.product_name }}</strong>
+              <strong data-no-translate>{{ item.product_name }}</strong>
               <span><s v-if="Number(item.discount_amount) > 0">{{ formatMoney(item.original_unit_price) }}</s> {{ formatMoney(item.unit_price) }} × {{ item.quantity }}</span>
               <small v-if="item.discount_rule_name" class="discount-name">{{ item.discount_rule_name }}</small>
             </div>

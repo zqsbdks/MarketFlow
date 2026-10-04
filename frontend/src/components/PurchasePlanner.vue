@@ -4,7 +4,7 @@ import { createPurchase, getPurchasePlanning } from '../api'
 import { getErrorMessage } from '../api/http'
 import { confirmTranslated } from '../i18n'
 import type { Department, PurchasePlanning, PurchasePlanningItem } from '../types/api'
-import { formatMoney } from '../utils'
+import { displayLocale, formatMoney } from '../utils'
 import { isPurchaseDayLocked } from '../utils/purchaseOrdering'
 
 const props = defineProps<{ departments: Department[]; ownDepartmentId: number | null; isManager: boolean }>()
@@ -57,7 +57,7 @@ function setQuantity(item: PurchasePlanningItem, date: string, value: number) {
 }
 function dateHeading(value: string) {
   const date = new Date(`${value}T12:00:00+09:00`)
-  return `${value.slice(5)}（${new Intl.DateTimeFormat('zh-CN', { weekday: 'short', timeZone: 'Asia/Tokyo' }).format(date)}）`
+  return `${value.slice(5)} (${new Intl.DateTimeFormat(displayLocale(), { weekday: 'short', timeZone: 'Asia/Tokyo' }).format(date)})`
 }
 async function loadPlanning() {
   if (!departmentId.value) { planning.value = null; return }
@@ -124,7 +124,7 @@ async function submit() {
         <thead><tr><th>商品名</th><th>供应商</th><th v-for="day in planning?.days || []" :key="day" :class="{ 'locked-day': dayLocked(day) }">{{ dateHeading(day) }}<small v-if="dayLocked(day)" class="block">已截止</small></th><th>可售库存</th><th>订货当天临期数量</th><th>订货金额</th></tr></thead>
         <tbody>
           <tr v-for="item in rows" :key="item.supplier_product_id">
-            <td><strong>{{ item.name }}</strong></td><td>{{ item.supplier_name }}</td>
+            <td><strong data-no-translate>{{ item.name }}</strong></td><td data-no-translate>{{ item.supplier_name }}</td>
             <td v-for="day in item.days" :key="day.date" class="day-cell" :class="{ 'locked-day': dayLocked(day.date) }"><input type="number" min="0" step="1" :disabled="dayLocked(day.date)" :value="quantity(item, day.date) || ''" :placeholder="dayLocked(day.date) ? '截止' : '订货数'" :aria-label="`${item.name} ${day.date}订货数量`" @change="setQuantity(item, day.date, Number(($event.target as HTMLInputElement).value))" /><small v-if="day.expected_quantity">预计到货 {{ day.expected_quantity }}</small><small v-if="day.received_quantity">已签收 {{ day.received_quantity }}</small><span class="last-sales">{{ day.last_week_sales }}</span><small>上周同曜日售出</small></td>
             <td>{{ item.saleable_stock }} 件</td><td :class="{ warning: item.near_expiry_stock_quantity > 0 }">{{ item.near_expiry_stock_quantity }} 件</td>
             <td>{{ formatMoney(Number(item.unit_cost) * item.days.reduce((sum, day) => sum + quantity(item, day.date), 0)) }}</td>

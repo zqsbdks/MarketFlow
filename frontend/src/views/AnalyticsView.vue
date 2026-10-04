@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
@@ -395,9 +396,9 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="query-controls">
-        <input v-model="startTime" type="datetime-local" aria-label="开始时间" />
+        <LocalizedDateInput v-model="startTime" type="datetime-local" aria-label="开始时间" />
         <span>至</span>
-        <input v-model="endTime" type="datetime-local" aria-label="结束时间" />
+        <LocalizedDateInput v-model="endTime" type="datetime-local" aria-label="结束时间" />
         <select v-model="departmentId"><option value="">全店</option><option v-for="item in departments" :key="item.id" :value="item.id">{{ item.name }}</option></select>
         <select v-model="interval" :disabled="!selectedMetrics.includes('sales_trend')"><option value="hour">按小时</option><option value="day">按日</option><option value="month">按月</option><option value="year">按年</option></select>
         <button class="primary-button" type="button" :disabled="loading || !selectedMetrics.length" @click="loadAnalytics">{{ loading ? '正在分析…' : '生成分析' }}</button>

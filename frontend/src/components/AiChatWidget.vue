@@ -275,7 +275,7 @@ function handleEnter(event: KeyboardEvent) {
         <div class="ai-conversation-picker">
           <select :value="conversationId ?? ''" aria-label="AI历史会话" @change="($event.target as HTMLSelectElement).value ? restoreConversation(Number(($event.target as HTMLSelectElement).value)) : clearConversation()">
             <option value="">新对话</option>
-            <option v-for="conversation in conversations" :key="conversation.id" :value="conversation.id">{{ conversation.title }}</option>
+            <option v-for="conversation in conversations" :key="conversation.id" :value="conversation.id" data-no-translate>{{ conversation.title }}</option>
           </select>
           <button v-if="olderBeforeId && conversationId" type="button" @click="restoreConversation(conversationId, olderBeforeId)">加载更早消息</button>
         </div>
@@ -318,7 +318,7 @@ function handleEnter(event: KeyboardEvent) {
             :class="message.role"
           >
             <div class="message-label">{{ message.role === 'user' ? '你' : 'AI 助手' }}</div>
-            <p>{{ message.content }}</p>
+            <p data-no-translate>{{ message.content }}</p>
           </article>
           <article v-if="isSending" class="chat-message model">
             <div class="message-label">AI 助手</div>

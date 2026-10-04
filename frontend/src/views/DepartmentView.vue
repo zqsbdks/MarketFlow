@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CalendarDays, CircleDollarSign, ReceiptText, TrendingUp } from '@lucide/vue'
@@ -84,9 +85,9 @@ onMounted(load)
     </PageHeader>
 
     <div class="toolbar panel compact">
-      <div class="field inline"><CalendarDays :size="17" /><input v-model="startTime" type="datetime-local" /></div>
+      <div class="field inline"><CalendarDays :size="17" /><LocalizedDateInput v-model="startTime" type="datetime-local" /></div>
       <span>至</span>
-      <div class="field inline"><input v-model="endTime" type="datetime-local" /></div>
+      <div class="field inline"><LocalizedDateInput v-model="endTime" type="datetime-local" /></div>
       <button class="secondary-button" @click="load">查询</button>
     </div>
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -105,7 +106,7 @@ onMounted(load)
           <div class="segmented-controls">
             <select v-model="categoryId" aria-label="商品分类">
               <option value="">全部分类</option>
-              <option v-for="category in categories" :key="category.id" :value="category.id">
+              <option v-for="category in categories" :key="category.id" :value="category.id" data-no-translate>
                 {{ category.name }}
               </option>
             </select>
@@ -119,7 +120,7 @@ onMounted(load)
           <table>
             <thead><tr><th>排名</th><th>商品</th><th>累计数量</th><th>累计金额</th></tr></thead>
             <tbody>
-              <tr v-for="item in rankings" :key="item.id"><td><span class="table-rank">{{ item.rank }}</span></td><td><strong>{{ item.name }}</strong></td><td>{{ item.quantity }} 件</td><td>{{ formatMoney(item.amount) }}</td></tr>
+              <tr v-for="item in rankings" :key="item.id"><td><span class="table-rank">{{ item.rank }}</span></td><td><strong data-no-translate>{{ item.name }}</strong></td><td>{{ item.quantity }} 件</td><td>{{ formatMoney(item.amount) }}</td></tr>
               <tr v-if="!rankings.length"><td colspan="4" class="empty-cell">暂无排行数据</td></tr>
             </tbody>
           </table>
