@@ -11,6 +11,23 @@ export const language = ref<Language>(
 
 // 中文是原始文案；日语和英语只用于界面，不改变后端业务枚举与数据库数据。
 const translations: Record<string, [string, string]> = {
+  '销售分析': ['売上分析', 'Sales analysis'],
+  '档案完整': ['プロフィール入力済み', 'Profile complete'],
+  '档案待补齐': ['プロフィール未完成', 'Profile incomplete'],
+  '创建账号后，请在员工详情中补齐个人资料。': ['アカウント作成後、従業員詳細で個人情報を入力してください。', 'After creating the account, complete the personal information in employee details.'],
+  '废弃损耗分析': ['廃棄損失分析', 'Disposal loss analysis'],
+  '按废弃处理日期统计完整当天，金额使用批次进货成本；原因占比按损耗成本计算。': ['廃棄処理日の一日全体を集計し、ロットの仕入原価を使用します。理由別の割合は損失原価に基づきます。', 'Includes the full disposal date and uses batch purchase costs. Reason shares are based on loss cost.'],
+  '废弃损耗单独展示，销售毛利润未扣除废弃成本。': ['廃棄損失は別途表示され、売上総利益から廃棄原価は差し引かれていません。', 'Disposal loss is shown separately; sales gross profit does not deduct disposal costs.'],
+  '所选日期内暂无废弃记录': ['選択期間に廃棄記録はありません', 'No disposal records in the selected dates'],
+  '废弃原因占比': ['廃棄理由別割合', 'Loss by reason'],
+  '部门损耗对比': ['部門別損失比較', 'Department loss comparison'],
+  '门店损耗对比': ['店舗別損失比較', 'Store loss comparison'],
+  '成本占比': ['原価割合', 'Cost share'],
+  '开始日期不能晚于结束日期': ['開始日は終了日より後にできません', 'Start date must not be after end date'],
+  '查询范围不能超过367天': ['集計期間は367日以内にしてください', 'Date range must not exceed 367 days'],
+  '结束日期超出支持范围': ['終了日は対応範囲外です', 'End date is outside the supported range'],
+  '入职日期不能晚于今天': ['入社日は今日より後にできません', 'Hire date must not be in the future'],
+  '完整档案需填写出生日期、入职日期、联系电话、居住地址和雇佣状态；性别可选择未填写。': ['生年月日、入社日、電話番号、住所、雇用状態を入力してください。性別は未入力でも構いません。', 'A complete profile requires birth date, hire date, phone, address and employment status. Gender may remain unspecified.'],
   '库存管理': ['在庫管理', 'Inventory management'],
   '批次库存': ['ロット在庫', 'Batch inventory'],
   '商品废弃': ['商品廃棄', 'Product disposal'],

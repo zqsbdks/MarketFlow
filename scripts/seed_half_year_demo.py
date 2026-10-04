@@ -142,10 +142,15 @@ async def seed():
         await create_audit_logs(db, manager, [], [], [], purchases, ledgers, sales, {})
         print(f"Sales: {len(sales)}. Generating notices...", flush=True)
 
-        hq = await db.scalar(select(Employee).where(Employee.employee_no == "HQ00001"))
+        hq = await db.scalar(
+            select(Employee)
+            .where(Employee.role == EmployeeRole.HEADQUARTERS)
+            .order_by(Employee.id)
+            .limit(1)
+        )
         if hq is None:
             hq = Employee(
-                employee_no="HQ00001",
+                employee_no="TMP-HQ-SEED",
                 name="本部管理者",
                 role=EmployeeRole.HEADQUARTERS,
                 password_hash=hash_password(random.SystemRandom().randbytes(24).hex()),
@@ -156,6 +161,7 @@ async def seed():
             )
             db.add(hq)
             await db.flush()
+            hq.employee_no = f"E{hq.id:05d}"
         groups = [("all", None, "全員", employees)]
         for department in departments.values():
             members = [e for e in employees if e.department_id == department.id]

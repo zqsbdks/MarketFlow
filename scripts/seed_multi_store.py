@@ -95,7 +95,7 @@ async def create_employee(db, *, name, role, store_id, department_id, password_h
     )
     db.add(employee)
     await db.flush()
-    employee.employee_no = "HQ00001" if role == EmployeeRole.HEADQUARTERS else f"E{employee.id:05d}"
+    employee.employee_no = f"E{employee.id:05d}"
     return employee
 
 
@@ -127,10 +127,15 @@ async def seed():
             raise RuntimeError("1 号店需要已有统一部门及供应商商品演示数据")
 
         hq_password = None
-        hq = await db.scalar(select(Employee).where(Employee.employee_no == "HQ00001"))
+        hq = await db.scalar(
+            select(Employee)
+            .where(Employee.role == EmployeeRole.HEADQUARTERS)
+            .order_by(Employee.id)
+            .limit(1)
+        )
         if hq is None:
             hq_password = temporary_password()
-            await create_employee(
+            hq = await create_employee(
                 db,
                 name="本部管理者",
                 role=EmployeeRole.HEADQUARTERS,
@@ -450,7 +455,12 @@ async def seed():
                 )
             )
             print(f"{store.store_no} {store.name}: {len(chosen)} 件商品、8 周销售样本")
-        headquarters = await db.scalar(select(Employee).where(Employee.employee_no == "HQ00001"))
+        headquarters = await db.scalar(
+            select(Employee)
+            .where(Employee.role == EmployeeRole.HEADQUARTERS)
+            .order_by(Employee.id)
+            .limit(1)
+        )
         notices = [
             (
                 "全店安全衛生チェック",
@@ -528,7 +538,7 @@ async def seed():
         await db.commit()
         print(f"完成：新增 {created_stores} 家门店、{created_staff} 名门店员工")
         if hq_password:
-            print(f"总部账号 HQ00001 的一次性密码：{hq_password}")
+            print(f"总部账号 {hq.employee_no} 的一次性密码：{hq_password}")
         if created_staff:
             print(f"新建门店员工的一次性演示密码：{staff_password}")
 

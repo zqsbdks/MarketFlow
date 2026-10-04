@@ -30,6 +30,9 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const scope = useStoreScope()
+function shortStoreName(name: string) {
+  return name.replace(/^MarketFlow\s+/i, '').trim()
+}
 const sidebarOpen = ref(false)
 const navigationMedia = window.matchMedia('(max-width: 1000px)')
 const compactNavigation = ref(navigationMedia.matches)
@@ -113,9 +116,9 @@ async function logout() {
 
       <div class="store-chip">
         <span class="live-dot" />
-        <div><small>查询门店</small><strong :data-no-translate="scope.selected?.name ? '' : undefined">{{ scope.selected?.store_no }} {{ scope.selected?.name || '加载中' }}</strong></div>
+        <div><small>查询门店</small><strong :data-no-translate="scope.selected?.name ? '' : undefined">{{ scope.selected?.store_no }} {{ (scope.selected?.name ? shortStoreName(scope.selected.name) : null) || '加载中' }}</strong></div>
         <select :value="scope.selectedId ?? ''" aria-label="选择查询门店" @change="scope.choose(Number(($event.target as HTMLSelectElement).value))">
-          <option v-for="store in scope.stores.filter((item) => item.is_active)" :key="store.id" :value="store.id">{{ store.store_no }} {{ store.name }}</option>
+          <option v-for="store in scope.stores.filter((item) => item.is_active)" :key="store.id" :value="store.id">{{ store.store_no }} {{ shortStoreName(store.name) }}</option>
         </select>
         <ChevronDown :size="16" />
       </div>

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
+from app.schemas.discard_analysis import DiscardAnalysisRequest, DiscardAnalysisResponse
 from app.schemas.reports_requests import (
     DepartmentRequest,
     RankingsRequest,
@@ -20,6 +21,7 @@ from app.schemas.reports_responses import (
     ReportAnalyticsResponse,
     ReportResponse,
 )
+from app.services.discard_analysis import get_discard_analysis
 from app.services.reports import (
     get_departments_service,
     get_rankings_service,
@@ -178,6 +180,20 @@ async def get_report_analytics(
 
 
 # endregion
+
+
+@reports_router.get(
+    "/discard-analysis",
+    response_model=ResponseModel[DiscardAnalysisResponse],
+    summary="废弃损耗分析",
+)
+async def discard_analysis(
+    request: Annotated[DiscardAnalysisRequest, Query()],
+    employee_id: int = Depends(get_current_employee_id),
+    db: AsyncSession = Depends(get_db),
+) -> ResponseModel[DiscardAnalysisResponse]:
+    data = await get_discard_analysis(db, employee_id, request)
+    return ResponseModel(code=200, message="获取废弃损耗分析成功", data=data)
 
 
 __all__ = ["reports_router"]

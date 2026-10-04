@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LocalizedDateInput from '../components/LocalizedDateInput.vue'
+import DiscardAnalysis from '../components/DiscardAnalysis.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
@@ -35,6 +36,8 @@ const metricOptions: { value: ReportMetric; label: string }[] = [
 ]
 
 const defaultRange = createDefaultRange()
+const analysisTab = ref<'sales' | 'discard'>('sales')
+watch(analysisTab, async (value) => { if (value === 'sales') { await nextTick(); resizeCharts() } })
 const startTime = ref(defaultRange.start)
 const endTime = ref(defaultRange.end)
 const departmentId = ref<number | ''>('')
@@ -382,6 +385,12 @@ onBeforeUnmount(() => {
   <div>
     <PageHeader eyebrow="BUSINESS INTELLIGENCE" title="经营分析" description="自由组合时间、部门、统计粒度和经营指标，生成一份综合营业报告。" />
 
+    <div class="button-row analysis-tabs" role="tablist">
+      <button role="tab" :aria-selected="analysisTab === 'sales'" :class="analysisTab === 'sales' ? 'primary-button' : 'secondary-button'" @click="analysisTab = 'sales'">销售分析</button>
+      <button role="tab" :aria-selected="analysisTab === 'discard'" :class="analysisTab === 'discard' ? 'primary-button' : 'secondary-button'" @click="analysisTab = 'discard'">废弃损耗分析</button>
+    </div>
+    <DiscardAnalysis v-if="analysisTab === 'discard'" />
+    <div v-show="analysisTab === 'sales'">
     <section class="panel query-panel">
       <div class="panel-heading">
         <div><p class="eyebrow">METRICS</p><h2>选择查询指标</h2></div>
@@ -487,11 +496,13 @@ onBeforeUnmount(() => {
         </article>
       </section>
     </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .query-panel { padding: 28px; }
+.analysis-tabs { flex-wrap: wrap; margin-bottom: 20px; }
 .button-row, .query-controls { display: flex; align-items: center; gap: 12px; }
 .metric-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0; }
 .metric-option { display: flex; align-items: center; gap: 9px; padding: 11px 15px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); cursor: pointer; }

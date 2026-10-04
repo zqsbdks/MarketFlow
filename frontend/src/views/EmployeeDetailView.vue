@@ -13,6 +13,7 @@ import type { EmployeeDetail, EmployeeDetailUpdate } from '../types/api'
 const route = useRoute()
 const auth = useAuthStore()
 const detail = ref<EmployeeDetail | null>(null)
+const profileComplete = computed(() => !!(detail.value?.birth_date && detail.value?.hire_date && detail.value?.phone?.trim() && detail.value?.address?.trim() && detail.value?.employment_status))
 const loading = ref(false)
 const saving = ref(false)
 const editing = ref(false)
@@ -76,6 +77,7 @@ async function save() {
   if (!form.value || !detail.value || saving.value) return
   error.value = ''
   const payload = { ...form.value, phone: form.value.phone.trim(), address: form.value.address.trim() }
+  if (payload.hire_date > today) { error.value = '入职日期不能晚于今天'; return }
   if (!payload.phone || !payload.address) { error.value = '联系电话和居住地址不能为空'; return }
   if (payload.birth_date > today || payload.birth_date > payload.hire_date) {
     error.value = '出生日期不能晚于今天或入职日期'; return
@@ -122,6 +124,7 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
         <div class="profile-avatar">{{ detail.name.slice(0, 1) }}</div>
         <p class="eyebrow">{{ detail.employee_no }}</p>
         <h2 data-no-translate>{{ detail.name }}</h2>
+        <p class="muted">{{ profileComplete ? '档案完整' : '档案待补齐' }}</p>
         <p class="muted">{{ detail.department_name || '全店' }} · {{ detail.role }}</p>
         <span :class="['status-badge', detail.employment_status === '在职' ? 'on_sale' : 'stopped']">{{ detail.employment_status }}</span>
         <dl class="identity-facts">
@@ -134,10 +137,11 @@ const displayTime = (value: string | null) => value ? value.replace('T', ' ').sl
       </aside>
 
       <form v-if="editing && form" class="panel details-card stack-form" @submit.prevent="save">
+        <p class="muted">完整档案需填写出生日期、入职日期、联系电话、居住地址和雇佣状态；性别可选择未填写。</p>
         <div><p class="eyebrow">EDIT PROFILE</p><h2>编辑员工资料</h2><p class="form-tip">带 * 的字段必填。姓名、部门和工种在本页仅供查看。</p></div>
         <fieldset :disabled="saving" class="edit-fields">
           <div class="field-grid">
-            <label><span>性别 *</span><select v-model="form.gender" required><option value="未填写">未填写</option><option value="男">男</option><option value="女">女</option></select></label>
+            <label><span>性别</span><select v-model="form.gender"><option value="未填写">未填写</option><option value="男">男</option><option value="女">女</option></select></label>
             <label><span>出生日期 *</span><LocalizedDateInput v-model="form.birth_date" type="date" :max="today" required /></label>
             <label><span>入职日期 *</span><LocalizedDateInput v-model="form.hire_date" type="date" required /></label>
             <label><span>联系电话 *</span><input v-model="form.phone" type="tel" maxlength="30" required autocomplete="tel" /></label>

@@ -36,8 +36,9 @@ CHECKS = {
     "GROUP BY sale_id) i ON i.sale_id=s.id "
     "WHERE s.total_amount<>i.amount OR s.total_cost<>i.cost",
     "incomplete employee profile": "SELECT COUNT(*) FROM employee e LEFT JOIN employee_detail d "
-    "ON d.employee_id=e.id WHERE d.employee_id IS NULL OR d.gender='未填写' "
-    "OR d.birth_date IS NULL OR d.phone IS NULL OR d.address IS NULL",
+    "ON d.employee_id=e.id WHERE d.employee_id IS NULL "
+    "OR d.birth_date IS NULL OR d.phone IS NULL OR TRIM(d.phone)='' "
+    "OR d.address IS NULL OR TRIM(d.address)=''",
     "employee age or employment dates": "SELECT COUNT(*) FROM employee_detail "
     "WHERE birth_date+INTERVAL 18 YEAR>hire_date OR hire_date>DATE(:now) "
     "OR separation_date<hire_date",

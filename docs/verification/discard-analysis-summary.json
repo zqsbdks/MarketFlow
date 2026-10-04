@@ -1,0 +1,256 @@
+{
+  "record_count": 1770,
+  "quantity": 21820,
+  "cost": "7912805.00",
+  "reasons": [
+    {
+      "key": "expired",
+      "name": "过期",
+      "quantity": 21820,
+      "cost": "7912805.00",
+      "cost_share": "100.00"
+    }
+  ],
+  "departments": [
+    {
+      "key": "3",
+      "name": "鮮魚部",
+      "quantity": 5830,
+      "cost": "2667234.00",
+      "cost_share": "33.71"
+    },
+    {
+      "key": "4",
+      "name": "惣菜部",
+      "quantity": 8406,
+      "cost": "2577098.00",
+      "cost_share": "32.57"
+    },
+    {
+      "key": "2",
+      "name": "精肉部",
+      "quantity": 4741,
+      "cost": "2125841.00",
+      "cost_share": "26.87"
+    },
+    {
+      "key": "1",
+      "name": "青果部",
+      "quantity": 2843,
+      "cost": "542632.00",
+      "cost_share": "6.86"
+    }
+  ],
+  "stores": [
+    {
+      "key": "21",
+      "name": "DP0021 長野店",
+      "quantity": 1237,
+      "cost": "464559.00",
+      "cost_share": "5.87"
+    },
+    {
+      "key": "27",
+      "name": "DP0027 神戸三宮店",
+      "quantity": 931,
+      "cost": "428102.00",
+      "cost_share": "5.41"
+    },
+    {
+      "key": "11",
+      "name": "DP0011 千葉中央店",
+      "quantity": 929,
+      "cost": "380201.00",
+      "cost_share": "4.80"
+    },
+    {
+      "key": "4",
+      "name": "DP0004 仙台中央店",
+      "quantity": 1010,
+      "cost": "348004.00",
+      "cost_share": "4.40"
+    },
+    {
+      "key": "18",
+      "name": "DP0018 川崎店",
+      "quantity": 965,
+      "cost": "340223.00",
+      "cost_share": "4.30"
+    },
+    {
+      "key": "15",
+      "name": "DP0015 品川店",
+      "quantity": 1000,
+      "cost": "333623.00",
+      "cost_share": "4.22"
+    },
+    {
+      "key": "9",
+      "name": "DP0009 高崎店",
+      "quantity": 761,
+      "cost": "326147.00",
+      "cost_share": "4.12"
+    },
+    {
+      "key": "3",
+      "name": "DP0003 函館店",
+      "quantity": 967,
+      "cost": "324184.00",
+      "cost_share": "4.10"
+    },
+    {
+      "key": "6",
+      "name": "DP0006 秋田店",
+      "quantity": 862,
+      "cost": "307384.00",
+      "cost_share": "3.88"
+    },
+    {
+      "key": "22",
+      "name": "DP0022 静岡店",
+      "quantity": 810,
+      "cost": "306102.00",
+      "cost_share": "3.87"
+    },
+    {
+      "key": "28",
+      "name": "DP0028 広島店",
+      "quantity": 763,
+      "cost": "296629.00",
+      "cost_share": "3.75"
+    },
+    {
+      "key": "30",
+      "name": "DP0030 那覇店",
+      "quantity": 740,
+      "cost": "289506.00",
+      "cost_share": "3.66"
+    },
+    {
+      "key": "12",
+      "name": "DP0012 船橋店",
+      "quantity": 798,
+      "cost": "282992.00",
+      "cost_share": "3.58"
+    },
+    {
+      "key": "26",
+      "name": "DP0026 大阪梅田店",
+      "quantity": 678,
+      "cost": "270583.00",
+      "cost_share": "3.42"
+    },
+    {
+      "key": "16",
+      "name": "DP0016 立川店",
+      "quantity": 737,
+      "cost": "270432.00",
+      "cost_share": "3.42"
+    },
+    {
+      "key": "25",
+      "name": "DP0025 京都店",
+      "quantity": 752,
+      "cost": "268241.00",
+      "cost_share": "3.39"
+    },
+    {
+      "key": "7",
+      "name": "DP0007 郡山店",
+      "quantity": 872,
+      "cost": "267141.00",
+      "cost_share": "3.38"
+    },
+    {
+      "key": "8",
+      "name": "DP0008 宇都宮店",
+      "quantity": 694,
+      "cost": "255679.00",
+      "cost_share": "3.23"
+    },
+    {
+      "key": "5",
+      "name": "DP0005 盛岡店",
+      "quantity": 707,
+      "cost": "248722.00",
+      "cost_share": "3.14"
+    },
+    {
+      "key": "19",
+      "name": "DP0019 藤沢店",
+      "quantity": 589,
+      "cost": "243123.00",
+      "cost_share": "3.07"
+    },
+    {
+      "key": "24",
+      "name": "DP0024 名古屋店",
+      "quantity": 804,
+      "cost": "236539.00",
+      "cost_share": "2.99"
+    },
+    {
+      "key": "29",
+      "name": "DP0029 福岡天神店",
+      "quantity": 728,
+      "cost": "229616.00",
+      "cost_share": "2.90"
+    },
+    {
+      "key": "17",
+      "name": "DP0017 横浜店",
+      "quantity": 636,
+      "cost": "219746.00",
+      "cost_share": "2.78"
+    },
+    {
+      "key": "2",
+      "name": "DP0002 札幌駅前店",
+      "quantity": 559,
+      "cost": "178108.00",
+      "cost_share": "2.25"
+    },
+    {
+      "key": "13",
+      "name": "DP0013 新宿店",
+      "quantity": 548,
+      "cost": "168772.00",
+      "cost_share": "2.13"
+    },
+    {
+      "key": "23",
+      "name": "DP0023 浜松店",
+      "quantity": 518,
+      "cost": "162688.00",
+      "cost_share": "2.06"
+    },
+    {
+      "key": "20",
+      "name": "DP0020 新潟店",
+      "quantity": 345,
+      "cost": "145839.00",
+      "cost_share": "1.84"
+    },
+    {
+      "key": "10",
+      "name": "DP0010 大宮店",
+      "quantity": 395,
+      "cost": "144453.00",
+      "cost_share": "1.83"
+    },
+    {
+      "key": "14",
+      "name": "DP0014 渋谷店",
+      "quantity": 342,
+      "cost": "128294.00",
+      "cost_share": "1.62"
+    },
+    {
+      "key": "1",
+      "name": "DP0001 高円寺店",
+      "quantity": 143,
+      "cost": "47173.00",
+      "cost_share": "0.60"
+    }
+  ]
+}

@@ -142,7 +142,7 @@ async def master_data(db, store, departments, rng, start):
             if any(e.department_id == department.id and e.role == role for e in employees):
                 continue
             employee = Employee(
-                employee_no=f"DS{store.id:02d}-{department.id}-{role.name[:3]}",
+                employee_no=f"TMP-{store.id}-{department.id}-{role.name[:3]}",
                 name=department.name
                 + (" 担当" if role == EmployeeRole.REGULAR_EMPLOYEE else " 補助"),
                 role=role,
@@ -153,6 +153,8 @@ async def master_data(db, store, departments, rng, start):
                 detail=EmployeeDetail(hire_date=start - timedelta(days=rng.randint(30, 200))),
             )
             db.add(employee)
+            await db.flush()
+            employee.employee_no = f"E{employee.id:05d}"
             employees.append(employee)
     await db.flush()
     products, catalog_by_product = [], {}

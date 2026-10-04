@@ -144,6 +144,7 @@ onMounted(async () => {
         <label><span>员工角色</span><select v-model="form.role"><option value="正式员工">正式员工</option><option value="契约工">契约工</option><option value="店长">店长</option></select></label>
         <label v-if="form.role !== '店长'"><span>所属部门</span><select v-model="form.department_id" required><option :value="null" disabled>请选择部门</option><option v-for="item in departments" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
         <p class="form-tip">账号创建后默认使用临时密码，员工首次登录必须修改。</p>
+        <p class="form-tip">创建账号后，请在员工详情中补齐个人资料。</p>
         <button class="primary-button full"><UserRoundCheck :size="18" />确认创建</button>
       </form>
     </ModalPanel>

@@ -73,6 +73,29 @@ def test_update_detail_accepts_json_body():
     assert all(parameter["in"] != "query" for parameter in operation.get("parameters", []))
 
 
+@pytest.mark.asyncio
+async def test_future_hire_date_rejected_before_write(monkeypatch):
+    actor = SimpleNamespace(
+        is_active=True, must_change_password=False, role=EmployeeRole.STORE_MANAGER
+    )
+    monkeypatch.setattr(service, "get_employee_by_id", AsyncMock(return_value=actor))
+    monkeypatch.setattr(service, "business_now", lambda: datetime(2026, 10, 4, 12))
+    write = AsyncMock()
+    monkeypatch.setattr(service, "update_employee_detail", write)
+    request = EmployeeDetailUpdateRequest(
+        gender=EmployeeGender.UNSPECIFIED,
+        birth_date=date(2000, 1, 1),
+        hire_date=date(2026, 10, 5),
+        phone="12345",
+        address="Demo",
+        employment_status=EmploymentStatus.EMPLOYED,
+    )
+    with pytest.raises(HTTPException) as exc:
+        await service.update_employee_detail_service(2, 1, request, AsyncMock())
+    assert exc.value.status_code == 400
+    write.assert_not_awaited()
+
+
 @pytest.mark.parametrize(
     ("actor", "target_id", "expected_status"),
     [

@@ -507,6 +507,9 @@ async def update_employee_detail_service(
             detail="只有店长可以修改员工详情",
         )
 
+    if request.hire_date > business_now().date():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="入职日期不能晚于今天")
+
     # 出生日期不能晚于今天，也不能晚于入职日期。
     if request.birth_date > business_now().date() or request.birth_date > request.hire_date:
         raise HTTPException(

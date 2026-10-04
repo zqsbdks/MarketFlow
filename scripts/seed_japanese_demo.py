@@ -115,14 +115,14 @@ CATEGORY_SEEDS = {
 }
 
 EMPLOYEE_SEEDS = [
-    ("EMP00002", "佐藤 健太", EmployeeRole.REGULAR_EMPLOYEE, "PRODUCE", EmployeeGender.MALE),
-    ("EMP00003", "鈴木 美咲", EmployeeRole.CONTRACT_WORKER, "PRODUCE", EmployeeGender.FEMALE),
-    ("EMP00004", "高橋 大輔", EmployeeRole.REGULAR_EMPLOYEE, "MEAT", EmployeeGender.MALE),
-    ("EMP00005", "田中 愛", EmployeeRole.CONTRACT_WORKER, "MEAT", EmployeeGender.FEMALE),
-    ("EMP00006", "伊藤 拓海", EmployeeRole.REGULAR_EMPLOYEE, "SEAFOOD", EmployeeGender.MALE),
-    ("EMP00007", "渡辺 さくら", EmployeeRole.CONTRACT_WORKER, "SEAFOOD", EmployeeGender.FEMALE),
-    ("EMP00008", "山本 翔太", EmployeeRole.REGULAR_EMPLOYEE, "DELI", EmployeeGender.MALE),
-    ("EMP00009", "中村 結衣", EmployeeRole.CONTRACT_WORKER, "DELI", EmployeeGender.FEMALE),
+    ("E00002", "佐藤 健太", EmployeeRole.REGULAR_EMPLOYEE, "PRODUCE", EmployeeGender.MALE),
+    ("E00003", "鈴木 美咲", EmployeeRole.CONTRACT_WORKER, "PRODUCE", EmployeeGender.FEMALE),
+    ("E00004", "高橋 大輔", EmployeeRole.REGULAR_EMPLOYEE, "MEAT", EmployeeGender.MALE),
+    ("E00005", "田中 愛", EmployeeRole.CONTRACT_WORKER, "MEAT", EmployeeGender.FEMALE),
+    ("E00006", "伊藤 拓海", EmployeeRole.REGULAR_EMPLOYEE, "SEAFOOD", EmployeeGender.MALE),
+    ("E00007", "渡辺 さくら", EmployeeRole.CONTRACT_WORKER, "SEAFOOD", EmployeeGender.FEMALE),
+    ("E00008", "山本 翔太", EmployeeRole.REGULAR_EMPLOYEE, "DELI", EmployeeGender.MALE),
+    ("E00009", "中村 結衣", EmployeeRole.CONTRACT_WORKER, "DELI", EmployeeGender.FEMALE),
 ]
 
 SUPPLIER_SEEDS = [
@@ -306,7 +306,7 @@ async def create_master_data(
     employees: list[Employee] = []
     for index, (employee_no, name, role, department_code, gender) in enumerate(EMPLOYEE_SEEDS):
         employee = Employee(
-            employee_no=employee_no,
+            employee_no=f"TMP-JP-{index}",
             store_id=manager.store_id,
             name=name,
             password_hash=shared_password_hash,
@@ -326,6 +326,8 @@ async def create_master_data(
         )
         employees.append(employee)
         db.add(employee)
+        await db.flush()
+        employee.employee_no = f"E{employee.id:05d}"
     await db.flush()
 
     suppliers: list[Supplier] = []
