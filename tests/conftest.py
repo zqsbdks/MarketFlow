@@ -6,8 +6,13 @@
 
 import os
 
+import pytest
+
 # Redis 在单元测试中关闭；数据库 Engine 虽然会构造，但只有集成测试才实际连接。
 os.environ.setdefault("APP_REDIS_URL", "")
+# TestClient lifespan must never start schedulers against a developer's .env database.
+os.environ.setdefault("APP_RUN_SCHEDULER", "false")
+os.environ.setdefault("APP_ENVIRONMENT", "test")
 # 降低测试输出噪声，同时保留警告和错误日志。
 os.environ.setdefault("APP_LOG_LEVEL", "WARNING")
 # 使用足够长且固定的测试密钥，使 JWT 测试可重复并避免读取本地真实密钥。
@@ -15,3 +20,14 @@ os.environ.setdefault(
     "APP_SECRET_KEY",
     "unit-test-secret-key-that-is-longer-than-thirty-two-bytes",
 )
+
+
+@pytest.fixture
+async def store_database():
+    from store_fixtures import create_store_database
+
+    engine, factory = await create_store_database()
+    try:
+        yield factory
+    finally:
+        await engine.dispose()

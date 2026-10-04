@@ -15,7 +15,9 @@ http.interceptors.request.use((config) => {
       const employee = JSON.parse(identity) as { id?: number; store_id?: number | null }
       const saved = localStorage.getItem(`marketflow_selected_store_${employee.id}`)
       const selected = saved ? Number(saved) : employee.store_id
-      if (selected && Number.isInteger(selected)) config.headers['X-Store-ID'] = String(selected)
+      if (!config.headers.has('X-Store-ID') && selected && Number.isInteger(selected)) {
+        config.headers.set('X-Store-ID', String(selected))
+      }
     } catch {
       // 无效的本地展示数据不作为权限凭据，服务端始终重新验证登录状态。
     }

@@ -1,4 +1,5 @@
 import { language } from './i18n'
+import { businessDateRange } from './utils/businessDates'
 
 function displayLocale(): string {
   return language.value === 'ja' ? 'ja-JP' : language.value === 'en' ? 'en-US' : 'zh-CN'
@@ -37,10 +38,7 @@ export function toLocalInput(date: Date): string {
 }
 
 export function createDefaultRange(days = 7) {
-  const japanDay = toLocalInput(new Date()).slice(0, 10)
-  const startDay = new Date(`${japanDay}T00:00:00Z`)
-  startDay.setUTCDate(startDay.getUTCDate() - days + 1)
-  return { start: `${startDay.toISOString().slice(0, 10)}T09:00`, end: `${japanDay}T21:00` }
+  return businessDateRange(days)
 }
 
 export function apiDateTime(value: string): string | undefined {

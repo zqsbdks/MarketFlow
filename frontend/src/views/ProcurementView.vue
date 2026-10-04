@@ -27,7 +27,8 @@ import PageHeader from '../components/PageHeader.vue'
 import { useAuthStore } from '../stores/auth'
 import { useStoreScope } from '../stores/storeScope'
 import type { Category, Department, Purchase, Supplier, SupplierProduct } from '../types/api'
-import { formatMoney } from '../utils'
+import { formatDateTime, formatMoney } from '../utils'
+import { loadAllPages } from '../utils/pagination'
 import { confirmTranslated, promptTranslated } from '../i18n'
 
 type Tab = 'purchases' | 'catalog' | 'suppliers'
@@ -42,6 +43,14 @@ const notice = ref('')
 const suppliers = ref<Supplier[]>([])
 const catalog = ref<SupplierProduct[]>([])
 const purchases = ref<Purchase[]>([])
+const supplierOptions = ref<Supplier[]>([])
+const pagination = reactive<Record<Tab, { page: number; total: number; totalPages: number }>>({
+  purchases: { page: 1, total: 0, totalPages: 0 },
+  catalog: { page: 1, total: 0, totalPages: 0 },
+  suppliers: { page: 1, total: 0, totalPages: 0 },
+})
+const currentPagination = computed(() => pagination[activeTab.value])
+const pageSize = 20
 const departments = ref<Department[]>([])
 const categories = ref<Category[]>([])
 const detail = ref<Purchase | null>(null)
@@ -59,6 +68,7 @@ const selectedCatalog = ref<SupplierProduct | null>(null)
 const supplierForm = reactive({ name: '', contact_name: '', phone: '', address: '' })
 const catalogForm = reactive({ supplier_id: '', category_id: '', name: '', unit_cost: '', shelf_life_days: 1 })
 const purchaseFilters = reactive({ purchase_no: '', department_id: '', ordered_at: '', arrived_at: '', status: 'pending' })
+const appliedPurchaseFilters = ref({ ...purchaseFilters })
 const supplierEditForm = reactive({ name: '', contact_name: '', phone: '', address: '', reason: '' })
 const catalogEditForm = reactive({ category_id: 0, name: '', unit_cost: '', shelf_life_days: 1, reason: '' })
 const canMaintainCatalog = computed(() => storeScope.canWriteStore && (auth.isManager || auth.employee?.role === '正式员工'))
@@ -66,20 +76,21 @@ const canManageSupplier = computed(() => storeScope.canWriteStore && auth.isMana
 
 function clearMessages() { error.value = ''; notice.value = '' }
 
-async function loadAll() {
+async function loadAll(): Promise<boolean> {
   loading.value = true
   clearMessages()
   try {
     const [supplierPage, catalogPage, purchasePage, departmentRows, categoryRows] = await Promise.all([
-      getSuppliers({ page_size: 100 }),
-      getSupplierProducts({ page_size: 100 }),
+      getSuppliers({ page: pagination.suppliers.page, page_size: pageSize }),
+      getSupplierProducts({ page: pagination.catalog.page, page_size: pageSize }),
       getPurchases({
-        page_size: 100,
-        purchase_no: purchaseFilters.purchase_no || undefined,
-        department_id: purchaseFilters.department_id || undefined,
-        ordered_at: purchaseFilters.ordered_at || undefined,
-        arrived_at: purchaseFilters.arrived_at || undefined,
-        status: purchaseFilters.status || undefined,
+        page: pagination.purchases.page,
+        page_size: pageSize,
+        purchase_no: appliedPurchaseFilters.value.purchase_no || undefined,
+        department_id: appliedPurchaseFilters.value.department_id || undefined,
+        ordered_at: appliedPurchaseFilters.value.ordered_at || undefined,
+        arrived_at: appliedPurchaseFilters.value.arrived_at || undefined,
+        status: appliedPurchaseFilters.value.status || undefined,
       }),
       getDepartments(),
       getCategories(),
@@ -87,9 +98,46 @@ async function loadAll() {
     suppliers.value = supplierPage.items
     catalog.value = catalogPage.items
     purchases.value = purchasePage.items
+    for (const [tab, result] of [['suppliers', supplierPage], ['catalog', catalogPage], ['purchases', purchasePage]] as const) {
+      pagination[tab].total = result.total
+      pagination[tab].totalPages = result.total_pages
+    }
+    // A status change can remove the last row on the last page.
+    const outside = (Object.keys(pagination) as Tab[]).filter((tab) => pagination[tab].page > Math.max(1, pagination[tab].totalPages))
+    if (outside.length) {
+      for (const tab of outside) pagination[tab].page = Math.max(1, pagination[tab].totalPages)
+      return await loadAll()
+    }
     departments.value = departmentRows
     categories.value = categoryRows
-  } catch (reason) { error.value = getErrorMessage(reason) }
+    return true
+  } catch (reason) { error.value = getErrorMessage(reason); return false }
+  finally { loading.value = false }
+}
+
+async function searchPurchases() {
+  appliedPurchaseFilters.value = { ...purchaseFilters }
+  pagination.purchases.page = 1
+  await loadAll()
+}
+
+async function changePage(step: number) {
+  if (loading.value) return
+  const state = currentPagination.value
+  const next = state.page + step
+  if (next < 1 || next > state.totalPages) return
+  const previous = state.page
+  state.page = next
+  if (!await loadAll()) state.page = previous
+}
+
+async function openCatalogCreator() {
+  clearMessages()
+  loading.value = true
+  try {
+    supplierOptions.value = await loadAllPages((page) => getSuppliers({ page, page_size: 100, is_active: true }))
+    catalogOpen.value = true
+  } catch (cause) { error.value = getErrorMessage(cause) }
   finally { loading.value = false }
 }
 
@@ -241,7 +289,7 @@ onMounted(loadAll)
 <template>
   <div>
     <PageHeader eyebrow="PROCUREMENT DESK" title="进货管理" description="从供应商目录下单，在预计到货后统一签收并生成库存批次。">
-      <span class="record-count"><Truck :size="17" /> {{ purchases.length }} 张进货单</span>
+      <span class="record-count"><Truck :size="17" /> {{ pagination.purchases.total }} 张进货单</span>
     </PageHeader>
 
     <section class="procurement-tabs">
@@ -256,15 +304,15 @@ onMounted(loadAll)
 
     <section v-if="activeTab === 'purchases'" class="panel table-panel">
       <div class="section-bar"><div><small>ARRIVAL QUEUE</small><h2>进货单队列</h2><p class="schedule-note">系统每天 12:00 自动签收；任务遗漏时可由店长手动补执行。</p></div><div class="actions"><button v-if="canManageSupplier" class="secondary-button" title="处理已到预计时间但仍待到货的进货单" :disabled="saving" @click="runAutoReceive"><RefreshCw :size="16" />补执行签收</button></div></div>
-      <div class="purchase-filters"><input v-model="purchaseFilters.purchase_no" placeholder="进货单号" /><select v-model="purchaseFilters.department_id"><option value="">全部部门</option><option v-for="item in departments" :key="item.id" :value="item.id">{{ item.name }}</option></select><input v-model="purchaseFilters.ordered_at" type="date" title="下单日期" /><input v-model="purchaseFilters.arrived_at" type="date" title="到货日期" /><select v-model="purchaseFilters.status"><option value="pending">待签收</option><option value="">全部状态</option><option value="arrived">已签收</option></select><button class="secondary-button" @click="loadAll">查询</button></div>
+      <div class="purchase-filters"><input v-model="purchaseFilters.purchase_no" placeholder="进货单号" /><select v-model="purchaseFilters.department_id"><option value="">全部部门</option><option v-for="item in departments" :key="item.id" :value="item.id">{{ item.name }}</option></select><input v-model="purchaseFilters.ordered_at" type="date" title="下单日期" /><input v-model="purchaseFilters.arrived_at" type="date" title="到货日期" /><select v-model="purchaseFilters.status"><option value="pending">待签收</option><option value="">全部状态</option><option value="arrived">已签收</option></select><button class="secondary-button" @click="searchPurchases" :disabled="loading">查询</button></div>
       <div class="table-wrap"><table><thead><tr><th>单号</th><th>部门</th><th>下单 / 预计到货</th><th>商品</th><th>金额</th><th>状态</th><th></th></tr></thead><tbody>
-        <tr v-for="item in purchases" :key="item.id"><td><strong>{{ item.purchase_no }}</strong><small class="block">{{ item.created_by_name }}</small></td><td>{{ item.department_name }}</td><td>{{ new Date(item.ordered_at).toLocaleString() }}<small class="block">{{ new Date(item.expected_arrival_at).toLocaleString() }}</small></td><td>{{ item.item_count }} 种 / {{ item.total_quantity }} 件</td><td>{{ formatMoney(item.total_amount) }}</td><td><span :class="['status-badge', item.status]">{{ item.status === 'arrived' ? '已签收' : '待签收' }}</span></td><td><div class="row-actions"><button v-if="canReceive(item)" class="receive-button" :disabled="saving" @click="manuallyReceive(item)">签收</button><span v-else-if="item.status === 'arrived'" class="received-label">已签收</span><button class="text-button" @click="openPurchase(item.id)">详情</button></div></td></tr>
+        <tr v-for="item in purchases" :key="item.id"><td><strong>{{ item.purchase_no }}</strong><small class="block">{{ item.created_by_name }}</small></td><td>{{ item.department_name }}</td><td>{{ formatDateTime(item.ordered_at) }}<small class="block">{{ formatDateTime(item.expected_arrival_at) }}</small></td><td>{{ item.item_count }} 种 / {{ item.total_quantity }} 件</td><td>{{ formatMoney(item.total_amount) }}</td><td><span :class="['status-badge', item.status]">{{ item.status === 'arrived' ? '已签收' : '待签收' }}</span></td><td><div class="row-actions"><button v-if="canReceive(item)" class="receive-button" :disabled="saving" @click="manuallyReceive(item)">签收</button><span v-else-if="item.status === 'arrived'" class="received-label">已签收</span><button class="text-button" @click="openPurchase(item.id)">详情</button></div></td></tr>
         <tr v-if="!loading && !purchases.length"><td colspan="7" class="empty-cell">暂无进货单</td></tr>
       </tbody></table></div>
     </section>
 
     <section v-else-if="activeTab === 'catalog'" class="panel table-panel">
-      <div class="section-bar"><div><small>SUPPLIER CATALOG</small><h2>供应商商品目录</h2></div><button v-if="canMaintainCatalog" class="primary-button" @click="catalogOpen = true"><Plus :size="16" />添加商品</button></div>
+      <div class="section-bar"><div><small>SUPPLIER CATALOG</small><h2>供应商商品目录</h2></div><button v-if="canMaintainCatalog" class="primary-button" @click="openCatalogCreator" :disabled="loading"><Plus :size="16" />添加商品</button></div>
       <div class="table-wrap"><table><thead><tr><th>商品</th><th>供应商</th><th>分类</th><th>进货价</th><th>保质期</th><th>状态</th><th></th></tr></thead><tbody>
         <tr v-for="item in catalog" :key="item.id"><td><button class="text-button" @click="openCatalogDetail(item.id)"><strong>{{ item.name }}</strong></button></td><td>{{ item.supplier_name }}</td><td>{{ item.category_name || '未设置' }}</td><td>{{ formatMoney(item.unit_cost) }}</td><td>{{ item.shelf_life_days ? `${item.shelf_life_days} 天` : '未设置' }}</td><td>{{ item.is_active ? '供应中' : '已停用' }}</td><td><button v-if="canMaintainCatalog" class="text-button" @click="toggleCatalog(item)">{{ item.is_active ? '停用' : '启用' }}</button></td></tr>
       </tbody></table></div>
@@ -277,11 +325,19 @@ onMounted(loadAll)
       </tbody></table></div>
     </section>
 
+    <div class="pagination panel" data-testid="procurement-pagination">
+      <span>第 {{ currentPagination.page }} / {{ currentPagination.totalPages || 1 }} 页</span>
+      <div>
+        <button :disabled="loading || currentPagination.page <= 1" @click="changePage(-1)">上一页</button>
+        <button :disabled="loading || currentPagination.page >= currentPagination.totalPages" @click="changePage(1)">下一页</button>
+      </div>
+    </div>
+
     <ModalPanel title="创建供应商" :open="supplierOpen" @close="supplierOpen = false"><form class="form-grid" @submit.prevent="submitSupplier"><label>供应商名称<input v-model="supplierForm.name" required /></label><label>联系人<input v-model="supplierForm.contact_name" /></label><label>联系电话<input v-model="supplierForm.phone" /></label><label class="wide">地址<input v-model="supplierForm.address" /></label><button class="primary-button wide" :disabled="saving">确认创建</button></form></ModalPanel>
-    <ModalPanel title="添加供应商商品" :open="catalogOpen" @close="catalogOpen = false"><form class="form-grid" @submit.prevent="submitCatalog"><label>供应商<select v-model="catalogForm.supplier_id" required><option value="">请选择</option><option v-for="item in suppliers.filter((row) => row.is_active)" :key="item.id" :value="item.id">{{ item.name }}</option></select></label><label>商品分类<select v-model="catalogForm.category_id" required><option value="">请选择</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label><label>商品名称<input v-model="catalogForm.name" required /></label><label>进货单价<input v-model="catalogForm.unit_cost" type="number" min="0" step="0.01" required /></label><label>默认保质期<input v-model.number="catalogForm.shelf_life_days" type="number" min="1" required /></label><button class="primary-button wide" :disabled="saving">保存目录商品</button></form></ModalPanel>
+    <ModalPanel title="添加供应商商品" :open="catalogOpen" @close="catalogOpen = false"><form class="form-grid" @submit.prevent="submitCatalog"><label>供应商<select v-model="catalogForm.supplier_id" required><option value="">请选择</option><option v-for="item in supplierOptions" :key="item.id" :value="item.id">{{ item.name }}</option></select></label><label>商品分类<select v-model="catalogForm.category_id" required><option value="">请选择</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label><label>商品名称<input v-model="catalogForm.name" required /></label><label>进货单价<input v-model="catalogForm.unit_cost" type="number" min="0" step="0.01" required /></label><label>默认保质期<input v-model.number="catalogForm.shelf_life_days" type="number" min="1" required /></label><button class="primary-button wide" :disabled="saving">保存目录商品</button></form></ModalPanel>
     <ModalPanel title="创建进货单" :open="purchaseOpen" wide @close="purchaseOpen = false"><PurchasePlanner v-if="purchaseOpen" :departments="departments" :own-department-id="auth.employee?.department?.id || null" :is-manager="auth.isManager" @created="purchaseCreated" /></ModalPanel>
     <ModalPanel title="进货单详情" :open="detailOpen" @close="detailOpen = false"><div v-if="detail" class="detail-sheet"><div class="detail-hero"><span><Truck /></span><div><p>{{ detail.purchase_no }}</p><h3>{{ detail.department_name }}</h3></div></div><dl><div><dt>状态</dt><dd>{{ detail.status === 'arrived' ? '已到货' : '待到货' }}</dd></div><div><dt>总金额</dt><dd>{{ formatMoney(detail.total_amount) }}</dd></div><div><dt>创建人</dt><dd>{{ detail.created_by_name }}</dd></div><div><dt>签收人</dt><dd>{{ detail.received_by_name || '尚未签收' }}</dd></div></dl><div class="detail-items"><div v-for="item in detail.items" :key="item.id"><strong>{{ item.product_name }}</strong><span>{{ item.quantity }} 件 × {{ formatMoney(item.unit_cost) }}</span><b>{{ formatMoney(item.subtotal) }}</b></div></div></div></ModalPanel>
-    <ModalPanel title="供应商详情" :open="supplierDetailOpen" @close="supplierDetailOpen = false"><div v-if="selectedSupplier" class="detail-sheet"><div class="detail-hero"><span><Building2 /></span><div><p>{{ selectedSupplier.supplier_no }}</p><h3>{{ selectedSupplier.name }}</h3></div></div><dl><div><dt>联系人</dt><dd>{{ selectedSupplier.contact_name || '—' }}</dd></div><div><dt>联系电话</dt><dd>{{ selectedSupplier.phone || '—' }}</dd></div><div><dt>地址</dt><dd>{{ selectedSupplier.address || '—' }}</dd></div><div><dt>合作状态</dt><dd>{{ selectedSupplier.is_active ? '合作中' : '已停用' }}</dd></div></dl><button v-if="auth.isManager" class="primary-button" @click="openSupplierEditor"><Pencil :size="16" />修改资料</button></div></ModalPanel>
+    <ModalPanel title="供应商详情" :open="supplierDetailOpen" @close="supplierDetailOpen = false"><div v-if="selectedSupplier" class="detail-sheet"><div class="detail-hero"><span><Building2 /></span><div><p>{{ selectedSupplier.supplier_no }}</p><h3>{{ selectedSupplier.name }}</h3></div></div><dl><div><dt>联系人</dt><dd>{{ selectedSupplier.contact_name || '—' }}</dd></div><div><dt>联系电话</dt><dd>{{ selectedSupplier.phone || '—' }}</dd></div><div><dt>地址</dt><dd>{{ selectedSupplier.address || '—' }}</dd></div><div><dt>合作状态</dt><dd>{{ selectedSupplier.is_active ? '合作中' : '已停用' }}</dd></div></dl><button v-if="canManageSupplier" class="primary-button" @click="openSupplierEditor"><Pencil :size="16" />修改资料</button></div></ModalPanel>
     <ModalPanel title="修改供应商" :open="supplierEditOpen" @close="supplierEditOpen = false"><form class="form-grid" @submit.prevent="submitSupplierEdit"><label>名称<input v-model="supplierEditForm.name" required /></label><label>联系人<input v-model="supplierEditForm.contact_name" /></label><label>电话<input v-model="supplierEditForm.phone" /></label><label>地址<input v-model="supplierEditForm.address" /></label><label class="wide">修改理由（可选）<input v-model="supplierEditForm.reason" maxlength="255" /></label><button class="primary-button wide" :disabled="saving">保存修改</button></form></ModalPanel>
     <ModalPanel title="供应商商品详情" :open="catalogDetailOpen" @close="catalogDetailOpen = false"><div v-if="selectedCatalog" class="detail-sheet"><div class="detail-hero"><span><Boxes /></span><div><p>{{ selectedCatalog.supplier_name }}</p><h3>{{ selectedCatalog.name }}</h3></div></div><dl><div><dt>商品分类</dt><dd>{{ selectedCatalog.category_name || '未设置' }}</dd></div><div><dt>进货单价</dt><dd>{{ formatMoney(selectedCatalog.unit_cost) }}</dd></div><div><dt>默认保质期</dt><dd>{{ selectedCatalog.shelf_life_days ? `${selectedCatalog.shelf_life_days} 天` : '未设置' }}</dd></div><div><dt>供应状态</dt><dd>{{ selectedCatalog.is_active ? '供应中' : '已停用' }}</dd></div></dl><button v-if="canMaintainCatalog" class="primary-button" @click="openCatalogEditor"><Pencil :size="16" />修改商品</button></div></ModalPanel>
     <ModalPanel title="修改供应商商品" :open="catalogEditOpen" @close="catalogEditOpen = false"><form class="form-grid" @submit.prevent="submitCatalogEdit"><label>分类<select v-model.number="catalogEditForm.category_id" required><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></label><label>商品名称<input v-model="catalogEditForm.name" required /></label><label>进货单价<input v-model="catalogEditForm.unit_cost" type="number" min="0" step="0.01" required /></label><label>默认保质期<input v-model.number="catalogEditForm.shelf_life_days" type="number" min="1" required /></label><label class="wide">修改理由（可选）<input v-model="catalogEditForm.reason" maxlength="255" /></label><button class="primary-button wide" :disabled="saving">保存修改</button></form></ModalPanel>

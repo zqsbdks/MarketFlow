@@ -5,6 +5,69 @@ on:
   pull_request:
 
 jobs:
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Create isolated deployment configuration
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import secrets
+          from pathlib import Path
+          password = secrets.token_hex(24)
+          config = {
+              'APP_PORT': '8080',
+              'MYSQL_DATABASE': 'marketflow_ci',
+              'MYSQL_USER': 'marketflow',
+              'MYSQL_PASSWORD': password,
+              'MYSQL_ROOT_PASSWORD': secrets.token_hex(24),
+              'APP_ENVIRONMENT': 'production',
+              'APP_DEBUG': 'false',
+              'APP_DATABASE_ECHO': 'false',
+              'APP_DATABASE_URL': f'mysql+aiomysql://marketflow:{password}@mysql:3306/marketflow_ci?charset=utf8mb4',
+              'APP_SECRET_KEY': secrets.token_hex(32),
+              'APP_AI_KEY_ENCRYPTION_KEY': base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),
+              'APP_CORS_ORIGINS': json.dumps(['http://localhost:8080']),
+              'APP_REDIS_URL': 'redis://redis:6379/0',
+              'APP_RUN_SCHEDULER': 'false',
+          }
+          Path('.env').write_text(''.join(f'{key}={value}\n' for key, value in config.items()))
+          PY
+      - run: docker compose -p marketflow-ci build
+      - run: docker compose -p marketflow-ci up -d mysql redis
+      - run: docker compose -p marketflow-ci run --rm backend python -m alembic upgrade head
+      - run: docker compose -p marketflow-ci up -d backend scheduler frontend
+      - name: Verify frontend and proxied dependency health
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-connrefused --retry-all-errors http://localhost:8080/health/ready | python -c "import json,sys; data=json.load(sys.stdin)['data']; assert data == {'database':'ok','redis':'ok','status':'ok'}, data"
+          curl --fail --silent --show-error http://localhost:8080/ > /dev/null
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -p marketflow-ci logs --no-color --tail=100
+      - name: Remove isolated CI services and volumes
+        if: always()
+        run: docker compose -p marketflow-ci down -v
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
   quality:
     runs-on: ubuntu-latest
     steps:

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 import { isPurchaseDayLocked } from '../src/utils/purchaseOrdering.ts'
 
 test('October 6 closes at noon October 4 in Japan', () => {

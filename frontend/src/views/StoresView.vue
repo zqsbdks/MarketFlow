@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { http, unwrap, getErrorMessage } from '../api/http'
 import type { ApiResponse } from '../types/api'
 import { useStoreScope } from '../stores/storeScope'
+import { businessDateRange } from '../utils/businessDates'
 
 interface Department { id: number; name: string; code: string; is_active: boolean }
 interface Category { id: number; name: string; department_id: number; is_active: boolean }
@@ -43,13 +44,10 @@ async function loadDepartments(storeId: number) {
 
 async function loadCompanyReport() {
   try {
-    const today = new Date()
-    const first = new Date(today)
-    first.setDate(first.getDate() - 60)
-    const format = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    const range = businessDateRange(60)
     const response = await http.get<ApiResponse<Report>>('/reports/overview', {
       headers: { 'X-Store-ID': 'all' },
-      params: { start_time: `${format(first)}T09:00:00`, end_time: `${format(today)}T21:00:00` },
+      params: { start_time: `${range.start}:00`, end_time: `${range.end}:00` },
     })
     companyReport.value = unwrap(response.data)
   } catch (cause) { error.value = getErrorMessage(cause) }

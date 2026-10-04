@@ -1,0 +1,1016 @@
+{
+  "verified_at_japan": "2026-10-04T10:51:17",
+  "stores": [
+    {
+      "store_no": "DP0001",
+      "name": "MarketFlow 高円寺店",
+      "id": 1,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 836,
+        "inventory_batch": 3272,
+        "sale": 17440,
+        "discount_rule": 7,
+        "contact_notice": 1077,
+        "operation_audit_log": 51431
+      },
+      "last_7_days_sales": 839,
+      "sales": {
+        "revenue": "32417022.00",
+        "cost": "23870561.00",
+        "gross_profit": "8546461.00",
+        "first_sale": "2026-04-04T12:01:26",
+        "last_sale": "2026-10-03T20:49:53"
+      }
+    },
+    {
+      "store_no": "DP0002",
+      "name": "MarketFlow 札幌駅前店",
+      "id": 2,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 813,
+        "inventory_batch": 2927,
+        "sale": 17045,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 46992
+      },
+      "last_7_days_sales": 674,
+      "sales": {
+        "revenue": "29632095.00",
+        "cost": "21856425.00",
+        "gross_profit": "7775670.00",
+        "first_sale": "2026-04-04T09:01:12",
+        "last_sale": "2026-10-04T10:35:36"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0003",
+      "name": "MarketFlow 函館店",
+      "id": 3,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 749,
+        "inventory_batch": 2854,
+        "sale": 16334,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45023
+      },
+      "last_7_days_sales": 581,
+      "sales": {
+        "revenue": "28113185.00",
+        "cost": "20675721.00",
+        "gross_profit": "7437464.00",
+        "first_sale": "2026-04-04T09:08:41",
+        "last_sale": "2026-10-04T10:23:48"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0004",
+      "name": "MarketFlow 仙台中央店",
+      "id": 4,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 775,
+        "inventory_batch": 2883,
+        "sale": 17676,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 48019
+      },
+      "last_7_days_sales": 668,
+      "sales": {
+        "revenue": "33158352.00",
+        "cost": "24247779.00",
+        "gross_profit": "8910573.00",
+        "first_sale": "2026-04-04T09:01:11",
+        "last_sale": "2026-10-04T10:20:16"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0005",
+      "name": "MarketFlow 盛岡店",
+      "id": 5,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 802,
+        "inventory_batch": 2877,
+        "sale": 19742,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 53457
+      },
+      "last_7_days_sales": 733,
+      "sales": {
+        "revenue": "37392199.00",
+        "cost": "27359107.00",
+        "gross_profit": "10033092.00",
+        "first_sale": "2026-04-04T09:10:07",
+        "last_sale": "2026-10-04T10:32:43"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0006",
+      "name": "MarketFlow 秋田店",
+      "id": 6,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 753,
+        "inventory_batch": 2855,
+        "sale": 19561,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 52934
+      },
+      "last_7_days_sales": 709,
+      "sales": {
+        "revenue": "37924408.00",
+        "cost": "27325157.00",
+        "gross_profit": "10599251.00",
+        "first_sale": "2026-04-04T09:00:21",
+        "last_sale": "2026-10-04T10:41:15"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0007",
+      "name": "MarketFlow 郡山店",
+      "id": 7,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 785,
+        "inventory_batch": 2908,
+        "sale": 17359,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 47645
+      },
+      "last_7_days_sales": 697,
+      "sales": {
+        "revenue": "29927155.00",
+        "cost": "21847725.00",
+        "gross_profit": "8079430.00",
+        "first_sale": "2026-04-04T09:23:14",
+        "last_sale": "2026-10-04T10:40:56"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0008",
+      "name": "MarketFlow 宇都宮店",
+      "id": 8,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 808,
+        "inventory_batch": 2909,
+        "sale": 16589,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45787
+      },
+      "last_7_days_sales": 623,
+      "sales": {
+        "revenue": "30271194.00",
+        "cost": "21932999.00",
+        "gross_profit": "8338195.00",
+        "first_sale": "2026-04-04T09:10:24",
+        "last_sale": "2026-10-04T10:23:31"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0009",
+      "name": "MarketFlow 高崎店",
+      "id": 9,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 742,
+        "inventory_batch": 2814,
+        "sale": 19726,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 53613
+      },
+      "last_7_days_sales": 736,
+      "sales": {
+        "revenue": "38703686.00",
+        "cost": "27890701.00",
+        "gross_profit": "10812985.00",
+        "first_sale": "2026-04-04T09:01:58",
+        "last_sale": "2026-10-04T10:42:50"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0010",
+      "name": "MarketFlow 大宮店",
+      "id": 10,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 776,
+        "inventory_batch": 2849,
+        "sale": 16519,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45376
+      },
+      "last_7_days_sales": 660,
+      "sales": {
+        "revenue": "29618862.00",
+        "cost": "21823218.00",
+        "gross_profit": "7795644.00",
+        "first_sale": "2026-04-04T09:06:33",
+        "last_sale": "2026-10-04T10:36:23"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0011",
+      "name": "MarketFlow 千葉中央店",
+      "id": 11,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 814,
+        "inventory_batch": 2943,
+        "sale": 16802,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 46223
+      },
+      "last_7_days_sales": 637,
+      "sales": {
+        "revenue": "31295676.00",
+        "cost": "22816797.00",
+        "gross_profit": "8478879.00",
+        "first_sale": "2026-04-04T09:05:39",
+        "last_sale": "2026-10-04T10:23:55"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0012",
+      "name": "MarketFlow 船橋店",
+      "id": 12,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 746,
+        "inventory_batch": 2853,
+        "sale": 18892,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 51647
+      },
+      "last_7_days_sales": 727,
+      "sales": {
+        "revenue": "33527322.00",
+        "cost": "24548952.00",
+        "gross_profit": "8978370.00",
+        "first_sale": "2026-04-04T09:01:16",
+        "last_sale": "2026-10-04T10:43:12"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0013",
+      "name": "MarketFlow 新宿店",
+      "id": 13,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 779,
+        "inventory_batch": 2876,
+        "sale": 16616,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45732
+      },
+      "last_7_days_sales": 641,
+      "sales": {
+        "revenue": "28832528.00",
+        "cost": "20941771.00",
+        "gross_profit": "7890757.00",
+        "first_sale": "2026-04-04T09:05:47",
+        "last_sale": "2026-10-04T10:34:46"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0014",
+      "name": "MarketFlow 渋谷店",
+      "id": 14,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 804,
+        "inventory_batch": 2879,
+        "sale": 15850,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 43689
+      },
+      "last_7_days_sales": 628,
+      "sales": {
+        "revenue": "27867998.00",
+        "cost": "20333395.00",
+        "gross_profit": "7534603.00",
+        "first_sale": "2026-04-04T09:09:19",
+        "last_sale": "2026-10-04T10:37:18"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0015",
+      "name": "MarketFlow 品川店",
+      "id": 15,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 753,
+        "inventory_batch": 2871,
+        "sale": 16826,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 46318
+      },
+      "last_7_days_sales": 612,
+      "sales": {
+        "revenue": "29842245.00",
+        "cost": "21768310.00",
+        "gross_profit": "8073935.00",
+        "first_sale": "2026-04-04T09:21:07",
+        "last_sale": "2026-10-04T10:41:59"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0016",
+      "name": "MarketFlow 立川店",
+      "id": 16,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 776,
+        "inventory_batch": 2874,
+        "sale": 15037,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 41989
+      },
+      "last_7_days_sales": 603,
+      "sales": {
+        "revenue": "27581966.00",
+        "cost": "19983335.00",
+        "gross_profit": "7598631.00",
+        "first_sale": "2026-04-04T09:03:27",
+        "last_sale": "2026-10-04T10:42:42"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0017",
+      "name": "MarketFlow 横浜店",
+      "id": 17,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 805,
+        "inventory_batch": 2916,
+        "sale": 19205,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 52516
+      },
+      "last_7_days_sales": 718,
+      "sales": {
+        "revenue": "34165797.00",
+        "cost": "24854828.00",
+        "gross_profit": "9310969.00",
+        "first_sale": "2026-04-04T09:01:37",
+        "last_sale": "2026-10-04T10:18:45"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0018",
+      "name": "MarketFlow 川崎店",
+      "id": 18,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 751,
+        "inventory_batch": 2857,
+        "sale": 16451,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45354
+      },
+      "last_7_days_sales": 600,
+      "sales": {
+        "revenue": "28505389.00",
+        "cost": "20709839.00",
+        "gross_profit": "7795550.00",
+        "first_sale": "2026-04-04T09:07:00",
+        "last_sale": "2026-10-04T10:35:23"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0019",
+      "name": "MarketFlow 藤沢店",
+      "id": 19,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 785,
+        "inventory_batch": 2907,
+        "sale": 15236,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 42348
+      },
+      "last_7_days_sales": 631,
+      "sales": {
+        "revenue": "28002165.00",
+        "cost": "20515487.00",
+        "gross_profit": "7486678.00",
+        "first_sale": "2026-04-04T09:24:58",
+        "last_sale": "2026-10-04T10:38:24"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0020",
+      "name": "MarketFlow 新潟店",
+      "id": 20,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 801,
+        "inventory_batch": 2875,
+        "sale": 17778,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 48726
+      },
+      "last_7_days_sales": 683,
+      "sales": {
+        "revenue": "32122618.00",
+        "cost": "23570035.00",
+        "gross_profit": "8552583.00",
+        "first_sale": "2026-04-04T09:10:10",
+        "last_sale": "2026-10-04T10:23:58"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0021",
+      "name": "MarketFlow 長野店",
+      "id": 21,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 746,
+        "inventory_batch": 2840,
+        "sale": 19408,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 52775
+      },
+      "last_7_days_sales": 725,
+      "sales": {
+        "revenue": "34357159.00",
+        "cost": "24917631.00",
+        "gross_profit": "9439528.00",
+        "first_sale": "2026-04-04T09:00:58",
+        "last_sale": "2026-10-04T10:41:01"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0022",
+      "name": "MarketFlow 静岡店",
+      "id": 22,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 775,
+        "inventory_batch": 2877,
+        "sale": 15617,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 43282
+      },
+      "last_7_days_sales": 589,
+      "sales": {
+        "revenue": "29821710.00",
+        "cost": "21768943.00",
+        "gross_profit": "8052767.00",
+        "first_sale": "2026-04-04T09:13:07",
+        "last_sale": "2026-10-04T10:35:43"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0023",
+      "name": "MarketFlow 浜松店",
+      "id": 23,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 821,
+        "inventory_batch": 2970,
+        "sale": 17319,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 47507
+      },
+      "last_7_days_sales": 676,
+      "sales": {
+        "revenue": "31464137.00",
+        "cost": "23015321.00",
+        "gross_profit": "8448816.00",
+        "first_sale": "2026-04-04T09:09:22",
+        "last_sale": "2026-10-04T10:35:38"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0024",
+      "name": "MarketFlow 名古屋店",
+      "id": 24,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 754,
+        "inventory_batch": 2858,
+        "sale": 18502,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 50596
+      },
+      "last_7_days_sales": 667,
+      "sales": {
+        "revenue": "33116176.00",
+        "cost": "23942793.00",
+        "gross_profit": "9173383.00",
+        "first_sale": "2026-04-04T09:01:12",
+        "last_sale": "2026-10-04T10:48:12"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0025",
+      "name": "MarketFlow 京都店",
+      "id": 25,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 776,
+        "inventory_batch": 2866,
+        "sale": 15426,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 43045
+      },
+      "last_7_days_sales": 629,
+      "sales": {
+        "revenue": "28035496.00",
+        "cost": "20454813.00",
+        "gross_profit": "7580683.00",
+        "first_sale": "2026-04-04T09:00:02",
+        "last_sale": "2026-10-04T10:36:10"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0026",
+      "name": "MarketFlow 大阪梅田店",
+      "id": 26,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 814,
+        "inventory_batch": 2931,
+        "sale": 16375,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45395
+      },
+      "last_7_days_sales": 634,
+      "sales": {
+        "revenue": "28922893.00",
+        "cost": "21072001.00",
+        "gross_profit": "7850892.00",
+        "first_sale": "2026-04-04T09:29:27",
+        "last_sale": "2026-10-04T10:35:47"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0027",
+      "name": "MarketFlow 神戸三宮店",
+      "id": 27,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 753,
+        "inventory_batch": 2864,
+        "sale": 16652,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45757
+      },
+      "last_7_days_sales": 594,
+      "sales": {
+        "revenue": "32082836.00",
+        "cost": "23281426.00",
+        "gross_profit": "8801410.00",
+        "first_sale": "2026-04-04T09:03:07",
+        "last_sale": "2026-10-04T10:44:07"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0028",
+      "name": "MarketFlow 広島店",
+      "id": 28,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 781,
+        "inventory_batch": 2906,
+        "sale": 16648,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 45842
+      },
+      "last_7_days_sales": 646,
+      "sales": {
+        "revenue": "31716512.00",
+        "cost": "22975403.00",
+        "gross_profit": "8741109.00",
+        "first_sale": "2026-04-04T09:01:00",
+        "last_sale": "2026-10-04T10:44:27"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0029",
+      "name": "MarketFlow 福岡天神店",
+      "id": 29,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 822,
+        "inventory_batch": 2959,
+        "sale": 19459,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 52961
+      },
+      "last_7_days_sales": 735,
+      "sales": {
+        "revenue": "35536129.00",
+        "cost": "26049046.00",
+        "gross_profit": "9487083.00",
+        "first_sale": "2026-04-04T09:06:36",
+        "last_sale": "2026-10-04T10:49:25"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    },
+    {
+      "store_no": "DP0030",
+      "name": "MarketFlow 那覇店",
+      "id": 30,
+      "counts": {
+        "product": 40,
+        "supplier": 8,
+        "supplier_product": 40,
+        "employee": 9,
+        "purchase": 748,
+        "inventory_batch": 2820,
+        "sale": 16116,
+        "discount_rule": 7,
+        "contact_notice": 1104,
+        "operation_audit_log": 44634
+      },
+      "last_7_days_sales": 591,
+      "sales": {
+        "revenue": "31893131.00",
+        "cost": "23295522.00",
+        "gross_profit": "8597609.00",
+        "first_sale": "2026-04-04T09:00:26",
+        "last_sale": "2026-10-04T10:46:17"
+      },
+      "validation": {
+        "sale_totals": 0,
+        "sale_time_and_store": 0,
+        "batch_balance": 0,
+        "product_stock": 0,
+        "purchase_totals": 0,
+        "batch_purchase_store": 0,
+        "discount_store": 0
+      }
+    }
+  ]
+}
