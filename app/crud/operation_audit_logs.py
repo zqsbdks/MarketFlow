@@ -19,6 +19,7 @@ INVENTORY_MOVEMENT_ACTIONS = (
     "sale_deduction",
     "update_quantity",
     "discard_expired",
+    "discard_manual",
 )
 
 

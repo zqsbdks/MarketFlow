@@ -22,7 +22,8 @@ CHECKS = {
     "(SELECT inventory_batch_id,SUM(quantity) sold FROM sale_item "
     "GROUP BY inventory_batch_id) s ON s.inventory_batch_id=b.id LEFT JOIN "
     "(SELECT target_id,SUM(JSON_EXTRACT(after_data,'$.discarded_quantity')) waste "
-    "FROM operation_audit_log WHERE action='discard_expired' GROUP BY target_id) w "
+    "FROM operation_audit_log WHERE action IN ('discard_expired','discard_manual') "
+    "GROUP BY target_id) w "
     "ON w.target_id=b.id WHERE b.initial_quantity<> "
     "COALESCE(s.sold,0)+COALESCE(w.waste,0)+b.remaining_quantity",
     "purchase subtotal mismatch": "SELECT COUNT(*) FROM purchase_item "

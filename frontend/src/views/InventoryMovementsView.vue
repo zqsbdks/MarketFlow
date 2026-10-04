@@ -133,6 +133,7 @@ onMounted(loadMovements)
         <option value="sale_deduction">销售出库</option>
         <option value="update_quantity">人工盘点</option>
         <option value="discard_expired">过期废弃</option>
+        <option value="discard_manual">手动废弃</option>
       </select>
       <LocalizedDateInput v-model="startTime" type="datetime-local" title="开始时间" />
       <span class="range-separator">至</span>

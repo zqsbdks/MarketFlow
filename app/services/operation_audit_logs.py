@@ -21,6 +21,7 @@ INVENTORY_ACTION_NAMES = {
     "sale_deduction": "销售出库",
     "update_quantity": "人工盘点",
     "discard_expired": "过期废弃",
+    "discard_manual": "手动废弃",
 }
 
 

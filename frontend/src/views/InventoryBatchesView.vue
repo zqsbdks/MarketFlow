@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LocalizedDateInput from '../components/LocalizedDateInput.vue'
+import InventoryDiscards from '../components/InventoryDiscards.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { CalendarDays, Layers3, PackageSearch, Pencil, Search, Trash2 } from '@lucide/vue'
 
@@ -28,6 +29,8 @@ import { confirmTranslated, promptTranslated } from '../i18n'
 
 const auth = useAuthStore()
 const storeScope = useStoreScope()
+const activeTab = ref<'batches' | 'discards'>('batches')
+const canViewDiscards = computed(() => auth.isHeadquarters || auth.isManager || auth.employee?.role === '正式员工')
 const batches = ref<InventoryBatchListItem[]>([])
 const departments = ref<Department[]>([])
 const suppliers = ref<Supplier[]>([])
@@ -180,6 +183,12 @@ onMounted(async () => {
       <span class="record-count"><Layers3 :size="17" />共 {{ total }} 个批次</span>
     </PageHeader>
 
+    <div v-if="canViewDiscards" class="inventory-tabs" role="tablist" aria-label="库存管理">
+      <button role="tab" :aria-selected="activeTab === 'batches'" :class="{ 'primary-button': activeTab === 'batches' }" @click="activeTab = 'batches'">批次库存</button>
+      <button role="tab" :aria-selected="activeTab === 'discards'" :class="{ 'primary-button': activeTab === 'discards' }" @click="activeTab = 'discards'">商品废弃</button>
+    </div>
+    <InventoryDiscards v-if="activeTab === 'discards'" @changed="loadBatches" />
+    <template v-else>
     <section class="panel batch-filter">
       <div class="filter-heading"><Search :size="18" /><span>筛选批次</span></div>
       <select v-model="filters.status">
@@ -233,6 +242,7 @@ onMounted(async () => {
       </div>
     </section>
 
+    </template>
     <ModalPanel title="库存批次详情" :open="detailOpen" @close="detailOpen = false">
       <div v-if="detail" class="detail-sheet">
         <div class="detail-hero"><span><PackageSearch /></span><div><p>{{ detail.batch_no }}</p><h3 data-no-translate>{{ detail.product_name }}</h3></div></div>
@@ -263,5 +273,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.inventory-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.inventory-tabs button{padding:10px 16px;border-radius:9px}
 .batch-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:18px;margin-bottom:18px}.batch-filter select,.batch-filter input{min-width:130px}.batch-filter label{display:flex;align-items:center;gap:7px}.filter-heading{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:700}.block{display:block;margin-top:4px;color:var(--muted)}.detail-actions{display:flex;gap:10px;flex-wrap:wrap}.danger-button{display:inline-flex;align-items:center;gap:7px;padding:10px 14px;border:1px solid #ff7c68;border-radius:9px;background:rgba(255,124,104,.1);color:#ff7c68;font-weight:700}.danger-button:disabled{opacity:.55;cursor:not-allowed}textarea{min-height:90px;resize:vertical;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}@media(max-width:760px){.batch-filter>*{flex:1 1 100%}}
 </style>

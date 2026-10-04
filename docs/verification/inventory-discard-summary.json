@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "record_totals": 0,
+    "item_amounts_and_store": 0,
+    "product_stock": 0,
+    "expired_stock_remaining": 0,
+    "expired_discard_date": 0
+  },
+  "counts": {
+    "records": 37747,
+    "quantity": "512413",
+    "total_cost": "185448346.00",
+    "imported_history": "37303",
+    "automatic_records": "37747"
+  }
+}

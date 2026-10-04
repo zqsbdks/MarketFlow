@@ -272,6 +272,7 @@ export type InventoryMovementAction =
   | 'sale_deduction'
   | 'update_quantity'
   | 'discard_expired'
+  | 'discard_manual'
 
 export interface InventoryMovement {
   id: number

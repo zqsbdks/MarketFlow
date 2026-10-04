@@ -329,6 +329,8 @@ EXPECTED_COLUMNS["ai_message"] = {
 }
 
 EXPECTED_TABLE_COMMENTS = {
+    "inventory_discard": "商品废弃单",
+    "inventory_discard_item": "废弃批次明细",
     "store": "门店表",
     "store_department": "门店部门启用配置表",
     "ai_conversation": "员工AI会话表",
@@ -353,6 +355,38 @@ EXPECTED_TABLE_COMMENTS = {
     "ai_pending_action": "AI待确认操作表",
     "ai_provider_credential": "员工AI模型密钥表",
     "business_sequence": "业务编号计数器表",
+}
+
+EXPECTED_COLUMNS["inventory_discard"] = {
+    "id",
+    "store_id",
+    "request_key",
+    "product_id",
+    "product_no",
+    "product_name",
+    "department_id",
+    "department_name",
+    "employee_id",
+    "employee_name",
+    "reason_code",
+    "note",
+    "requested_batch_id",
+    "quantity",
+    "total_cost",
+    "created_at",
+}
+EXPECTED_COLUMNS["inventory_discard_item"] = {
+    "id",
+    "store_id",
+    "discard_id",
+    "batch_id",
+    "batch_no",
+    "expiration_date",
+    "quantity",
+    "unit_cost",
+    "total_cost",
+    "before_quantity",
+    "after_quantity",
 }
 
 
@@ -519,7 +553,7 @@ def test_latest_alembic_revision_is_the_only_head() -> None:
     """AI待确认操作表迁移是当前唯一的Alembic版本头。"""
 
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["20261002_0029"]
+    assert script.get_heads() == ["428315d374cd"]
 
 
 def test_discount_scope_requires_exactly_one_target() -> None:

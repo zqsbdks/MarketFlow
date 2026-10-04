@@ -81,7 +81,7 @@ async def validate_store(db, store_id):
             SELECT a.target_id bid, SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(a.after_data,
                        '$.discarded_quantity')) AS UNSIGNED)) qty
             FROM operation_audit_log a WHERE a.store_id=:sid
-            AND a.target_type='inventory_batch' AND a.action='discard_expired'
+            AND a.target_type='inventory_batch' AND a.action IN ('discard_expired','discard_manual')
             GROUP BY a.target_id
           ) d ON d.bid=b.id WHERE b.store_id=:sid
           AND (b.initial_quantity<>b.remaining_quantity+COALESCE(i.qty,0)+COALESCE(d.qty,0)

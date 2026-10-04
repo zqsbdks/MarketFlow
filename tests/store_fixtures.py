@@ -20,9 +20,12 @@ from app.models.supplier_product import SupplierProduct
 
 async def create_store_database(url="sqlite+aiosqlite:///:memory:"):
     engine = create_async_engine(url)
+    sqlite = engine.dialect.name == "sqlite"
 
     @event.listens_for(engine.sync_engine, "connect")
     def add_json_contains(connection, _):
+        if not sqlite:
+            return
         # The application uses MySQL JSON_CONTAINS for weekly discount schedules.
         connection.create_function(
             "json_contains",
@@ -38,9 +41,13 @@ async def create_store_database(url="sqlite+aiosqlite:///:memory:"):
         table.to_metadata(metadata)
     for table in metadata.tables.values():
         for column in table.columns:
-            if isinstance(column.type, BigInteger):
+            if sqlite and isinstance(column.type, BigInteger):
                 column.type = Integer()
-            if column.server_default is not None and "ON UPDATE" in str(column.server_default.arg):
+            if (
+                sqlite
+                and column.server_default is not None
+                and "ON UPDATE" in str(column.server_default.arg)
+            ):
                 column.server_default = DefaultClause(text("CURRENT_TIMESTAMP"))
     async with engine.begin() as connection:
         await connection.run_sync(metadata.create_all)
@@ -48,7 +55,9 @@ async def create_store_database(url="sqlite+aiosqlite:///:memory:"):
     async with factory() as db:
         db.add_all([Store(id=i, store_no=f"DP{i:04d}", name=f"Store {i}") for i in (1, 2)])
         db.add_all([Department(id=i, code=f"D{i}", name=f"Department {i}") for i in (1, 2)])
+        await db.flush()
         db.add_all([Category(id=i, department_id=i, name=f"Category {i}") for i in (1, 2)])
+        await db.flush()
         for store in (1, 2):
             db.add(StoreDepartment(store_id=store, department_id=1, is_active=True))
             db.add(
@@ -56,6 +65,7 @@ async def create_store_database(url="sqlite+aiosqlite:///:memory:"):
                     id=store, store_id=store, supplier_no=f"SUP{store}", name=f"Supplier {store}"
                 )
             )
+            await db.flush()
             db.add(
                 SupplierProduct(
                     id=store,
@@ -67,6 +77,7 @@ async def create_store_database(url="sqlite+aiosqlite:///:memory:"):
                     shelf_life_days=7,
                 )
             )
+            await db.flush()
             db.add(
                 Product(
                     id=store,

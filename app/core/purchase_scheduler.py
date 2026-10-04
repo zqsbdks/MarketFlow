@@ -8,12 +8,16 @@ import asyncio
 import logging
 from datetime import datetime, time, timedelta
 
+from sqlalchemy import select
+
 from app.core.business_time import business_now
 from app.core.database import async_session_factory
 from app.core.distributed_lock import distributed_lock
 from app.crud.inventory_batches import refresh_inventory_batch_statuses
 from app.crud.products import StockInconsistency, get_stock_inconsistencies
 from app.crud.purchases import auto_receive_due_purchases
+from app.models.inventory_batch import InventoryBatch
+from app.services.inventory_discards import discard_expired_product
 
 logger = logging.getLogger(__name__)
 AUTO_RECEIVE_TIME = time(hour=12)
@@ -112,6 +116,32 @@ async def _run_batch_status_refresh_once() -> int:
         if not acquired:
             logger.info("其他实例正在刷新批次状态，本实例跳过")
             return 0
+        # 每个商品独立事务，锁顺序与销售相同，避免一次锁住全公司的库存。
+        today = business_now().date()
+        async with async_session_factory() as db:
+            product_ids = list(
+                (
+                    await db.scalars(
+                        select(InventoryBatch.product_id)
+                        .where(
+                            InventoryBatch.expiration_date < today,
+                            InventoryBatch.remaining_quantity > 0,
+                        )
+                        .distinct()
+                        .order_by(InventoryBatch.product_id)
+                    )
+                ).all()
+            )
+        discarded_count = 0
+        for product_id in product_ids:
+            async with async_session_factory() as db:
+                try:
+                    discarded_count += await discard_expired_product(product_id, today, db)
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    logger.exception("商品 %s 自动过期废弃失败，将在下次任务重试", product_id)
+        logger.info("自动过期废弃完成，共处理 %s 个批次", discarded_count)
         async with async_session_factory() as db:
             try:
                 changed_batch_count = await refresh_inventory_batch_statuses(

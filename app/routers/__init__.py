@@ -15,6 +15,7 @@ from app.routers.departments import departments_router
 from app.routers.discount_rule import discount_rules_router
 from app.routers.employees import employees_router
 from app.routers.inventory_batches import inventory_batches_router
+from app.routers.inventory_discards import inventory_discards_router
 from app.routers.operation_audit_logs import operation_audit_logs_router
 from app.routers.products import products_router
 from app.routers.purchases import purchases_router
@@ -37,6 +38,7 @@ api_router.include_router(stores_router)
 api_router.include_router(discount_rules_router)
 api_router.include_router(employees_router)
 api_router.include_router(inventory_batches_router)
+api_router.include_router(inventory_discards_router)
 api_router.include_router(operation_audit_logs_router)
 api_router.include_router(products_router)
 api_router.include_router(purchases_router)
@@ -54,6 +56,7 @@ __all__ = [
     "discount_rules_router",
     "employees_router",
     "inventory_batches_router",
+    "inventory_discards_router",
     "operation_audit_logs_router",
     "products_router",
     "purchases_router",

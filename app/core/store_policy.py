@@ -22,7 +22,7 @@ async def configure_store_context(request, employee, db):
     if raw:
         if raw == "all":
             if not headquarters or not request.url.path.endswith(
-                ("/overview", "/departments", "/analytics")
+                ("/overview", "/departments", "/analytics", "/inventory-discards/list")
             ):
                 raise HTTPException(403, "只有总部经营报表支持全公司汇总")
             selected = None
