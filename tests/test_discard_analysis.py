@@ -109,3 +109,115 @@ async def test_invalid_range_and_disabled_account(analysis_database):
         with pytest.raises(HTTPException) as exc:
             await get_discard_analysis(db, 1, query())
         assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_analytics_loss_metrics_are_optional_and_do_not_force_sales_query(
+    analysis_database, monkeypatch
+):
+    from unittest.mock import AsyncMock
+
+    from app.models.employee import Employee
+    from app.models.enums import ReportMetric
+    from app.services import reports
+
+    sales = AsyncMock(return_value=(None, [], []))
+    monkeypatch.setattr(reports, "get_report_analytics", sales)
+    async with analysis_database() as db:
+        await configure_store_context(
+            http_request(path="/api/v1/reports/analytics", store="1"), await db.get(Employee, 1), db
+        )
+        result = await reports.get_report_analytics_service(
+            db,
+            1,
+            datetime(2026, 10, 4, 9),
+            datetime(2026, 10, 4, 21),
+            None,
+            "day",
+            [ReportMetric.LOSS_COST, ReportMetric.DISCARD_QUANTITY],
+        )
+        assert result.model_dump(exclude_unset=True) == {
+            "loss_cost": Decimal("30.03"),
+            "discard_quantity": 5,
+        }
+        assert sales.await_args.kwargs["include_summary"] is False
+        assert sales.await_args.kwargs["include_departments"] is False
+        assert sales.await_args.kwargs["include_trend"] is False
+        loss_query = AsyncMock(side_effect=AssertionError("unselected losses must not be queried"))
+        monkeypatch.setattr(reports, "get_discard_analysis", loss_query)
+        await reports.get_report_analytics_service(
+            db,
+            1,
+            datetime(2026, 10, 4, 9),
+            datetime(2026, 10, 4, 21),
+            None,
+            "day",
+            [ReportMetric.REVENUE],
+        )
+        loss_query.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "revenue,expected", [(Decimal("100.10"), Decimal("30.00")), (Decimal("0"), None)]
+)
+async def test_analytics_loss_ratio_does_not_return_unselected_revenue(
+    analysis_database, monkeypatch, revenue, expected
+):
+    from unittest.mock import AsyncMock
+
+    from app.models.employee import Employee
+    from app.models.enums import ReportMetric
+    from app.services import reports
+
+    sales = AsyncMock(
+        return_value=((revenue, revenue, Decimal(0), Decimal(0), revenue, 0, 0), [], [])
+    )
+    monkeypatch.setattr(reports, "get_report_analytics", sales)
+    async with analysis_database() as db:
+        await configure_store_context(
+            http_request(path="/api/v1/reports/analytics", store="1"), await db.get(Employee, 1), db
+        )
+        result = await reports.get_report_analytics_service(
+            db,
+            1,
+            datetime(2026, 10, 4, 9),
+            datetime(2026, 10, 4, 21),
+            None,
+            "day",
+            [ReportMetric.LOSS_REVENUE_RATIO],
+        )
+        assert result.model_dump(exclude_unset=True) == {"loss_revenue_ratio": expected}
+        assert sales.await_args.kwargs["include_summary"] is True
+
+
+def test_analytics_http_accepts_loss_metrics_and_omits_unselected_fields(monkeypatch):
+    from fastapi.testclient import TestClient
+    from test_reports import override_db, override_employee_id
+
+    from app.dependencies.auth import get_current_employee_id
+    from app.dependencies.db import get_db
+    from app.main import create_app
+    from app.models.enums import ReportMetric
+    from app.schemas.reports_responses import ReportAnalyticsResponse
+
+    app = create_app()
+
+    async def analytics(**kwargs):
+        assert kwargs["metrics"] == [ReportMetric.DISCARD_QUANTITY]
+        return ReportAnalyticsResponse(discard_quantity=5)
+
+    monkeypatch.setattr("app.routers.reports.get_report_analytics_service", analytics)
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_employee_id] = override_employee_id
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/reports/analytics",
+            params={
+                "start_time": "2026-10-04T09:00:00",
+                "end_time": "2026-10-04T21:00:00",
+                "metrics": "discard_quantity",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["data"] == {"discard_quantity": 5}

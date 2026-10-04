@@ -35,6 +35,13 @@ export type RankingGroupBy = 'product' | 'category'
 export type RankingSortBy = 'quantity' | 'amount'
 export type SortOrder = 'asc' | 'desc'
 export type ReportMetric =
+  | 'loss_cost'
+  | 'loss_revenue_ratio'
+  | 'discard_quantity'
+  | 'discard_count'
+  | 'discard_reason_share'
+  | 'department_loss_comparison'
+  | 'store_loss_comparison'
   | 'original_revenue'
   | 'revenue'
   | 'discount_amount'
@@ -72,6 +79,13 @@ export interface SalesTrendItem {
 }
 
 export interface ReportAnalytics {
+  loss_cost?: string | null
+  loss_revenue_ratio?: string | null
+  discard_quantity?: number | null
+  discard_count?: number | null
+  discard_reason_share?: LossAnalysisGroup[]
+  department_loss_comparison?: LossAnalysisGroup[]
+  store_loss_comparison?: LossAnalysisGroup[]
   original_revenue?: string | null
   revenue?: string | null
   discount_amount?: string | null
@@ -94,6 +108,8 @@ export interface ApiResponse<T> {
   message: string
   data: T | null
 }
+
+export interface LossAnalysisGroup { key: string; name: string; quantity: number; cost: string; cost_share: string }
 
 export interface Department {
   id: number

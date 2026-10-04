@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import LocalizedDateInput from '../components/LocalizedDateInput.vue'
 import DiscardAnalysis from '../components/DiscardAnalysis.vue'
+import { useAuthStore } from '../stores/auth'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
@@ -17,6 +18,7 @@ import { apiDateTime, createDefaultRange, formatDateTime, formatMoney } from '..
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
+const auth = useAuthStore()
 const metricOptions: { value: ReportMetric; label: string }[] = [
   { value: 'original_revenue', label: '原价销售额' },
   { value: 'revenue', label: '营业额（实收）' },
@@ -33,11 +35,17 @@ const metricOptions: { value: ReportMetric; label: string }[] = [
   { value: 'gross_profit_growth_rate', label: '毛利润增长率' },
   { value: 'department_revenue_share', label: '部门销售额占比' },
   { value: 'sales_trend', label: '营业趋势' },
+  { value: 'loss_cost', label: '损耗金额' },
+  { value: 'loss_revenue_ratio', label: '损耗占营业额比例' },
+  { value: 'discard_quantity', label: '废弃数量' },
+  { value: 'discard_count', label: '废弃记录数' },
+  { value: 'discard_reason_share', label: '废弃原因占比' },
+  { value: 'department_loss_comparison', label: '部门损耗对比' },
 ]
+if (auth.isHeadquarters) metricOptions.push({ value: 'store_loss_comparison', label: '门店损耗对比' })
 
 const defaultRange = createDefaultRange()
-const analysisTab = ref<'sales' | 'discard'>('sales')
-watch(analysisTab, async (value) => { if (value === 'sales') { await nextTick(); resizeCharts() } })
+const allStores = ref(false)
 const startTime = ref(defaultRange.start)
 const endTime = ref(defaultRange.end)
 const departmentId = ref<number | ''>('')
@@ -65,11 +73,21 @@ let growthChart: EChartsType | null = null
 
 const showTables = computed(() => displayMode.value === 'table' || displayMode.value === 'both')
 const showCharts = computed(() => displayMode.value === 'chart' || displayMode.value === 'both')
+const hasLossMetrics = computed(() => selectedMetrics.value.some(metric => metric.includes('loss') || metric.startsWith('discard')))
+const lossGroups = computed(() => [
+  { title: '废弃原因占比', items: analytics.value?.discard_reason_share, literal: false },
+  { title: '部门损耗对比', items: analytics.value?.department_loss_comparison, literal: false },
+  { title: '门店损耗对比', items: analytics.value?.store_loss_comparison, literal: true },
+].filter(group => group.items !== undefined).map(group => ({ ...group, items: group.items! })))
 
 const summaryRows = computed(() => {
   const data = analytics.value
   if (!data) return []
   const rows: { label: string; value: string }[] = []
+  if (data.loss_cost !== undefined) rows.push({ label: '损耗金额', value: data.loss_cost == null ? '—' : formatMoney(data.loss_cost) })
+  if (data.loss_revenue_ratio !== undefined) rows.push({ label: '损耗占营业额比例', value: formatPercent(data.loss_revenue_ratio) })
+  if (data.discard_quantity !== undefined) rows.push({ label: '废弃数量', value: data.discard_quantity == null ? '—' : `${data.discard_quantity} 件` })
+  if (data.discard_count !== undefined) rows.push({ label: '废弃记录数', value: data.discard_count == null ? '—' : String(data.discard_count) })
   if (data.original_revenue !== undefined) rows.push({ label: '原价销售额', value: data.original_revenue == null ? '—' : formatMoney(data.original_revenue) })
   if (data.revenue !== undefined) rows.push({ label: '营业额（实收）', value: data.revenue == null ? '—' : formatMoney(data.revenue) })
   if (data.discount_amount !== undefined) rows.push({ label: '优惠金额', value: data.discount_amount == null ? '—' : formatMoney(data.discount_amount) })
@@ -127,6 +145,7 @@ function setLocalizedOption(chart: EChartsType, option: Parameters<EChartsType['
 }
 
 async function loadAnalytics() {
+  if (loading.value) return
   error.value = ''
   if (!selectedMetrics.value.length) {
     analytics.value = null
@@ -141,14 +160,17 @@ async function loadAnalytics() {
   }
 
   loading.value = true
+  analytics.value = null
   try {
+    const company = allStores.value && auth.isHeadquarters
+    const metrics = [...selectedMetrics.value]
     analytics.value = await getReportAnalytics({
       start_time: start,
       end_time: end,
       department_id: departmentId.value || undefined,
       interval: interval.value,
-      metrics: selectedMetrics.value,
-    })
+      metrics,
+    }, company)
     await nextTick()
     renderCharts()
   } catch (reason) {
@@ -385,12 +407,6 @@ onBeforeUnmount(() => {
   <div>
     <PageHeader eyebrow="BUSINESS INTELLIGENCE" title="经营分析" description="自由组合时间、部门、统计粒度和经营指标，生成一份综合营业报告。" />
 
-    <div class="button-row analysis-tabs" role="tablist">
-      <button role="tab" :aria-selected="analysisTab === 'sales'" :class="analysisTab === 'sales' ? 'primary-button' : 'secondary-button'" @click="analysisTab = 'sales'">销售分析</button>
-      <button role="tab" :aria-selected="analysisTab === 'discard'" :class="analysisTab === 'discard' ? 'primary-button' : 'secondary-button'" @click="analysisTab = 'discard'">废弃损耗分析</button>
-    </div>
-    <DiscardAnalysis v-if="analysisTab === 'discard'" />
-    <div v-show="analysisTab === 'sales'">
     <section class="panel query-panel">
       <div class="panel-heading">
         <div><p class="eyebrow">METRICS</p><h2>选择查询指标</h2></div>
@@ -410,14 +426,21 @@ onBeforeUnmount(() => {
         <LocalizedDateInput v-model="endTime" type="datetime-local" aria-label="结束时间" />
         <select v-model="departmentId"><option value="">全店</option><option v-for="item in departments" :key="item.id" :value="item.id">{{ item.name }}</option></select>
         <select v-model="interval" :disabled="!selectedMetrics.includes('sales_trend')"><option value="hour">按小时</option><option value="day">按日</option><option value="month">按月</option><option value="year">按年</option></select>
+        <label v-if="auth.isHeadquarters"><input v-model="allStores" type="checkbox" :disabled="loading" />全公司汇总</label>
         <button class="primary-button" type="button" :disabled="loading || !selectedMetrics.length" @click="loadAnalytics">{{ loading ? '正在分析…' : '生成分析' }}</button>
         <select v-model="displayMode" aria-label="结果展示方式"><option value="table">仅表格</option><option value="chart">仅图表</option><option value="both">表格和图表</option></select>
       </div>
       <p v-if="error" class="alert error">{{ error }}</p>
+      <p v-if="hasLossMetrics" class="loss-explanation">损耗按完整日期统计（包含凌晨自动废弃），金额按批次进货成本计算。</p>
+      <p v-if="selectedMetrics.includes('loss_revenue_ratio')" class="loss-explanation">损耗占营业额比例 = 损耗成本 ÷ 所选时间的营业额；无营业额时显示横线。</p>
     </section>
 
     <template v-if="analytics">
       <section v-if="showCharts" class="metric-results">
+        <div v-if="analytics.loss_cost !== undefined" class="result-card"><span>损耗金额</span><strong>{{ analytics.loss_cost == null ? '—' : formatMoney(analytics.loss_cost) }}</strong></div>
+        <div v-if="analytics.loss_revenue_ratio !== undefined" class="result-card"><span>损耗占营业额比例</span><strong>{{ formatPercent(analytics.loss_revenue_ratio) }}</strong></div>
+        <div v-if="analytics.discard_quantity !== undefined" class="result-card"><span>废弃数量</span><strong>{{ analytics.discard_quantity ?? '—' }} 件</strong></div>
+        <div v-if="analytics.discard_count !== undefined" class="result-card"><span>废弃记录数</span><strong>{{ analytics.discard_count ?? '—' }}</strong></div>
         <div v-if="analytics.original_revenue !== undefined" class="result-card"><span>原价销售额</span><strong>{{ analytics.original_revenue == null ? '—' : formatMoney(analytics.original_revenue) }}</strong></div>
         <div v-if="analytics.revenue !== undefined" class="result-card"><span>营业额（实收）</span><strong>{{ analytics.revenue == null ? '—' : formatMoney(analytics.revenue) }}</strong></div>
         <div v-if="analytics.discount_amount !== undefined" class="result-card"><span>优惠金额</span><strong>{{ analytics.discount_amount == null ? '—' : formatMoney(analytics.discount_amount) }}</strong></div>
@@ -463,6 +486,8 @@ onBeforeUnmount(() => {
         </article>
       </section>
 
+      <DiscardAnalysis :groups="lossGroups" :show-tables="showTables" :show-charts="showCharts" />
+
       <section v-if="showCharts" class="chart-grid">
         <article v-if="analytics.sales_trend" class="panel chart-panel-wide">
           <div class="panel-heading"><div><p class="eyebrow">FINANCIAL TREND</p><h2>营收、成本与毛利润</h2></div></div>
@@ -496,13 +521,12 @@ onBeforeUnmount(() => {
         </article>
       </section>
     </template>
-    </div>
   </div>
 </template>
 
 <style scoped>
 .query-panel { padding: 28px; }
-.analysis-tabs { flex-wrap: wrap; margin-bottom: 20px; }
+.loss-explanation { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .button-row, .query-controls { display: flex; align-items: center; gap: 12px; }
 .metric-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0; }
 .metric-option { display: flex; align-items: center; gap: 9px; padding: 11px 15px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); cursor: pointer; }

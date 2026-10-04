@@ -17,7 +17,14 @@ from app.crud.reports import (
     get_report_analytics,
     get_reports,
 )
-from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder, ReportMetric
+from app.models.enums import (
+    EmployeeRole,
+    RankingGroupBy,
+    RankingSortBy,
+    RankingSortOrder,
+    ReportMetric,
+)
+from app.schemas.discard_analysis import DiscardAnalysisRequest
 from app.schemas.reports_responses import (
     DepartmentResponse,
     RankingItemResponse,
@@ -25,6 +32,7 @@ from app.schemas.reports_responses import (
     ReportAnalyticsResponse,
     ReportResponse,
 )
+from app.services.discard_analysis import get_discard_analysis
 
 BUSINESS_OPENING_TIME = time(9, 0)
 BUSINESS_CLOSING_TIME = time(21, 0)
@@ -504,6 +512,7 @@ async def get_report_analytics_service(
         ReportMetric.GROSS_PROFIT_MARGIN,
         ReportMetric.REVENUE_GROWTH_RATE,
         ReportMetric.GROSS_PROFIT_GROWTH_RATE,
+        ReportMetric.LOSS_REVENUE_RATIO,
     }
     # 三个布尔值告诉CRUD究竟需要执行哪类SQL，避免勾选一项却查询全部数据。
     needs_summary = bool(requested & summary_metrics)  # 是否查询营业额、成本、数量等汇总值。
@@ -522,6 +531,53 @@ async def get_report_analytics_service(
     )
 
     response_values: dict[str, Any] = {}
+    loss_metrics = {
+        ReportMetric.LOSS_COST,
+        ReportMetric.LOSS_REVENUE_RATIO,
+        ReportMetric.DISCARD_QUANTITY,
+        ReportMetric.DISCARD_COUNT,
+        ReportMetric.DISCARD_REASON_SHARE,
+        ReportMetric.DEPARTMENT_LOSS_COMPARISON,
+        ReportMetric.STORE_LOSS_COMPARISON,
+    }
+    if requested & loss_metrics:
+        if (
+            ReportMetric.STORE_LOSS_COMPARISON in requested
+            and employee.role != EmployeeRole.HEADQUARTERS
+        ):
+            raise HTTPException(403, "只有总部可以查看门店损耗对比")
+        losses = await get_discard_analysis(
+            db,
+            employee_id,
+            DiscardAnalysisRequest(
+                start_date=start_time.date(), end_date=end_time.date(), department_id=department_id
+            ),
+            include_breakdowns=bool(
+                requested
+                & {
+                    ReportMetric.DISCARD_REASON_SHARE,
+                    ReportMetric.DEPARTMENT_LOSS_COMPARISON,
+                    ReportMetric.STORE_LOSS_COMPARISON,
+                }
+            ),
+            limit_days=None,
+        )
+        loss_values = {
+            ReportMetric.LOSS_COST: losses.cost,
+            ReportMetric.LOSS_REVENUE_RATIO: _percentage(losses.cost, current[1])
+            if current is not None
+            else None,
+            ReportMetric.DISCARD_QUANTITY: losses.quantity,
+            ReportMetric.DISCARD_COUNT: losses.record_count,
+            ReportMetric.DISCARD_REASON_SHARE: [item.model_dump() for item in losses.reasons],
+            ReportMetric.DEPARTMENT_LOSS_COMPARISON: [
+                item.model_dump() for item in losses.departments
+            ],
+            ReportMetric.STORE_LOSS_COMPARISON: [item.model_dump() for item in losses.stores],
+        }
+        response_values.update(
+            {metric.value: loss_values[metric] for metric in requested & loss_metrics}
+        )
     if current is not None:
         # CRUD按固定顺序返回原价销售额、营业额、优惠额、成本、毛利、销量和单数。
         original_revenue, revenue, discount_amount, cost, gross_profit, quantity, sale_count = (

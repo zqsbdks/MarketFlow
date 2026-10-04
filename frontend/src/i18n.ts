@@ -12,6 +12,11 @@ export const language = ref<Language>(
 // 中文是原始文案；日语和英语只用于界面，不改变后端业务枚举与数据库数据。
 const translations: Record<string, [string, string]> = {
   '销售分析': ['売上分析', 'Sales analysis'],
+  '损耗金额': ['廃棄損失額', 'Disposal loss cost'],
+  '损耗按完整日期统计（包含凌晨自动废弃），金额按批次进货成本计算。': ['廃棄は一日全体を集計し、深夜の自動廃棄を含みます。金額はロットの仕入原価で計算します。', 'Disposal includes full dates and overnight automatic disposal. Amounts use batch purchase costs.'],
+  '只有总部可以查看门店损耗对比': ['店舗別損失比較は本部のみ閲覧できます', 'Only headquarters can view store loss comparisons'],
+  '损耗占营业额比例': ['売上に対する廃棄原価率', 'Loss cost / revenue'],
+  '损耗占营业额比例 = 损耗成本 ÷ 所选时间的营业额；无营业额时显示横线。': ['廃棄原価率 = 廃棄原価 ÷ 選択期間の売上。売上がない場合は横線を表示します。', 'Loss ratio = disposal cost / revenue in the selected period. A dash is shown when there is no revenue.'],
   '档案完整': ['プロフィール入力済み', 'Profile complete'],
   '档案待补齐': ['プロフィール未完成', 'Profile incomplete'],
   '创建账号后，请在员工详情中补齐个人资料。': ['アカウント作成後、従業員詳細で個人情報を入力してください。', 'After creating the account, complete the personal information in employee details.'],

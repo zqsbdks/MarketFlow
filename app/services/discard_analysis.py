@@ -27,7 +27,12 @@ REASONS = {
 
 
 async def get_discard_analysis(
-    db: AsyncSession, employee_id: int, request: DiscardAnalysisRequest
+    db: AsyncSession,
+    employee_id: int,
+    request: DiscardAnalysisRequest,
+    *,
+    include_breakdowns: bool = True,
+    limit_days: int | None = 367,
 ) -> DiscardAnalysisResponse:
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
     if employee is None:
@@ -38,7 +43,7 @@ async def get_discard_analysis(
         raise HTTPException(400, "开始日期不能晚于结束日期")
     if request.end_date == date.max:
         raise HTTPException(400, "结束日期超出支持范围")
-    if (request.end_date - request.start_date).days > 366:
+    if limit_days is not None and (request.end_date - request.start_date).days >= limit_days:
         raise HTTPException(400, "查询范围不能超过367天")
     if (
         db.info.get("store_context")
@@ -53,6 +58,19 @@ async def get_discard_analysis(
     ]
     if request.department_id is not None:
         conditions.append(InventoryDiscard.department_id == request.department_id)
+    if not include_breakdowns:
+        records, qty, amount = (
+            await db.execute(
+                select(
+                    func.count(InventoryDiscard.id),
+                    func.coalesce(func.sum(InventoryDiscard.quantity), 0),
+                    func.coalesce(func.sum(InventoryDiscard.total_cost), 0),
+                ).where(*conditions)
+            )
+        ).one()
+        return DiscardAnalysisResponse(
+            record_count=records, quantity=qty, cost=amount, reasons=[], departments=[], stores=[]
+        )
     # One grouped query gives a consistent snapshot for every total and breakdown.
     rows = (
         await db.execute(

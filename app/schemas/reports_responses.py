@@ -74,6 +74,19 @@ class ReportAnalyticsResponse(BaseModel):
     # None表示分母为0等情况下无法计算，允许负毛利率和负增长率。
     original_revenue: Decimal | None = Field(None, description="折扣前原价销售额", ge=0)
     revenue: Decimal | None = Field(None, description="营业额", ge=0)
+    loss_cost: Decimal | None = Field(
+        None, description="所选完整日期内按批次进货成本统计的废弃损耗金额", ge=0
+    )
+    loss_revenue_ratio: Decimal | None = Field(
+        None, description="损耗占营业额比例（%）；营业额为0时为null", ge=0
+    )
+    discard_quantity: int | None = Field(None, description="废弃数量", ge=0)
+    discard_count: int | None = Field(None, description="废弃记录数", ge=0)
+    discard_reason_share: list[dict[str, Any]] | None = Field(None, description="废弃原因成本占比")
+    department_loss_comparison: list[dict[str, Any]] | None = Field(
+        None, description="部门损耗对比"
+    )
+    store_loss_comparison: list[dict[str, Any]] | None = Field(None, description="总部门店损耗对比")
     discount_amount: Decimal | None = Field(None, description="优惠金额", ge=0)
     discount_rate: Decimal | None = Field(
         None,

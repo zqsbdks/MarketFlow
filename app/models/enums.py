@@ -131,6 +131,13 @@ class ReportMetric(StrEnum):
     GROSS_PROFIT_GROWTH_RATE = "gross_profit_growth_rate"  # 毛利润增长率。
     DEPARTMENT_REVENUE_SHARE = "department_revenue_share"  # 部门销售额占比。
     SALES_TREND = "sales_trend"  # 按小时、日、月或年的营业数据。
+    LOSS_COST = "loss_cost"
+    LOSS_REVENUE_RATIO = "loss_revenue_ratio"
+    DISCARD_QUANTITY = "discard_quantity"
+    DISCARD_COUNT = "discard_count"
+    DISCARD_REASON_SHARE = "discard_reason_share"
+    DEPARTMENT_LOSS_COMPARISON = "department_loss_comparison"
+    STORE_LOSS_COMPARISON = "store_loss_comparison"
 
 
 __all__ = [

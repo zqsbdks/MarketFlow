@@ -168,7 +168,7 @@ export async function getReportAnalytics(params: {
   department_id?: number
   interval: 'hour' | 'day' | 'month' | 'year'
   metrics: ReportMetric[]
-}) {
+}, allStores = false) {
   // URLSearchParams 会把多个指标编码成 metrics=a&metrics=b，供 FastAPI 解析为列表。
   const query = new URLSearchParams()
   query.set('start_time', params.start_time)
@@ -176,7 +176,7 @@ export async function getReportAnalytics(params: {
   query.set('interval', params.interval)
   if (params.department_id !== undefined) query.set('department_id', String(params.department_id))
   for (const metric of params.metrics) query.append('metrics', metric)
-  const response = await http.get<ApiResponse<ReportAnalytics>>('/reports/analytics', { params: query })
+  const response = await http.get<ApiResponse<ReportAnalytics>>('/reports/analytics', { params: query, headers: allStores ? { 'X-Store-ID': 'all' } : undefined })
   return unwrap(response.data)
 }
 
