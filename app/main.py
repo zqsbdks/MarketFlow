@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
     # lifespan 统一接管 Redis、数据库连接池等资源的启动与释放。
     application = FastAPI(
         title=settings.project_name,
-        version="1.3.0",
+        version="2.1.0",
         debug=settings.debug,
         lifespan=lifespan,
     )
