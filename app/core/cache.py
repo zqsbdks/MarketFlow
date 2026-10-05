@@ -1,4 +1,8 @@
-"""接口响应缓存的公共配置、缓存键生成和失效处理。"""
+"""接口与业务查询缓存：命名空间、稳定键、类型化结果恢复及故障降级。
+
+HTTP接口缓存使用请求键，销量预测和历史报表使用business_cache装饰器。
+两者共用Redis或进程内后端，不缓存业务写入及实时库存，不替代上层权限校验。
+"""
 
 import hashlib
 import inspect
@@ -58,6 +62,7 @@ async def initialize_business_cache() -> None:
 
 
 def historical_report(arguments: dict[str, Any]) -> bool:
+    """仅允许缓存结束日期早于日本今天的销售报表；无结束时间或含今天则实时查。"""
     end = arguments.get("end_time") or arguments.get("end_date")
     if isinstance(end, datetime):
         return end < datetime.combine(business_now().date(), time.min)
@@ -74,11 +79,16 @@ def business_cache(
     """缓存纯查询结果；不缓存会话，不绕过上层权限校验，缓存故障回退数据库。"""
 
     def decorate(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+        """为纯查询构建类型化结果序列化器，保留原函数签名供调用方和类型检查使用。"""
         signature = inspect.signature(func)
         adapter = TypeAdapter(get_type_hints(func)["return"])
 
         @wraps(func)
         async def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            """规范化参数并读取查询缓存；权限范围入键，缓存不可用时回退原查询。
+
+            数据库异常不吞掉、不缓存；缓存读写异常只记日志。恢复Decimal、日期和元组类型，
+            避免缓存命中后改变上层接口结果。预测显式按店铺共享，报表保留账号查询范围。"""
             bound = signature.bind(*args, **kwargs)
             bound.apply_defaults()
             arguments = bound.arguments

@@ -8,6 +8,8 @@ from app.models.base import Base, TimestampMixin
 
 # region 门店模型
 class Store(TimestampMixin, Base):
+    """门店编号、名称和启用状态；数据库ID用于关联，编号用于展示。"""
+
     __tablename__ = "store"
     __table_args__ = (
         UniqueConstraint("store_no", name="uq_store_no"),
@@ -33,6 +35,8 @@ class Store(TimestampMixin, Base):
 
 # region 门店部门配置
 class StoreDepartment(TimestampMixin, Base):
+    """门店启用部门的关联配置，停用前需检查员工、库存及待到货引用。"""
+
     __tablename__ = "store_department"
     __table_args__ = ({"mysql_charset": "utf8mb4", "comment": "门店部门启用配置表"},)
     store_id: Mapped[int] = mapped_column(

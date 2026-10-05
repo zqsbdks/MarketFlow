@@ -18,6 +18,8 @@ class AiChatMessageRequest(BaseModel):
 
 
 class AiChatRequest(BaseModel):
+    """本轮AI请求、服务商和会话信息；历史可信度和写操作权限由服务端重新验证。"""
+
     conversation_id: int | None = Field(None, ge=1, description="继续已保存的会话；不传则新建")
     """一次支持工具调用的多轮 AI 聊天请求。"""
 

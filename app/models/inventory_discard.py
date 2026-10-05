@@ -23,6 +23,8 @@ from app.models.store_scoped import StoreScopedMixin
 
 
 class InventoryDiscard(StoreScopedMixin, Base):
+    """废弃单头，保存商品、部门、员工和损耗成本快照；request_key保证幂等。"""
+
     __tablename__ = "inventory_discard"
     __table_args__ = (
         UniqueConstraint("store_id", "request_key", name="uq_discard_store_request"),
@@ -75,6 +77,8 @@ class InventoryDiscard(StoreScopedMixin, Base):
 
 
 class InventoryDiscardItem(StoreScopedMixin, Base):
+    """废弃批次明细，记录原剩余量、扣减量、新剩余量及实际进货成本。"""
+
     __tablename__ = "inventory_discard_item"
     __table_args__ = (
         UniqueConstraint("discard_id", "batch_id", name="uq_discard_batch"),

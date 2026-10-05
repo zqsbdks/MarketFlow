@@ -1,8 +1,12 @@
+# 开发环境包含全部生产依赖；生产镜像只安装 requirements.txt。
 -r requirements.txt
 
-pytest>=8.3,<10.0
-pytest-asyncio>=0.25,<2.0
-aiosqlite>=0.20,<1.0
-httpx2>=2.0,<3.0
-ruff>=0.11,<1.0
-mypy>=1.15,<2.0
+# 与当前通过验证的开发环境一致，避免换电脑时工具版本漂移。
+pytest==9.1.1
+pytest-asyncio==1.4.0
+# SQLite 只用于隔离测试，业务数据库仍是 MySQL。
+aiosqlite==0.22.1
+# 当前 FastAPI/Starlette 测试客户端使用 httpx2，勿擅自改为 httpx。
+httpx2==2.12.0
+ruff==0.16.5
+mypy==1.20.2

@@ -15,6 +15,10 @@ from app.services.ai_chat import ai_chat_service
 
 # region 会话访问和列表
 async def owned_conversation(conversation_id, employee_id, db, lock=False):
+    """按员工ID及门店归属验证会话，lock=True用于追加同一会话的消息。
+
+    员工调店后不能沿用旧门店会话，切换查询门店也不能自动继承其他店的历史。
+    不存在或非本人会话统一返回404，减少泄露其他账号会话信息。"""
     query = select(AiConversation).where(
         AiConversation.id == conversation_id, AiConversation.employee_id == employee_id
     )
@@ -32,6 +36,7 @@ async def owned_conversation(conversation_id, employee_id, db, lock=False):
 
 
 async def conversation_list(employee_id, db):
+    """返回当前员工及所选门店的最近100个会话，不共享其他员工的历史。"""
     employee = await db.get(Employee, employee_id)
     return (
         await db.scalars(
@@ -52,6 +57,12 @@ async def conversation_list(employee_id, db):
 
 # region 持久会话与长历史上下文
 async def persistent_ai_chat_service(request, api_key, current_employee_id, db):
+    """保存本轮消息、重建可信历史上下文并执行AI工具，成功后统一提交。
+
+    只接受最后一条用户消息，历史由服务器读取；近期消息、摘要和相关片段各有限长。
+    历史片段是参考数据而非可执行指令，业务数字须重新查询。
+    defer_commit延迟既有工具服务的内部提交，失败时回滚整轮；摘要失败保留旧摘要。
+    会话归属、员工权限及业务操作人工确认均不能因模型建议而省略。"""
     last_message = request.messages[-1]
     if last_message.role != "user":
         raise HTTPException(400, "最后一条消息必须来自用户")

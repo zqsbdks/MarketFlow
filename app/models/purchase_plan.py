@@ -10,6 +10,12 @@ from app.models.store_scoped import StoreScopedMixin
 
 
 class PurchasePlan(StoreScopedMixin, TimestampMixin, Base):
+    """门店/部门/到货日唯一的计划头，分开保存人工覆盖与自动建议。
+
+    两类JSON字典以供应目录ID字符串为键。0是明确人工取消，缺少键表示使用自动量。
+    purchase_id只在订单成功创建的同一事务内填写，后台重试据此避免重复生成。
+    """
+
     __tablename__ = "purchase_plan"
     __table_args__ = (
         UniqueConstraint("store_id", "department_id", "arrival_date", name="uq_purchase_plan_day"),

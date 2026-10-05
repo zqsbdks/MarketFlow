@@ -25,7 +25,12 @@ from app.services.replenishment import calculate_replenishment
 async def get_purchase_planning(
     department_id: int, arrival_date: date | None, db: AsyncSession
 ) -> dict:
-    """每种供应商品一行；历史销量与已有订单只作参考，不自动生成订货量。"""
+    """每种供应商品一行，组合自动建议、人工覆盖、已有到货及历史销量。
+
+    默认从今天+2天展示7个到货日，额外提供前一天到货参考列。
+    截止或已下单日期显示持久化快照，可编辑日期重新推演；GET不保存或生成订单。
+    门店读取范围由上层依赖配置，跨店查看不具备写入权限。
+    """
     today = business_now().date()
     first_day = arrival_date or today + timedelta(days=2)
     if not today <= first_day <= today + timedelta(days=30):

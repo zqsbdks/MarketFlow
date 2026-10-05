@@ -8,6 +8,8 @@ from app.models.base import Base, CreatedAtMixin, TimestampMixin
 
 # region 会话
 class AiConversation(TimestampMixin, Base):
+    """按员工、查看门店及归属门店保存AI会话，调店或切店后不能复用旧权限范围。"""
+
     __tablename__ = "ai_conversation"
     __table_args__ = {"mysql_charset": "utf8mb4", "comment": "员工AI会话表"}
     id: Mapped[int] = mapped_column(
@@ -36,6 +38,8 @@ class AiConversation(TimestampMixin, Base):
 
 # region 历史消息
 class AiMessage(CreatedAtMixin, Base):
+    """服务器保存的会话消息及待确认操作快照，供后续上下文重建而非直接执行。"""
+
     __tablename__ = "ai_message"
     __table_args__ = {"mysql_charset": "utf8mb4", "comment": "AI完整历史消息表"}
     id: Mapped[int] = mapped_column(

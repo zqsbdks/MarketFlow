@@ -20,6 +20,11 @@ from app.models.sale_item import SaleItem
 async def weekday_sales_forecast(
     store_id: int, product_ids: tuple[int, ...], today: date, db: AsyncSession
 ) -> dict[str, list[int]]:
+    """统计本店商品最近28个完整日期的同星期销量，返回每周7天的日销量预测。
+
+    product_ids必须是稳定排序的元组，today使用日本业务日期；当天未结束销量不纳入。
+    没有销售的星期仍按4周平均，不按有销售的日期数平均，避免夸大稀疏销量。
+    预测可按店铺/商品/日期缓存，实际库存与最终建议量不能复用此缓存。"""
     rows = (
         await db.execute(
             select(SaleItem.product_id, func.date(Sale.sold_at), func.sum(SaleItem.quantity))
@@ -42,13 +47,21 @@ async def weekday_sales_forecast(
 def simulate_replenishment(
     now, days, sales, batches, incoming, minimum_stock, shelf_life, overrides
 ):
-    """保底值是销售后的目标余量，不是最低订货量；每日只补一天的预计需求。"""
+    """纯内存逐日推演：过期清理→已有到货→建议补货→预计销售扣减。
+
+    batches为(可用日期,到期日期,数量)，incoming为(到货日期,到期日期,数量)。
+    sales按星期几0至6索引，overrides按到货日保存人工量，0也必须优先。
+    保底是销售后的目标余量，并非最低订货量；每天只补一天预计需求。
+    当天销量按09:00至21:00剩余时长折算；按天计入到货，不保证每小时都有库存。
+    不修改传入批次对象，不执行数据库操作。
+    """
     stock = [list(batch) for batch in batches]  # [可用日期，到期日期，数量]
     result = {}
     first = now.date()
     last = max(days)
     day = first
     while day <= last:
+        # 到期日当天仍可销售，日期小于业务日期的批次才从可用库存移除。
         stock = [batch for batch in stock if batch[1] is None or batch[1] >= day]
         for arrival, expires, quantity in incoming:
             if arrival == day and (expires is None or expires >= day):
@@ -61,6 +74,7 @@ def simulate_replenishment(
             demand = ceil(demand * remaining_hours / 12)
         available = sum(batch[2] for batch in stock if batch[0] <= day)
         if day in days:
+            # 可用库存补到预测销量+保底；人工量覆盖系统建议，包括明确填0。
             suggestion = min(1000000, max(0, ceil(demand + minimum_stock - available)))
             quantity = overrides.get(day, suggestion)
             result[day] = {
@@ -87,7 +101,13 @@ def simulate_replenishment(
 
 
 async def refresh_automatic_plans(db: AsyncSession, now: datetime) -> int:
-    """后台每小时刷新所有启用门店，无需浏览器打开；截止时保留最终快照。"""
+    """按启用门店/部门保存七天自动量，保留人工覆盖与截止快照。
+
+    目录和供应商必须有效，且已设置保质期。本店有效店长/正式员工记录订单归属。
+    系统刷新不要求员工已改初始密码，员工前端写入仍要求改密。
+    每部门独立提交；已生成订单或已锁定快照不覆盖，浏览器无需打开。
+    返回更新的计划头数，不是新生成的订单数。
+    """
     from sqlalchemy.dialects.mysql import insert as mysql_insert
     from sqlalchemy.dialects.sqlite import insert as sqlite_insert
     from sqlalchemy.orm import selectinload
@@ -194,6 +214,11 @@ async def refresh_automatic_plans(db: AsyncSession, now: datetime) -> int:
 async def calculate_replenishment(
     store_id: int, department_id: int, days: list[date], catalog, db: AsyncSession, now: datetime
 ) -> dict:
+    """实时组装库存、在途订单及人工覆盖，逐日模拟每个供应商品的订货建议。
+
+    返回目录ID到日期到建议详情的嵌套字典。days表示到货日，now是日本业务时间。
+    历史销量通过预测缓存复用；批次、待到货和计划每次查询，包含更早计划的影响。
+    只读取数据，不保存建议，也不生成订单；实际持久化由refresh_automatic_plans负责。"""
     today = now.date()
     catalog_ids = [item.id for item in catalog]
     if not catalog_ids:

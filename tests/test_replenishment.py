@@ -2,8 +2,8 @@ from datetime import date, datetime
 
 from sqlalchemy import select
 
-from app.models.purchase_plan import PurchasePlan
 from app.models.employee import Employee
+from app.models.purchase_plan import PurchasePlan
 from app.models.supplier_product import SupplierProduct
 from app.schemas.purchase_plan import SaveMinimumStock, SavePurchasePlan
 from app.services import purchase_plan_submission as service

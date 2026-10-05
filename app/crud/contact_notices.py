@@ -29,6 +29,9 @@ async def get_recipients(notice_id: int, db: AsyncSession):
 
 
 async def get_notices(request, employee, now, db: AsyncSession):
+    """在当前账号可见范围内分页读取事项，应用收件/发布/管理视角与筛选条件。
+
+    权限范围必须先由服务层验证；分页总数与记录使用一致条件，避免泄露不可见事项。"""
     conditions = []
     recipient = exists().where(
         ContactNoticeRecipient.notice_id == ContactNotice.id,

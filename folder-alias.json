@@ -1,26 +1,63 @@
 {
-    "scripts/seed_contact_notices.py": {"description": "日语联络事项演示数据与确认灯号生成脚本"},
-    "tests/test_contact_notices_mysql.py": {"description": "联络事项MySQL发布确认自动关闭完整流程回滚测试"},
-    "tests/test_contact_notices.py": {"description": "联络事项权限、确认名单与自动关闭测试"},
-    "frontend/src/components/NoticeReminder.vue": {"description": "首页联络事项未读和待确认提醒"},
-    "app/models/contact_notice.py": {"description": "联络事项与员工确认记录ORM模型"},
-    "app/crud/contact_notices.py": {"description": "联络事项分页查询与接收名单数据访问"},
-    "app/services/contact_notices.py": {"description": "联络事项权限、发布确认与自动关闭业务"},
-    "app/routers/contact_notices.py": {"description": "联络事项查询、发布与员工确认API"},
-    "app/schemas/contact_notices_requests.py": {"description": "联络事项查询、创建修改和状态请求模型"},
-    "app/schemas/contact_notices_responses.py": {"description": "联络事项分页详情与确认名单响应模型"},
-    "app/core/contact_notice_scheduler.py": {"description": "联络事项到期自动关闭定时任务"},
-    "alembic/versions/20261001_0022_contact_notices.py": {"description": "联络事项和员工确认表迁移"},
-    "frontend/src/api/contactNotices.ts": {"description": "联络事项前端类型与API请求"},
-    "frontend/src/views/ContactNoticesView.vue": {"description": "联络事项发布、筛选与确认名单页面"},
+    ".cache": {
+        "description": "开发工具统一缓存（可重新生成）"
+    },
+    ".dockerignore": {
+        "description": "项目配置或资源：.dockerignore"
+    },
+    ".env": {
+        "description": "本地私密运行配置（禁止提交）"
+    },
+    ".env.deploy.example": {
+        "description": "项目配置或资源：.env.deploy.example"
+    },
+    ".env.example": {
+        "description": "可安全提交的环境变量示例"
+    },
+    ".gitattributes": {
+        "description": "Git文本编码与跨平台换行规则"
+    },
     ".github": {
         "description": "GitHub仓库自动化配置目录"
+    },
+    ".github/workflows": {
+        "description": "项目目录：workflows"
     },
     ".github/workflows/ci.yml": {
         "description": "GitHub Actions代码检查与自动测试工作流"
     },
+    ".gitignore": {
+        "description": "Git忽略规则"
+    },
+    ".mypy_cache": {
+        "description": "旧版Mypy类型检查缓存"
+    },
+    ".pytest_cache": {
+        "description": "旧版pytest测试缓存"
+    },
+    ".ruff_cache": {
+        "description": "Ruff代码检查缓存"
+    },
+    ".tmp-share": {
+        "description": "临时共享产物"
+    },
+    ".tmp-share/cloudflared.exe": {
+        "description": "项目配置或资源：cloudflared.exe"
+    },
+    ".tmp-share/department-filter-fixed.png": {
+        "description": "界面验收截图或图标：department-filter-fixed"
+    },
+    ".tmp-share/public-index.html": {
+        "description": "项目配置或资源：public-index.html"
+    },
+    ".venv": {
+        "description": "Python虚拟环境（本机依赖，禁止提交）"
+    },
     ".vscode": {
         "description": "VS Code项目级编辑器配置"
+    },
+    ".vscode/extensions.json": {
+        "description": "VS Code推荐扩展列表"
     },
     ".vscode/settings.json": {
         "description": "VS Code插件与工作区选项"
@@ -28,260 +65,35 @@
     ".vscode/tasks.json": {
         "description": "VS Code一键初始化、开发、测试和迁移任务"
     },
-    ".vscode/extensions.json": {
-        "description": "VS Code推荐扩展列表"
+    "CHANGELOG.md": {
+        "description": "发布版本与重要功能变更记录"
     },
-    "app": {
-        "description": "FastAPI后端应用源码"
+    "COMMANDS.md": {
+        "description": "开发、测试、迁移和依赖管理命令手册"
     },
-    "app/__init__.py": {
-        "description": "应用Python包入口（保持无副作用）"
+    "Dockerfile": {
+        "description": "后端FastAPI容器镜像配置"
     },
-    "app/main.py": {
-        "description": "FastAPI应用工厂与ASGI启动入口"
+    "NAMING.md": {
+        "description": "Python命名规范与常用英文词表"
     },
-    "app/core": {
-        "description": "配置、数据库、缓存、安全等核心基础设施"
-    },
-    "app/core/__init__.py": {
-        "description": "核心模块公共导出入口"
-    },
-    "app/core/cache.py": {
-        "description": "接口缓存时长、缓存键与主动失效公共工具"
-    },
-    "app/core/config.py": {
-        "description": "环境变量与.env配置模型"
-    },
-    "app/core/database.py": {
-        "description": "异步MySQL引擎、会话工厂与数据库依赖"
-    },
-    "app/core/exceptions.py": {
-        "description": "统一响应结构与全局异常处理器"
-    },
-    "app/core/health.py": {
-        "description": "MySQL与可选Redis服务就绪状态检查"
-    },
-    "app/core/lifespan.py": {
-        "description": "应用启动和关闭时的资源生命周期管理"
-    },
-    "app/core/logging.py": {
-        "description": "控制台与轮转文件日志配置"
-    },
-    "app/core/middlewares.py": {
-        "description": "CORS等全局中间件的统一注册入口"
-    },
-    "app/core/redis.py": {
-        "description": "可选Redis异步客户端与连接关闭逻辑"
-    },
-    "app/core/security.py": {
-        "description": "Argon2密码哈希与校验工具"
-    },
-    "app/core/token.py": {
-        "description": "JWT访问令牌签发工具"
-    },
-    "app/crud": {
-        "description": "数据库访问层扩展目录"
-    },
-    "app/crud/__init__.py": {
-        "description": "CRUD数据访问包入口"
-    },
-    "app/dependencies": {
-        "description": "FastAPI可复用Depends依赖"
-    },
-    "app/dependencies/__init__.py": {
-        "description": "公共依赖统一导出入口"
-    },
-    "app/dependencies/db.py": {
-        "description": "数据库会话依赖的简短别名"
-    },
-    "app/dependencies/auth.py": {
-        "description": "Bearer JWT解析、员工ID转换与缓存接口账号状态验证依赖"
-    },
-    "app/models": {
-        "description": "SQLAlchemy ORM模型目录"
-    },
-    "app/models/__init__.py": {
-        "description": "ORM模型注册与Alembic发现入口"
-    },
-    "app/models/base.py": {
-        "description": "ORM声明式Base与公共时间字段Mixin"
-    },
-    "app/models/enums.py": {
-        "description": "员工、商品、销售、进货、库存批次与折扣业务枚举"
-    },
-    "app/models/department.py": {
-        "description": "固定部门SQLAlchemy ORM模型"
-    },
-    "app/models/employee.py": {
-        "description": "员工登录账号、角色与部门归属ORM模型"
-    },
-    "app/models/employee_detail.py": {
-        "description": "员工个人资料与雇佣状态ORM模型"
-    },
-    "app/models/category.py": {
-        "description": "部门商品分类及同部门名称唯一约束ORM模型"
-    },
-    "app/models/product.py": {
-        "description": "商品价格、销售状态、库存与保质期ORM模型"
-    },
-    "app/models/product_supplier.py": {
-        "description": "商品与供货商多对多关系、默认价格和首选状态ORM模型"
-    },
-    "app/models/supplier.py": {
-        "description": "供货商资料与合作状态ORM模型"
-    },
-    "app/models/purchase.py": {
-        "description": "部门进货单、到货状态与签收员工ORM模型"
-    },
-    "app/models/purchase_item.py": {
-        "description": "进货商品、供货商、价格和保质期明细ORM模型"
-    },
-    "app/models/inventory_batch.py": {
-        "description": "商品到货批次、剩余库存与到期日期ORM模型"
-    },
-    "app/models/sale.py": {
-        "description": "销售单金额、成本与毛利润汇总ORM模型"
-    },
-    "app/models/sale_item.py": {
-        "description": "销售商品、扣减批次、价格和成本快照明细ORM模型"
-    },
-    "app/routers": {
-        "description": "API业务路由目录"
-    },
-    "app/routers/__init__.py": {
-        "description": "顶层API路由聚合入口"
-    },
-    "app/routers/auth.py": {
-        "description": "员工登录与当前员工信息API路由"
-    },
-    "app/routers/categories.py": {
-        "description": "商品分类查询API路由"
-    },
-    "app/routers/departments.py": {
-        "description": "部门查询API路由"
-    },
-    "app/routers/employees.py": {
-        "description": "店长创建、查询、修改状态与重置密码API路由"
-    },
-    "app/routers/products.py": {
-        "description": "商品列表、详情、资料与销售状态修改API路由"
-    },
-    "app/routers/sales.py": {
-        "description": "折扣价格预览、收银结算、销售列表与小票详情API路由"
-    },
-    "app/routers/reports.py": {
-        "description": "营业概览、部门对比和销售排行API路由"
-    },
-    "app/services": {
-        "description": "登录、查询与统计业务服务层"
-    },
-    "app/services/__init__.py": {
-        "description": "业务服务层Python包入口"
-    },
-    "app/services/auth.py": {
-        "description": "员工登录认证与当前员工信息业务逻辑"
-    },
-    "app/services/categories.py": {
-        "description": "商品分类查询业务逻辑"
-    },
-    "app/services/departments.py": {
-        "description": "部门查询业务逻辑"
-    },
-    "app/services/employees.py": {
-        "description": "员工创建、查询、状态修改与密码重置业务逻辑"
-    },
-    "app/services/products.py": {
-        "description": "商品查询、资料及状态修改权限校验业务逻辑"
-    },
-    "app/services/sales.py": {
-        "description": "折扣试算、收银权限校验、销售事务处理与小票合并业务逻辑"
-    },
-    "app/services/reports.py": {
-        "description": "营业报表权限验证与响应组装业务逻辑"
-    },
-    "app/crud/auth.py": {
-        "description": "按员工编号或ID查询账号的数据访问函数"
-    },
-    "app/crud/categories.py": {
-        "description": "商品分类查询数据访问函数"
-    },
-    "app/crud/departments.py": {
-        "description": "部门查询数据访问函数"
-    },
-    "app/crud/employees.py": {
-        "description": "员工创建、查询、状态修改与密码重置数据访问函数"
-    },
-    "app/crud/products.py": {
-        "description": "商品筛选、详情查询与资料更新数据访问函数"
-    },
-    "app/crud/sales.py": {
-        "description": "折扣快照写入、销售查询、批次扣减与商品库存同步函数"
-    },
-    "app/crud/reports.py": {
-        "description": "营业数据汇总、分组与排行查询函数"
-    },
-    "app/schemas/auth_requests.py": {
-        "description": "员工登录请求Pydantic模型"
-    },
-    "app/schemas/auth_responses.py": {
-        "description": "员工登录令牌与当前员工信息响应模型"
-    },
-    "app/schemas/categories_requests.py": {
-        "description": "商品分类查询参数模型"
-    },
-    "app/schemas/categories_responses.py": {
-        "description": "商品分类查询响应模型"
-    },
-    "app/schemas/departments_requests.py": {
-        "description": "部门查询参数模型"
-    },
-    "app/schemas/departments_responses.py": {
-        "description": "部门查询响应模型"
-    },
-    "app/schemas/employees_requests.py": {
-        "description": "员工创建、列表筛选与状态修改请求模型"
-    },
-    "app/schemas/employees_responses.py": {
-        "description": "员工创建、列表、状态修改与密码重置响应模型"
-    },
-    "app/schemas/products_requests.py": {
-        "description": "商品列表筛选、资料与销售状态修改请求模型"
-    },
-    "app/schemas/products_responses.py": {
-        "description": "商品列表、详情、资料与状态修改响应模型"
-    },
-    "app/schemas/sales_requests.py": {
-        "description": "销售查询及收银台商品数量请求模型"
-    },
-    "app/schemas/sales_responses.py": {
-        "description": "销售价格预览、折扣小票与销售记录响应模型"
-    },
-    "app/schemas/reports_requests.py": {
-        "description": "营业报表时间、部门与排行查询参数模型"
-    },
-    "app/schemas/reports_responses.py": {
-        "description": "营业概览、部门对比与排行响应模型"
-    },
-    "app/schemas": {
-        "description": "Pydantic请求与响应模型目录"
-    },
-    "app/schemas/__init__.py": {
-        "description": "Pydantic模型包入口与公共类型导出"
-    },
-    "app/schemas/base.py": {
-        "description": "通用泛型API响应模型"
+    "README.md": {
+        "description": "项目结构、启动、迁移与测试说明"
     },
     "alembic": {
         "description": "数据库版本迁移工作目录"
+    },
+    "alembic.ini": {
+        "description": "Alembic迁移与日志主配置"
+    },
+    "alembic/README": {
+        "description": "Alembic目录说明文件"
     },
     "alembic/env.py": {
         "description": "Alembic异步迁移运行环境与元数据绑定"
     },
     "alembic/script.py.mako": {
         "description": "新迁移脚本的代码生成模板"
-    },
-    "alembic/README": {
-        "description": "Alembic目录说明文件"
     },
     "alembic/versions": {
         "description": "数据库迁移版本脚本目录"
@@ -310,170 +122,476 @@
     "alembic/versions/20260907_0007_add_product_supplier.py": {
         "description": "创建商品与供货商多对多关联表"
     },
-    "frontend": {
-        "description": "Vue 3 门店经营管理前端"
+    "alembic/versions/20260913_0007_add_supplier_product_category.py": {
+        "description": "为供应商商品目录增加分类字段迁移"
     },
-    "frontend/src": {
-        "description": "前端业务源码"
+    "alembic/versions/20260917_0008_update_inventory_batch_status.py": {
+        "description": "库存批次报废状态替换为临期状态的数据库迁移"
     },
-    "frontend/src/api": {
-        "description": "FastAPI 接口请求与统一错误处理"
+    "alembic/versions/20260917_0009_create_inventory_adjustment.py": {
+        "description": "创建库存调整记录表的数据库迁移"
     },
-    "frontend/src/components": {
-        "description": "前端通用展示组件"
+    "alembic/versions/20260917_0010_create_operation_audit_log.py": {
+        "description": "以统一操作审计记录表替换库存专用调整表迁移"
     },
-    "frontend/src/layouts": {
-        "description": "经营管理台整体布局"
+    "alembic/versions/20260917_0011_add_sale_item_batch.py": {
+        "description": "销售明细关联实际扣减库存批次并增加收银台来源迁移"
     },
-    "frontend/src/router": {
-        "description": "页面路由与登录权限守卫"
+    "alembic/versions/20260920_0012_add_expired_inventory_batch_status.py": {
+        "description": "数据库迁移：add expired inventory batch status"
     },
-    "frontend/src/stores": {
-        "description": "Pinia 登录状态管理"
+    "alembic/versions/20260920_0013_add_product_low_stock_threshold.py": {
+        "description": "数据库迁移：add product low stock threshold"
     },
-    "frontend/src/types": {
-        "description": "后端接口 TypeScript 类型"
+    "alembic/versions/20260920_0014_allow_system_audit_logs.py": {
+        "description": "数据库迁移：allow system operation audit logs"
     },
-    "frontend/src/views": {
-        "description": "登录、总览、部门、商品、销售与员工页面"
+    "alembic/versions/20260921_0015_create_discount_tables.py": {
+        "description": "创建折扣规则与折扣适用范围表迁移"
     },
-    "frontend/package.json": {
-        "description": "前端依赖与开发构建命令"
+    "alembic/versions/20260927_0016_remove_discount_stock_thresholds.py": {
+        "description": "删除折扣规则开始与停止库存阈值字段迁移"
     },
-    "frontend/README.md": {
-        "description": "前端启动与构建说明"
+    "alembic/versions/20260927_0017_add_discount_rule_department.py": {
+        "description": "为折扣规则增加必填所属部门字段迁移"
     },
-    "tests": {
-        "description": "pytest单元测试与集成测试"
+    "alembic/versions/20260927_0018_add_sale_discount_snapshots.py": {
+        "description": "为销售单和销售明细增加折扣金额及规则快照字段迁移"
     },
-    "tests/conftest.py": {
-        "description": "测试环境变量与共享测试配置"
+    "alembic/versions/20261001_0019_create_ai_pending_actions.py": {
+        "description": "创建AI待确认操作表及状态索引迁移"
     },
-    "tests/test_app.py": {
-        "description": "根接口、健康检查和404响应测试"
+    "alembic/versions/20261001_0020_ai_provider_credential.py": {
+        "description": "创建员工AI密钥加密存储表迁移"
     },
-    "tests/test_cache.py": {
-        "description": "接口缓存命中、查询参数归一化与主动失效测试"
+    "alembic/versions/20261001_0021_concurrency_safety.py": {
+        "description": "业务编号、乐观锁和重复提交保护数据库迁移"
     },
-    "tests/test_auth.py": {
-        "description": "员工登录成功、失败、停用与密码验证测试"
+    "alembic/versions/20261001_0022_contact_notices.py": {
+        "description": "联络事项和员工确认表迁移"
     },
-    "tests/test_employees.py": {
-        "description": "创建员工与员工列表接口及业务规则测试"
+    "alembic/versions/20261001_0023_multi_store.py": {
+        "description": "数据库迁移：门店归属、总部角色和持久AI会话；现有数据归到DP0001"
     },
-    "tests/test_products.py": {
-        "description": "商品列表字段、业务组装与路由响应测试"
+    "alembic/versions/20261001_0024_store_catalog.py": {
+        "description": "数据库迁移：每店独立的商品目录匹配和折扣名称"
     },
-    "tests/test_sales.py": {
-        "description": "销售单列表汇总、日期校验与路由响应测试"
+    "alembic/versions/20261001_0025_headquarters_notices.py": {
+        "description": "数据库迁移：总部联络指定接收门店"
     },
-    "tests/test_reports.py": {
-        "description": "营业概览业务校验与统一响应格式测试"
+    "alembic/versions/20261001_0026_ai_home_store.py": {
+        "description": "数据库迁移：会话创建时的员工门店归属快照"
     },
-    "tests/test_config.py": {
-        "description": "应用配置加载与隔离性测试"
+    "alembic/versions/20261002_0027_store_suppliers.py": {
+        "description": "数据库迁移：门店独立供应商与报价；已创建的演示门店自动复制其来源目录"
     },
-    "tests/test_database.py": {
-        "description": "异步MySQL驱动与连接集成测试"
+    "alembic/versions/20261002_0028_employee_store_check.py": {
+        "description": "数据库迁移：数据库兜底：总部账号不归店，其他员工必须明确归店"
     },
-    "tests/test_dependencies.py": {
-        "description": "JWT认证依赖测试"
+    "alembic/versions/20261002_0029_supplier_number_scope.py": {
+        "description": "数据库迁移：供应商编号允许不同门店分别从 SUP00001 起使用"
     },
-    "tests/test_security.py": {
-        "description": "密码哈希与JWT往返测试"
+    "alembic/versions/20261004_0031_automatic_purchase_quantities.py": {
+        "description": "数据库迁移：自动补货数量与商品保底库存"
     },
-    "tests/test_models.py": {
-        "description": "第一版ORM字段、约束、关系与迁移结构测试"
+    "alembic/versions/372ffba6f65b_add_supplier_product_catalog.py": {
+        "description": "创建供应商商品目录表及商品来源关联迁移"
     },
-    "scripts": {
-        "description": "可复用项目自动化脚本"
+    "alembic/versions/3878bf50f212_remove_product_shelf_life_days.py": {
+        "description": "移除正式商品默认保质期字段迁移"
     },
-    "scripts/freeze_requirements.py": {
-        "description": "使用当前虚拟环境生成依赖快照"
+    "alembic/versions/428315d374cd_add_inventory_discard_records.py": {
+        "description": "数据库迁移：add inventory discard records"
     },
-    "scripts/bootstrap_manager.py": {
-        "description": "为空数据库创建首个店长登录账号"
+    "alembic/versions/c453fbf6a0a7_add_daily_purchase_plans.py": {
+        "description": "数据库迁移：add daily purchase plans"
     },
-    "scripts/check_database.py": {
-        "description": "检查MySQL连接和数据库基本可用性"
+    "app": {
+        "description": "FastAPI后端应用源码"
     },
-    "scripts/seed_japanese_demo.py": {
-        "description": "生成约两个月日语超市进货、库存、折扣与销售演示数据"
+    "app/__init__.py": {
+        "description": "应用Python包入口（保持无副作用）"
     },
-    "scripts/setup.py": {
-        "description": "跨平台初始化环境、依赖与项目配置"
+    "app/ai": {
+        "description": "项目目录：ai"
     },
-    "scripts/setup.ps1": {
-        "description": "克隆后创建环境配置、虚拟环境并安装全部依赖"
+    "app/ai/__init__.py": {
+        "description": "AI工具与服务商适配包入口"
     },
-    ".env": {
-        "description": "本地私密运行配置（禁止提交）"
+    "app/ai/action_registry.py": {
+        "description": "AI统一业务操作类型、请求参数校验与中文确认摘要注册表"
     },
-    ".env.example": {
-        "description": "可安全提交的环境变量示例"
+    "app/ai/providers": {
+        "description": "项目目录：providers"
     },
-    ".gitattributes": {
-        "description": "Git文本编码与跨平台换行规则"
+    "app/ai/providers/__init__.py": {
+        "description": "AI服务商适配器注册与错误类型"
     },
-    ".gitignore": {
-        "description": "Git忽略规则"
+    "app/ai/providers/base.py": {
+        "description": "模型供应商统一接口、返回结构与公共HTTP请求工具"
     },
-    "alembic.ini": {
-        "description": "Alembic迁移与日志主配置"
+    "app/ai/providers/gemini.py": {
+        "description": "Google Gemini聊天及函数调用格式适配器"
     },
-    "folder-alias.json": {
-        "description": "项目目录和文件的中文用途别名"
+    "app/ai/providers/openai.py": {
+        "description": "OpenAI聊天及函数调用格式适配器"
     },
-    "frontend/src/views/EmployeeDetailView.vue": {
-        "description": "员工档案查看与店长编辑页面"
+    "app/ai/providers/registry.py": {
+        "description": "AI模型供应商固定白名单与适配器选择器"
     },
-    "frontend/src/views/InventoryBatchesView.vue": {
-        "description": "库存批次筛选、详情与盘点数量修改页面"
+    "app/ai/tools.py": {
+        "description": "MarketFlow实时查询与待确认修改工具白名单"
     },
-    "pyproject.toml": {
-        "description": "pytest、Ruff和MyPy工具配置"
+    "app/core": {
+        "description": "配置、数据库、缓存、安全等核心基础设施"
     },
-    "README.md": {
-        "description": "项目结构、启动、迁移与测试说明"
+    "app/core/__init__.py": {
+        "description": "核心模块公共导出入口"
     },
-    "COMMANDS.md": {
-        "description": "开发、测试、迁移和依赖管理命令手册"
+    "app/core/business_sequence.py": {
+        "description": "并发安全的业务编号分配工具"
     },
-    "NAMING.md": {
-        "description": "Python命名规范与常用英文词表"
+    "app/core/business_time.py": {
+        "description": "日本门店业务时间统一工具"
     },
-    "requirements.txt": {
-        "description": "生产运行依赖列表"
+    "app/core/cache.py": {
+        "description": "接口及纯查询缓存、预测共享、历史报表策略与故障降级"
     },
-    "requirements-dev.txt": {
-        "description": "测试和代码质量开发依赖列表"
+    "app/core/config.py": {
+        "description": "环境变量与.env配置模型"
     },
-    "requirements-freeze.txt": {
-        "description": "自动生成且不提交的完整依赖快照"
+    "app/core/contact_notice_scheduler.py": {
+        "description": "联络事项到期自动关闭任务"
+    },
+    "app/core/csrf.py": {
+        "description": "浏览器登录Cookie的CSRF校验工具"
+    },
+    "app/core/database.py": {
+        "description": "异步MySQL引擎、会话工厂与数据库依赖"
+    },
+    "app/core/distributed_lock.py": {
+        "description": "Redis跨进程定时任务分布式锁"
+    },
+    "app/core/exceptions.py": {
+        "description": "统一响应结构与全局异常处理器"
+    },
+    "app/core/health.py": {
+        "description": "MySQL与可选Redis服务就绪状态检查"
+    },
+    "app/core/lifespan.py": {
+        "description": "应用启动和关闭时的资源生命周期管理"
+    },
+    "app/core/logging.py": {
+        "description": "控制台与轮转文件日志配置"
+    },
+    "app/core/middlewares.py": {
+        "description": "CORS等全局中间件的统一注册入口"
     },
     "app/core/purchase_scheduler.py": {
         "description": "自动签收、凌晨临期刷新及半小时库存检查调度器"
     },
+    "app/core/redis.py": {
+        "description": "可选Redis异步客户端与连接关闭逻辑"
+    },
+    "app/core/scheduler_worker.py": {
+        "description": "独立定时任务进程入口"
+    },
+    "app/core/security.py": {
+        "description": "Argon2密码哈希与校验工具"
+    },
+    "app/core/store_policy.py": {
+        "description": "多门店读写隔离及权限上下文"
+    },
+    "app/core/token.py": {
+        "description": "JWT访问令牌签发工具"
+    },
+    "app/crud": {
+        "description": "数据库访问层扩展目录"
+    },
+    "app/crud/__init__.py": {
+        "description": "CRUD数据访问包入口"
+    },
+    "app/crud/ai_pending_actions.py": {
+        "description": "AI待确认操作创建、查询和行锁数据访问函数"
+    },
+    "app/crud/auth.py": {
+        "description": "按员工编号或ID查询账号的数据访问函数"
+    },
+    "app/crud/categories.py": {
+        "description": "商品分类查询数据访问函数"
+    },
+    "app/crud/contact_notices.py": {
+        "description": "联络事项分页查询与接收名单数据访问"
+    },
+    "app/crud/departments.py": {
+        "description": "部门查询数据访问函数"
+    },
+    "app/crud/discount_rule.py": {
+        "description": "折扣规则与适用范围数据库访问函数"
+    },
+    "app/crud/employees.py": {
+        "description": "员工创建、查询、状态修改与密码重置数据访问函数"
+    },
+    "app/crud/inventory_batches.py": {
+        "description": "库存批次查询、状态刷新、数量调整与过期废弃数据访问函数"
+    },
+    "app/crud/operation_audit_logs.py": {
+        "description": "操作审计与库存变动流水分页关联查询函数"
+    },
+    "app/crud/products.py": {
+        "description": "商品筛选、详情查询与资料更新数据访问函数"
+    },
     "app/crud/purchases.py": {
         "description": "进货单、明细、商品与库存批次数据访问函数"
     },
-    "app/crud/suppliers.py": {
-        "description": "供应商查询、创建、状态与资料更新数据访问函数"
+    "app/crud/reports.py": {
+        "description": "营业数据汇总、分组与排行查询函数"
+    },
+    "app/crud/sales.py": {
+        "description": "折扣快照写入、销售查询、批次扣减与商品库存同步函数"
     },
     "app/crud/supplier_products.py": {
         "description": "供应商商品目录查询、创建与更新数据访问函数"
     },
+    "app/crud/suppliers.py": {
+        "description": "供应商查询、创建、状态与资料更新数据访问函数"
+    },
+    "app/dependencies": {
+        "description": "FastAPI可复用Depends依赖"
+    },
+    "app/dependencies/__init__.py": {
+        "description": "公共依赖统一导出入口"
+    },
+    "app/dependencies/auth.py": {
+        "description": "Bearer JWT解析、员工ID转换与缓存接口账号状态验证依赖"
+    },
+    "app/dependencies/db.py": {
+        "description": "数据库会话依赖的简短别名"
+    },
+    "app/main.py": {
+        "description": "FastAPI应用工厂与ASGI启动入口"
+    },
+    "app/models": {
+        "description": "SQLAlchemy ORM模型目录"
+    },
+    "app/models/__init__.py": {
+        "description": "ORM模型注册与Alembic发现入口"
+    },
+    "app/models/ai_conversation.py": {
+        "description": "员工AI会话及长期记忆模型"
+    },
+    "app/models/ai_pending_action.py": {
+        "description": "AI提出但必须由员工二次确认的操作ORM模型"
+    },
+    "app/models/ai_provider_credential.py": {
+        "description": "员工AI模型密钥加密存储ORM模型"
+    },
+    "app/models/base.py": {
+        "description": "ORM声明式Base与公共时间字段Mixin"
+    },
+    "app/models/business_sequence.py": {
+        "description": "业务编号计数器ORM模型"
+    },
+    "app/models/category.py": {
+        "description": "部门商品分类及同部门名称唯一约束ORM模型"
+    },
+    "app/models/contact_notice.py": {
+        "description": "联络事项及员工确认模型"
+    },
+    "app/models/department.py": {
+        "description": "固定部门SQLAlchemy ORM模型"
+    },
+    "app/models/discount_rule.py": {
+        "description": "实际参与展示、试算和销售结算的折扣规则ORM模型"
+    },
+    "app/models/discount_rule_scope.py": {
+        "description": "折扣规则与商品、分类或部门适用范围关联ORM模型"
+    },
+    "app/models/employee.py": {
+        "description": "员工登录账号、角色与部门归属ORM模型"
+    },
+    "app/models/employee_detail.py": {
+        "description": "员工个人资料与雇佣状态ORM模型"
+    },
+    "app/models/enums.py": {
+        "description": "员工、商品、销售、进货、库存批次与折扣业务枚举"
+    },
+    "app/models/inventory_batch.py": {
+        "description": "商品到货批次、剩余库存与到期日期ORM模型"
+    },
+    "app/models/inventory_discard.py": {
+        "description": "废弃损耗单及批次成本明细ORM模型"
+    },
+    "app/models/operation_audit_log.py": {
+        "description": "统一保存各模块修改前后数据与理由的审计ORM模型"
+    },
+    "app/models/product.py": {
+        "description": "商品价格、销售状态、库存与保质期ORM模型"
+    },
+    "app/models/purchase.py": {
+        "description": "部门进货单、到货状态与签收员工ORM模型"
+    },
+    "app/models/purchase_item.py": {
+        "description": "进货商品、供货商、价格和保质期明细ORM模型"
+    },
+    "app/models/purchase_plan.py": {
+        "description": "每日订货计划、人工覆盖及自动数量快照模型"
+    },
+    "app/models/sale.py": {
+        "description": "销售单金额、成本与毛利润汇总ORM模型"
+    },
+    "app/models/sale_item.py": {
+        "description": "销售商品、扣减批次、价格和成本快照明细ORM模型"
+    },
+    "app/models/store.py": {
+        "description": "门店及门店部门启用配置模型"
+    },
+    "app/models/store_scoped.py": {
+        "description": "门店归属ORM模型基类"
+    },
+    "app/models/supplier.py": {
+        "description": "供货商资料与合作状态ORM模型"
+    },
     "app/models/supplier_product.py": {
         "description": "供应商商品目录、进货价与默认保质期ORM模型"
+    },
+    "app/routers": {
+        "description": "API业务路由目录"
+    },
+    "app/routers/__init__.py": {
+        "description": "顶层API路由聚合入口"
+    },
+    "app/routers/ai_chat.py": {
+        "description": "AI实时聊天以及修改确认和取消接口"
+    },
+    "app/routers/ai_conversations.py": {
+        "description": "员工AI历史会话API"
+    },
+    "app/routers/auth.py": {
+        "description": "员工登录与当前员工信息API路由"
+    },
+    "app/routers/categories.py": {
+        "description": "商品分类查询API路由"
+    },
+    "app/routers/contact_notices.py": {
+        "description": "联络事项发布与确认API"
+    },
+    "app/routers/departments.py": {
+        "description": "部门查询API路由"
+    },
+    "app/routers/discount_rule.py": {
+        "description": "折扣规则与适用范围API路由"
+    },
+    "app/routers/employees.py": {
+        "description": "店长创建、查询、修改状态与重置密码API路由"
+    },
+    "app/routers/inventory_batches.py": {
+        "description": "库存批次查询、数量调整与过期废弃API路由"
+    },
+    "app/routers/inventory_discards.py": {
+        "description": "商品废弃API路由"
+    },
+    "app/routers/operation_audit_logs.py": {
+        "description": "店长查询操作审计与库存变动流水API路由"
+    },
+    "app/routers/products.py": {
+        "description": "商品列表、详情、资料与销售状态修改API路由"
     },
     "app/routers/purchases.py": {
         "description": "进货单查询、创建与自动签收API路由"
     },
-    "app/routers/suppliers.py": {
-        "description": "供应商查询、创建、状态与资料修改API路由"
+    "app/routers/reports.py": {
+        "description": "营业概览、部门对比和销售排行API路由"
+    },
+    "app/routers/sales.py": {
+        "description": "折扣价格预览、收银结算、销售列表与小票详情API路由"
+    },
+    "app/routers/stores.py": {
+        "description": "总部门店管理与员工调店API"
     },
     "app/routers/supplier_products.py": {
         "description": "供应商商品目录查询、创建与修改API路由"
+    },
+    "app/routers/suppliers.py": {
+        "description": "供应商查询、创建、状态与资料修改API路由"
+    },
+    "app/schemas": {
+        "description": "Pydantic请求与响应模型目录"
+    },
+    "app/schemas/__init__.py": {
+        "description": "Pydantic模型包入口与公共类型导出"
+    },
+    "app/schemas/ai_chat_requests.py": {
+        "description": "AI供应商、模型名称与最近对话请求模型"
+    },
+    "app/schemas/ai_chat_responses.py": {
+        "description": "AI回答、待确认操作及执行结果响应模型"
+    },
+    "app/schemas/auth_requests.py": {
+        "description": "员工登录请求Pydantic模型"
+    },
+    "app/schemas/auth_responses.py": {
+        "description": "员工登录令牌与当前员工信息响应模型"
+    },
+    "app/schemas/base.py": {
+        "description": "通用泛型API响应模型"
+    },
+    "app/schemas/categories_requests.py": {
+        "description": "商品分类查询参数模型"
+    },
+    "app/schemas/categories_responses.py": {
+        "description": "商品分类查询响应模型"
+    },
+    "app/schemas/contact_notices_requests.py": {
+        "description": "联络事项请求模型"
+    },
+    "app/schemas/contact_notices_responses.py": {
+        "description": "联络事项响应模型"
+    },
+    "app/schemas/departments_requests.py": {
+        "description": "部门查询参数模型"
+    },
+    "app/schemas/departments_responses.py": {
+        "description": "部门查询响应模型"
+    },
+    "app/schemas/discard_analysis.py": {
+        "description": "废弃损耗分析请求及响应模型"
+    },
+    "app/schemas/discount_rule_requests.py": {
+        "description": "折扣规则列表筛选、创建与适用范围请求模型"
+    },
+    "app/schemas/discount_rule_responses.py": {
+        "description": "折扣规则列表、详情、计算状态与适用范围响应模型"
+    },
+    "app/schemas/employees_requests.py": {
+        "description": "员工创建、列表筛选与状态修改请求模型"
+    },
+    "app/schemas/employees_responses.py": {
+        "description": "员工创建、列表、状态修改与密码重置响应模型"
+    },
+    "app/schemas/inventory_batches_requests.py": {
+        "description": "库存批次筛选、数量调整与过期废弃请求模型"
+    },
+    "app/schemas/inventory_batches_responses.py": {
+        "description": "库存批次列表项、分页列表与完整详情响应模型"
+    },
+    "app/schemas/inventory_discards.py": {
+        "description": "商品废弃请求及响应模型"
+    },
+    "app/schemas/operation_audit_logs_requests.py": {
+        "description": "操作审计与库存流水分页筛选请求模型"
+    },
+    "app/schemas/operation_audit_logs_responses.py": {
+        "description": "操作审计与库存流水列表响应模型"
+    },
+    "app/schemas/products_requests.py": {
+        "description": "商品列表筛选、资料与销售状态修改请求模型"
+    },
+    "app/schemas/products_responses.py": {
+        "description": "商品列表、详情、资料与状态修改响应模型"
+    },
+    "app/schemas/purchase_plan.py": {
+        "description": "订货量、保底库存与人工确认请求校验"
     },
     "app/schemas/purchases_requests.py": {
         "description": "进货单列表筛选与创建请求模型"
@@ -481,11 +599,20 @@
     "app/schemas/purchases_responses.py": {
         "description": "进货单列表、详情与创建结果响应模型"
     },
-    "app/schemas/suppliers_requests.py": {
-        "description": "供应商查询、创建、状态与资料修改请求模型"
+    "app/schemas/reports_requests.py": {
+        "description": "营业报表时间、部门与排行查询参数模型"
     },
-    "app/schemas/suppliers_responses.py": {
-        "description": "供应商列表与详情响应模型"
+    "app/schemas/reports_responses.py": {
+        "description": "营业概览、部门对比与排行响应模型"
+    },
+    "app/schemas/sales_requests.py": {
+        "description": "销售查询及收银台商品数量请求模型"
+    },
+    "app/schemas/sales_responses.py": {
+        "description": "销售价格预览、折扣小票与销售记录响应模型"
+    },
+    "app/schemas/stores.py": {
+        "description": "门店总部操作请求模型"
     },
     "app/schemas/supplier_products_requests.py": {
         "description": "供应商商品目录查询、创建与修改请求模型"
@@ -493,26 +620,236 @@
     "app/schemas/supplier_products_responses.py": {
         "description": "供应商商品目录列表与详情响应模型"
     },
+    "app/schemas/suppliers_requests.py": {
+        "description": "供应商查询、创建、状态与资料修改请求模型"
+    },
+    "app/schemas/suppliers_responses.py": {
+        "description": "供应商列表与详情响应模型"
+    },
+    "app/services": {
+        "description": "登录、查询与统计业务服务层"
+    },
+    "app/services/__init__.py": {
+        "description": "业务服务层Python包入口"
+    },
+    "app/services/ai_actions.py": {
+        "description": "AI待确认修改的确认、取消、权限复核和安全执行逻辑"
+    },
+    "app/services/ai_chat.py": {
+        "description": "多模型对话、MarketFlow工具调用与待确认修改编排逻辑"
+    },
+    "app/services/ai_credentials.py": {
+        "description": "AI模型密钥加密保存、读取与删除业务逻辑"
+    },
+    "app/services/ai_memory.py": {
+        "description": "员工AI对话历史与摘要逻辑"
+    },
+    "app/services/auth.py": {
+        "description": "员工登录认证与当前员工信息业务逻辑"
+    },
+    "app/services/categories.py": {
+        "description": "商品分类查询业务逻辑"
+    },
+    "app/services/contact_notices.py": {
+        "description": "联络事项权限与发布确认逻辑"
+    },
+    "app/services/departments.py": {
+        "description": "部门查询业务逻辑"
+    },
+    "app/services/discard_analysis.py": {
+        "description": "废弃损耗分析业务服务"
+    },
+    "app/services/discount_rule.py": {
+        "description": "折扣规则计算状态、权限校验与业务逻辑"
+    },
+    "app/services/employees.py": {
+        "description": "员工创建、查询、状态修改与密码重置业务逻辑"
+    },
+    "app/services/inventory_batches.py": {
+        "description": "库存批次查询、调整权限校验与过期废弃业务逻辑"
+    },
+    "app/services/inventory_discards.py": {
+        "description": "商品废弃业务服务"
+    },
+    "app/services/operation_audit_logs.py": {
+        "description": "操作审计与库存流水权限校验及响应组装"
+    },
+    "app/services/products.py": {
+        "description": "商品查询、资料及状态修改权限校验业务逻辑"
+    },
+    "app/services/purchase_plan_submission.py": {
+        "description": "人工订货保存、截止锁定及幂等自动下单"
+    },
+    "app/services/purchase_planning.py": {
+        "description": "自动建议、人工计划、到货参考与历史销量的七天表格组装"
+    },
     "app/services/purchases.py": {
         "description": "进货权限校验、单据创建与签收业务逻辑"
     },
-    "app/services/suppliers.py": {
-        "description": "供应商查询、创建与修改业务逻辑"
+    "app/services/quantity_confirmation.py": {
+        "description": "人工数量异常规则与绑定操作的确认签名"
+    },
+    "app/services/replenishment.py": {
+        "description": "同星期销量预测及逐日库存补货推演"
+    },
+    "app/services/reports.py": {
+        "description": "营业报表权限验证与响应组装业务逻辑"
+    },
+    "app/services/sales.py": {
+        "description": "折扣试算、收银权限校验、销售事务处理与小票合并业务逻辑"
     },
     "app/services/supplier_products.py": {
         "description": "供应商商品目录查询、创建与修改业务逻辑"
     },
+    "app/services/suppliers.py": {
+        "description": "供应商查询、创建与修改业务逻辑"
+    },
+    "backend.err.log": {
+        "description": "本地后端错误输出日志"
+    },
+    "backend.out.log": {
+        "description": "本地后端标准输出日志"
+    },
+    "compose.yaml": {
+        "description": "前后端、数据库、缓存及定时任务容器编排"
+    },
+    "docs": {
+        "description": "项目说明、代码阅读指南及历史验收资料"
+    },
+    "docs/CODE_GUIDE.md": {
+        "description": "后端调用链、事务规则与前端代码阅读指南"
+    },
+    "docs/CONFIGURATION.md": {
+        "description": "环境变量、部署配置与依赖维护指南"
+    },
+    "docs/FIX_VERIFICATION.md": {
+        "description": "说明文档：四项待办的修复与验收记录"
+    },
+    "docs/PROJECT_STATUS.md": {
+        "description": "说明文档：MarketFlow 项目功能说明与进度报告"
+    },
+    "docs/verification": {
+        "description": "项目目录：verification"
+    },
+    "docs/verification/AUTOMATIC_REPLENISHMENT_REPORT.md": {
+        "description": "说明文档：自动补货建议与保底库存"
+    },
+    "docs/verification/BUSINESS_CACHE_REPORT.md": {
+        "description": "说明文档：销量预测与历史经营报表缓存"
+    },
+    "docs/verification/DOCUMENTATION_REVIEW_REPORT.md": {
+        "description": "文件别名、依赖配置与代码注释整理验收报告"
+    },
+    "docs/verification/FRONTEND_UI_REPORT.md": {
+        "description": "说明文档：前端语言与布局修复验收"
+    },
+    "docs/verification/INVENTORY_DISCARD_REPORT.md": {
+        "description": "说明文档：商品废弃功能与验收记录"
+    },
+    "docs/verification/LOSS_ANALYSIS_EMPLOYEE_REPORT.md": {
+        "description": "说明文档：废弃损耗分析与员工资料完善"
+    },
+    "docs/verification/PURCHASE_PLAN_AUTO_SUBMIT_REPORT.md": {
+        "description": "说明文档：每日截止后自动生成进货单"
+    },
+    "docs/verification/QUANTITY_CONFIRMATION_REPORT.md": {
+        "description": "说明文档：订货数量与保底库存异常确认"
+    },
+    "docs/verification/STORE_DATA_REPORT.md": {
+        "description": "说明文档：多店演示数据验收"
+    },
+    "docs/verification/analytics-loss-metrics-zh.png": {
+        "description": "界面验收截图或图标：analytics-loss-metrics-zh"
+    },
+    "docs/verification/automatic-replenishment-zh.png": {
+        "description": "界面验收截图或图标：automatic-replenishment-zh"
+    },
+    "docs/verification/discard-analysis-integrated-zh.png": {
+        "description": "界面验收截图或图标：discard-analysis-integrated-zh"
+    },
+    "docs/verification/discard-analysis-summary.json": {
+        "description": "项目配置或资源：discard-analysis-summary.json"
+    },
+    "docs/verification/discard-analysis-zh.png": {
+        "description": "界面验收截图或图标：discard-analysis-zh"
+    },
+    "docs/verification/discard-manual-success.png": {
+        "description": "界面验收截图或图标：discard-manual-success"
+    },
+    "docs/verification/discard-records-zh.png": {
+        "description": "界面验收截图或图标：discard-records-zh"
+    },
+    "docs/verification/frontend-procurement-en.png": {
+        "description": "界面验收截图或图标：frontend-procurement-en"
+    },
+    "docs/verification/frontend-procurement-mobile-en.png": {
+        "description": "界面验收截图或图标：frontend-procurement-mobile-en"
+    },
+    "docs/verification/headquarters-summary.png": {
+        "description": "界面验收截图或图标：headquarters-summary"
+    },
+    "docs/verification/inventory-discard-summary.json": {
+        "description": "项目配置或资源：inventory-discard-summary.json"
+    },
+    "docs/verification/procurement-page-seven.png": {
+        "description": "界面验收截图或图标：procurement-page-seven"
+    },
+    "docs/verification/purchase-plan-auto-submit-zh.png": {
+        "description": "界面验收截图或图标：purchase-plan-auto-submit-zh"
+    },
+    "docs/verification/purchase-plan-next-day-arrivals-zh.png": {
+        "description": "界面验收截图或图标：purchase-plan-next-day-arrivals-zh"
+    },
+    "docs/verification/store-data-summary.json": {
+        "description": "项目配置或资源：store-data-summary.json"
+    },
+    "folder-alias.json": {
+        "description": "项目目录和文件的中文用途别名"
+    },
+    "frontend": {
+        "description": "Vue 3 门店经营管理前端"
+    },
+    "frontend.err.log": {
+        "description": "本地前端错误输出日志"
+    },
+    "frontend.out.log": {
+        "description": "本地前端标准输出日志"
+    },
+    "frontend/.dockerignore": {
+        "description": "项目配置或资源：.dockerignore"
+    },
+    "frontend/.env.example": {
+        "description": "前端环境变量配置示例"
+    },
+    "frontend/Dockerfile": {
+        "description": "前端构建与Nginx静态服务镜像配置"
+    },
+    "frontend/README.md": {
+        "description": "前端启动与构建说明"
+    },
+    "frontend/index.html": {
+        "description": "Vue前端HTML页面入口"
+    },
+    "frontend/nginx.conf": {
+        "description": "前端页面与后端API反向代理配置"
+    },
+    "frontend/package-lock.json": {
+        "description": "前端依赖版本锁定文件"
+    },
+    "frontend/package.json": {
+        "description": "前端依赖与开发构建命令"
+    },
+    "frontend/src": {
+        "description": "前端业务源码"
+    },
     "frontend/src/App.vue": {
         "description": "Vue前端根组件与路由展示入口"
     },
-    "frontend/src/main.ts": {
-        "description": "Vue应用创建、插件注册与挂载入口"
+    "frontend/src/api": {
+        "description": "FastAPI 接口请求与统一错误处理"
     },
-    "frontend/src/utils.ts": {
-        "description": "前端日期、金额与文本格式化工具"
-    },
-    "frontend/src/vite-env.d.ts": {
-        "description": "Vite前端环境变量类型声明"
+    "frontend/src/api/contactNotices.ts": {
+        "description": "联络事项前端API封装"
     },
     "frontend/src/api/http.ts": {
         "description": "HTTP客户端、令牌注入与统一错误处理"
@@ -520,32 +857,119 @@
     "frontend/src/api/index.ts": {
         "description": "后端业务接口调用函数统一出口"
     },
+    "frontend/src/api/inventoryDiscards.ts": {
+        "description": "商品废弃接口调用及类型"
+    },
+    "frontend/src/components": {
+        "description": "前端通用展示组件"
+    },
+    "frontend/src/components/AiChatWidget.vue": {
+        "description": "全局右下角AI聊天机器人、密钥设置与对话界面"
+    },
+    "frontend/src/components/DiscardAnalysis.vue": {
+        "description": "废弃损耗分析界面组件"
+    },
+    "frontend/src/components/InventoryDiscards.vue": {
+        "description": "商品废弃界面组件"
+    },
+    "frontend/src/components/LanguageSwitcher.vue": {
+        "description": "前端语言切换组件"
+    },
     "frontend/src/components/LoadingBlock.vue": {
         "description": "页面数据加载状态通用组件"
+    },
+    "frontend/src/components/LocalizedDateInput.vue": {
+        "description": "跟随语言切换的日期时间输入组件"
     },
     "frontend/src/components/ModalPanel.vue": {
         "description": "通用弹窗面板组件"
     },
+    "frontend/src/components/NoticeReminder.vue": {
+        "description": "联络事项提醒组件"
+    },
     "frontend/src/components/PageHeader.vue": {
         "description": "页面标题、副标题与操作区组件"
+    },
+    "frontend/src/components/PurchasePlanner.vue": {
+        "description": "七天订货表、编辑草稿、保底库存及异常人工确认"
     },
     "frontend/src/components/StatCard.vue": {
         "description": "经营指标统计卡片组件"
     },
+    "frontend/src/components/ThemeSwitcher.vue": {
+        "description": "日夜模式切换按钮"
+    },
+    "frontend/src/i18n.ts": {
+        "description": "前端日英中文切换与界面文案翻译"
+    },
+    "frontend/src/layouts": {
+        "description": "经营管理台整体布局"
+    },
     "frontend/src/layouts/AppLayout.vue": {
         "description": "经营管理台导航与页面整体布局"
+    },
+    "frontend/src/light.css": {
+        "description": "前端日间模式配色样式"
+    },
+    "frontend/src/main.ts": {
+        "description": "Vue应用创建、插件注册与挂载入口"
+    },
+    "frontend/src/modern.css": {
+        "description": "现代深色经营管理界面样式"
+    },
+    "frontend/src/responsive.css": {
+        "description": "全站响应式布局和窄窗口适配"
+    },
+    "frontend/src/router": {
+        "description": "页面路由与登录权限守卫"
     },
     "frontend/src/router/index.ts": {
         "description": "前端页面路由、登录与角色权限守卫"
     },
+    "frontend/src/stores": {
+        "description": "Pinia 登录状态管理"
+    },
     "frontend/src/stores/auth.ts": {
         "description": "Pinia登录员工与访问令牌状态管理"
+    },
+    "frontend/src/stores/storeScope.ts": {
+        "description": "前端门店切换与只读范围状态"
+    },
+    "frontend/src/styles.css": {
+        "description": "前端基础布局与通用组件样式"
+    },
+    "frontend/src/theme.ts": {
+        "description": "日夜模式状态与浏览器偏好保存"
+    },
+    "frontend/src/types": {
+        "description": "后端接口 TypeScript 类型"
     },
     "frontend/src/types/api.ts": {
         "description": "后端请求、响应与业务对象TypeScript类型"
     },
+    "frontend/src/utils": {
+        "description": "日期、分页、格式化与订货规则工具"
+    },
+    "frontend/src/utils.ts": {
+        "description": "前端日期、金额与文本格式化工具"
+    },
+    "frontend/src/utils/businessDates.ts": {
+        "description": "日本业务时区日期计算"
+    },
+    "frontend/src/utils/pagination.ts": {
+        "description": "列表分页导航工具"
+    },
+    "frontend/src/utils/purchaseOrdering.ts": {
+        "description": "到货日期及订货截止时间判断"
+    },
+    "frontend/src/views": {
+        "description": "登录、总览、部门、商品、销售与员工页面"
+    },
     "frontend/src/views/AnalyticsView.vue": {
         "description": "综合营业指标与趋势图表分析页面"
+    },
+    "frontend/src/views/ContactNoticesView.vue": {
+        "description": "联络事项发布及确认页面"
     },
     "frontend/src/views/DashboardView.vue": {
         "description": "店铺整体经营总览页面"
@@ -556,8 +980,17 @@
     "frontend/src/views/DiscountRulesView.vue": {
         "description": "折扣规则筛选、配置、启停及适用商品管理页面"
     },
+    "frontend/src/views/EmployeeDetailView.vue": {
+        "description": "员工档案查看与店长编辑页面"
+    },
     "frontend/src/views/EmployeesView.vue": {
         "description": "员工列表、创建与账号管理页面"
+    },
+    "frontend/src/views/InventoryBatchesView.vue": {
+        "description": "库存批次筛选、详情与盘点数量修改页面"
+    },
+    "frontend/src/views/InventoryMovementsView.vue": {
+        "description": "进货、销售、盘点与过期废弃库存变动流水页面"
     },
     "frontend/src/views/LoginView.vue": {
         "description": "员工账号登录页面"
@@ -580,26 +1013,44 @@
     "frontend/src/views/ShoppingView.vue": {
         "description": "商品模拟扫码、购物车、实时折扣试算与收银结账页面"
     },
-    "tests/test_employee_detail.py": {
-        "description": "员工详情查询与修改业务测试"
+    "frontend/src/views/StoresView.vue": {
+        "description": "总部门店与员工管理页面"
     },
-    "tests/test_purchases.py": {
-        "description": "进货单查询、创建与签收业务测试"
+    "frontend/src/vite-env.d.ts": {
+        "description": "Vite前端环境变量类型声明"
     },
-    "tests/test_suppliers.py": {
-        "description": "供应商查询、创建与修改业务测试"
+    "frontend/tests": {
+        "description": "Vitest前端交互回归测试"
     },
-    "tests/test_supplier_products.py": {
-        "description": "供应商商品目录接口与业务规则测试"
+    "frontend/tests/analyticsLoss.test.ts": {
+        "description": "前端回归测试：analyticsLoss"
     },
-    "frontend/.env.example": {
-        "description": "前端环境变量配置示例"
+    "frontend/tests/businessDates.test.ts": {
+        "description": "前端回归测试：businessDates"
     },
-    "frontend/index.html": {
-        "description": "Vue前端HTML页面入口"
+    "frontend/tests/discardAnalysis.test.ts": {
+        "description": "前端回归测试：discardAnalysis"
     },
-    "frontend/package-lock.json": {
-        "description": "前端依赖版本锁定文件"
+    "frontend/tests/http.test.ts": {
+        "description": "前端回归测试：http"
+    },
+    "frontend/tests/i18n.test.ts": {
+        "description": "前端回归测试：i18n"
+    },
+    "frontend/tests/inventoryDiscards.test.ts": {
+        "description": "前端回归测试：inventoryDiscards"
+    },
+    "frontend/tests/pagination.test.ts": {
+        "description": "前端回归测试：pagination"
+    },
+    "frontend/tests/procurement.test.ts": {
+        "description": "前端回归测试：procurement"
+    },
+    "frontend/tests/purchaseOrdering.test.ts": {
+        "description": "前端回归测试：purchaseOrdering"
+    },
+    "frontend/tests/purchasePlanner.test.ts": {
+        "description": "前端回归测试：purchasePlanner"
     },
     "frontend/tsconfig.app.json": {
         "description": "前端应用TypeScript编译配置"
@@ -613,241 +1064,181 @@
     "frontend/vite.config.ts": {
         "description": "Vite开发服务与前端构建配置"
     },
-    "frontend/src/modern.css": {
-        "description": "现代深色经营管理界面样式"
+    "frontend/vitest.config.ts": {
+        "description": "项目配置或资源：vitest.config.ts"
     },
-    "frontend/src/styles.css": {
-        "description": "前端基础布局与通用组件样式"
+    "pyproject.toml": {
+        "description": "pytest、Ruff和MyPy工具配置"
     },
-    "alembic/versions/20260913_0007_add_supplier_product_category.py": {
-        "description": "为供应商商品目录增加分类字段迁移"
+    "requirements-dev.txt": {
+        "description": "测试和代码质量开发依赖列表"
     },
-    "alembic/versions/372ffba6f65b_add_supplier_product_catalog.py": {
-        "description": "创建供应商商品目录表及商品来源关联迁移"
+    "requirements.txt": {
+        "description": "生产运行依赖列表"
     },
-    "alembic/versions/3878bf50f212_remove_product_shelf_life_days.py": {
-        "description": "移除正式商品默认保质期字段迁移"
+    "scripts": {
+        "description": "可复用项目自动化脚本"
     },
-    "app/routers/inventory_batches.py": {
-        "description": "库存批次查询、数量调整与过期废弃API路由"
+    "scripts/bootstrap_manager.py": {
+        "description": "为空数据库创建首个店长登录账号"
     },
-    "app/services/inventory_batches.py": {
-        "description": "库存批次查询、调整权限校验与过期废弃业务逻辑"
+    "scripts/check_database.py": {
+        "description": "检查MySQL连接和数据库基本可用性"
     },
-    "app/crud/inventory_batches.py": {
-        "description": "库存批次查询、状态刷新、数量调整与过期废弃数据访问函数"
+    "scripts/check_demo_data.py": {
+        "description": "模拟数据关联及业务一致性检查"
     },
-    "app/schemas/inventory_batches_requests.py": {
-        "description": "库存批次筛选、数量调整与过期废弃请求模型"
+    "scripts/complete_demo_employee_profiles.py": {
+        "description": "补齐演示员工个人及雇佣资料"
     },
-    "app/schemas/inventory_batches_responses.py": {
-        "description": "库存批次列表项、分页列表与完整详情响应模型"
+    "scripts/freeze_requirements.py": {
+        "description": "使用当前虚拟环境生成依赖快照"
     },
-    "tests/test_inventory_batches.py": {
-        "description": "过期库存废弃业务校验与API路由测试"
+    "scripts/normalize_demo_data.py": {
+        "description": "演示数据标准化维护"
     },
-    "alembic/versions/20260917_0008_update_inventory_batch_status.py": {
-        "description": "库存批次报废状态替换为临期状态的数据库迁移"
+    "scripts/normalize_employee_numbers.py": {
+        "description": "统一员工编号为E加五位数字"
     },
-    "alembic/versions/20260917_0009_create_inventory_adjustment.py": {
-        "description": "创建库存调整记录表的数据库迁移"
+    "scripts/seed_contact_notices.py": {
+        "description": "联络事项演示数据生成脚本"
     },
-    "app/models/operation_audit_log.py": {
-        "description": "统一保存各模块修改前后数据与理由的审计ORM模型"
+    "scripts/seed_half_year_demo.py": {
+        "description": "生成首店半年模拟业务数据"
     },
-    "app/crud/operation_audit_logs.py": {
-        "description": "操作审计与库存变动流水分页关联查询函数"
+    "scripts/seed_japanese_demo.py": {
+        "description": "生成约两个月日语超市进货、库存、折扣与销售演示数据"
     },
-    "app/routers/operation_audit_logs.py": {
-        "description": "店长查询操作审计与库存变动流水API路由"
+    "scripts/seed_multi_store.py": {
+        "description": "多门店日语演示数据生成脚本"
     },
-    "app/schemas/operation_audit_logs_requests.py": {
-        "description": "操作审计与库存流水分页筛选请求模型"
+    "scripts/seed_store_scale_demo.py": {
+        "description": "按门店生成不同规模的半年模拟业务数据"
     },
-    "app/schemas/operation_audit_logs_responses.py": {
-        "description": "操作审计与库存流水列表响应模型"
+    "scripts/setup.ps1": {
+        "description": "克隆后创建环境配置、虚拟环境并安装全部依赖"
     },
-    "app/services/operation_audit_logs.py": {
-        "description": "操作审计与库存流水权限校验及响应组装"
+    "scripts/setup.py": {
+        "description": "跨平台初始化环境、依赖与项目配置"
     },
-    "alembic/versions/20260917_0010_create_operation_audit_log.py": {
-        "description": "以统一操作审计记录表替换库存专用调整表迁移"
+    "scripts/verify_inventory_discards.py": {
+        "description": "废弃库存扣减与损耗记录验收"
     },
-    "alembic/versions/20260917_0011_add_sale_item_batch.py": {
-        "description": "销售明细关联实际扣减库存批次并增加收银台来源迁移"
+    "scripts/verify_store_scale_demo.py": {
+        "description": "跨店关联、金额与库存平衡验收"
     },
-    "frontend/src/views/InventoryMovementsView.vue": {
-        "description": "进货、销售、盘点与过期废弃库存变动流水页面"
+    "tests": {
+        "description": "pytest单元测试与集成测试"
     },
-    "tests/test_operation_audit_logs.py": {
-        "description": "库存变动流水数量计算、响应组装与API路由测试"
+    "tests/conftest.py": {
+        "description": "测试环境变量与共享测试配置"
     },
-    "app/models/discount_rule.py": {
-        "description": "实际参与展示、试算和销售结算的折扣规则ORM模型"
-    },
-    "app/models/discount_rule_scope.py": {
-        "description": "折扣规则与商品、分类或部门适用范围关联ORM模型"
-    },
-    "app/routers/discount_rule.py": {
-        "description": "折扣规则与适用范围API路由"
-    },
-    "app/crud/discount_rule.py": {
-        "description": "折扣规则与适用范围数据库访问函数"
-    },
-    "app/services/discount_rule.py": {
-        "description": "折扣规则计算状态、权限校验与业务逻辑"
-    },
-    "app/schemas/discount_rule_requests.py": {
-        "description": "折扣规则列表筛选、创建与适用范围请求模型"
-    },
-    "app/schemas/discount_rule_responses.py": {
-        "description": "折扣规则列表、详情、计算状态与适用范围响应模型"
-    },
-    "tests/test_discount_rules.py": {
-        "description": "折扣规则动态状态、列表、详情与创建业务测试"
-    },
-    "alembic/versions/20260921_0015_create_discount_tables.py": {
-        "description": "创建折扣规则与折扣适用范围表迁移"
-    },
-    "alembic/versions/20260927_0016_remove_discount_stock_thresholds.py": {
-        "description": "删除折扣规则开始与停止库存阈值字段迁移"
-    },
-    "alembic/versions/20260927_0017_add_discount_rule_department.py": {
-        "description": "为折扣规则增加必填所属部门字段迁移"
-    },
-    "alembic/versions/20260927_0018_add_sale_discount_snapshots.py": {
-        "description": "为销售单和销售明细增加折扣金额及规则快照字段迁移"
-    },
-    "app/schemas/ai_chat_requests.py": {
-        "description": "AI供应商、模型名称与最近对话请求模型"
-    },
-    "app/schemas/ai_chat_responses.py": {
-        "description": "AI回答、待确认操作及执行结果响应模型"
-    },
-    "app/services/ai_chat.py": {
-        "description": "多模型对话、MarketFlow工具调用与待确认修改编排逻辑"
-    },
-    "app/routers/ai_chat.py": {
-        "description": "AI实时聊天以及修改确认和取消接口"
-    },
-    "frontend/src/components/AiChatWidget.vue": {
-        "description": "全局右下角AI聊天机器人、密钥设置与对话界面"
+    "tests/store_fixtures.py": {
+        "description": "隔离SQLite数据库及双店测试样本"
     },
     "tests/test_ai_chat.py": {
         "description": "多供应商AI解析、工具调用编排与安全限制测试"
     },
-    "app/models/ai_pending_action.py": {
-        "description": "AI提出但必须由员工二次确认的操作ORM模型"
+    "tests/test_ai_memory.py": {
+        "description": "账号独立AI历史与摘要回归测试"
     },
-    "app/crud/ai_pending_actions.py": {
-        "description": "AI待确认操作创建、查询和行锁数据访问函数"
+    "tests/test_app.py": {
+        "description": "根接口、健康检查和404响应测试"
     },
-    "app/services/ai_actions.py": {
-        "description": "AI待确认修改的确认、取消、权限复核和安全执行逻辑"
+    "tests/test_auth.py": {
+        "description": "员工登录成功、失败、停用与密码验证测试"
     },
-    "app/ai/tools.py": {
-        "description": "MarketFlow实时查询与待确认修改工具白名单"
-    },
-    "app/ai/action_registry.py": {
-        "description": "AI统一业务操作类型、请求参数校验与中文确认摘要注册表"
-    },
-    "app/ai/providers/base.py": {
-        "description": "模型供应商统一接口、返回结构与公共HTTP请求工具"
-    },
-    "app/ai/providers/gemini.py": {
-        "description": "Google Gemini聊天及函数调用格式适配器"
-    },
-    "app/ai/providers/openai.py": {
-        "description": "OpenAI聊天及函数调用格式适配器"
-    },
-    "app/ai/providers/registry.py": {
-        "description": "AI模型供应商固定白名单与适配器选择器"
-    },
-    "alembic/versions/20261001_0019_create_ai_pending_actions.py": {
-        "description": "创建AI待确认操作表及状态索引迁移"
-    },
-    "alembic/versions/20261001_0020_ai_provider_credential.py": {
-        "description": "创建员工AI密钥加密存储表迁移"
-    },
-    "alembic/versions/20261001_0021_concurrency_safety.py": {
-        "description": "业务编号、乐观锁和重复提交保护数据库迁移"
-    },
-    "app/core/business_time.py": {
-        "description": "日本门店业务时间统一工具"
-    },
-    "app/core/business_sequence.py": {
-        "description": "并发安全的业务编号分配工具"
-    },
-    "app/core/distributed_lock.py": {
-        "description": "Redis跨进程定时任务分布式锁"
-    },
-    "app/core/csrf.py": {
-        "description": "浏览器登录Cookie的CSRF校验工具"
-    },
-    "app/core/scheduler_worker.py": {
-        "description": "独立定时任务进程入口"
-    },
-    "app/models/ai_provider_credential.py": {
-        "description": "员工AI模型密钥加密存储ORM模型"
-    },
-    "app/models/business_sequence.py": {
-        "description": "业务编号计数器ORM模型"
-    },
-    "app/services/ai_credentials.py": {
-        "description": "AI模型密钥加密保存、读取与删除业务逻辑"
-    },
-    "frontend/src/i18n.ts": {
-        "description": "前端日英中文切换与界面文案翻译"
-    },
-    "frontend/src/components/LanguageSwitcher.vue": {
-        "description": "前端语言切换组件"
-    },
-    "frontend/src/theme.ts": {
-        "description": "日夜模式状态与浏览器偏好保存"
-    },
-    "frontend/src/components/ThemeSwitcher.vue": {
-        "description": "日夜模式切换按钮"
-    },
-    "frontend/src/light.css": {
-        "description": "前端日间模式配色样式"
+    "tests/test_business_cache.py": {
+        "description": "业务查询缓存回归测试"
     },
     "tests/test_business_safety.py": {
         "description": "日本业务时间、AI事务与密钥加密测试"
     },
-    "compose.yaml": {
-        "description": "前后端、数据库、缓存及定时任务容器编排"
+    "tests/test_business_workflow.py": {
+        "description": "完整业务流程回归测试"
     },
-    "Dockerfile": {
-        "description": "后端FastAPI容器镜像配置"
+    "tests/test_cache.py": {
+        "description": "接口缓存命中、查询参数归一化与主动失效测试"
     },
-    "frontend/Dockerfile": {
-        "description": "前端构建与Nginx静态服务镜像配置"
+    "tests/test_complete_demo_profiles.py": {
+        "description": "模拟员工资料补齐回归测试"
     },
-    "frontend/nginx.conf": {
-        "description": "前端页面与后端API反向代理配置"
+    "tests/test_config.py": {
+        "description": "应用配置加载与隔离性测试"
     },
-    "app/core/store_policy.py": { "description": "多门店读写隔离及权限上下文" },
-    "app/models/store.py": { "description": "门店及门店部门启用配置模型" },
-    "app/models/store_scoped.py": { "description": "门店归属ORM模型基类" },
-    "app/models/contact_notice.py": { "description": "联络事项及员工确认模型" },
-    "app/models/ai_conversation.py": { "description": "员工AI会话及长期记忆模型" },
-    "app/routers/stores.py": { "description": "总部门店管理与员工调店API" },
-    "app/routers/contact_notices.py": { "description": "联络事项发布与确认API" },
-    "app/routers/ai_conversations.py": { "description": "员工AI历史会话API" },
-    "app/schemas/stores.py": { "description": "门店总部操作请求模型" },
-    "app/schemas/contact_notices_requests.py": { "description": "联络事项请求模型" },
-    "app/schemas/contact_notices_responses.py": { "description": "联络事项响应模型" },
-    "app/services/contact_notices.py": { "description": "联络事项权限与发布确认逻辑" },
-    "app/services/ai_memory.py": { "description": "员工AI对话历史与摘要逻辑" },
-    "app/core/contact_notice_scheduler.py": { "description": "联络事项到期自动关闭任务" },
-    "frontend/src/stores/storeScope.ts": { "description": "前端门店切换与只读范围状态" },
-    "frontend/src/views/StoresView.vue": { "description": "总部门店与员工管理页面" },
-    "frontend/src/views/ContactNoticesView.vue": { "description": "联络事项发布及确认页面" },
-    "frontend/src/components/NoticeReminder.vue": { "description": "联络事项提醒组件" },
-    "frontend/src/api/contactNotices.ts": { "description": "联络事项前端API封装" },
-    "scripts/seed_multi_store.py": { "description": "多门店日语演示数据生成脚本" },
-    "scripts/seed_contact_notices.py": { "description": "联络事项演示数据生成脚本" },
-    "app/services/purchase_planning.py": { "description": "七天进货计划、上周同曜日销量与库存参考查询" },
-    "frontend/src/components/PurchasePlanner.vue": { "description": "表格式七天进货计划和下单组件" },
-    "tests/test_purchase_planning.py": { "description": "进货计划与单张签收接口回归测试" }
+    "tests/test_contact_notices.py": {
+        "description": "联络事项权限、确认名单与自动关闭测试"
+    },
+    "tests/test_contact_notices_mysql.py": {
+        "description": "联络事项MySQL发布确认自动关闭完整流程回滚测试"
+    },
+    "tests/test_database.py": {
+        "description": "异步MySQL驱动与连接集成测试"
+    },
+    "tests/test_dependencies.py": {
+        "description": "JWT认证依赖测试"
+    },
+    "tests/test_discard_analysis.py": {
+        "description": "废弃损耗分析回归测试"
+    },
+    "tests/test_discount_rules.py": {
+        "description": "折扣规则动态状态、列表、详情与创建业务测试"
+    },
+    "tests/test_employee_detail.py": {
+        "description": "员工详情查询与修改业务测试"
+    },
+    "tests/test_employees.py": {
+        "description": "创建员工与员工列表接口及业务规则测试"
+    },
+    "tests/test_inventory_batches.py": {
+        "description": "过期库存废弃业务校验与API路由测试"
+    },
+    "tests/test_inventory_discards.py": {
+        "description": "商品废弃回归测试"
+    },
+    "tests/test_inventory_discards_mysql.py": {
+        "description": "废弃事务与MySQL并发回归测试"
+    },
+    "tests/test_models.py": {
+        "description": "第一版ORM字段、约束、关系与迁移结构测试"
+    },
+    "tests/test_operation_audit_logs.py": {
+        "description": "库存变动流水数量计算、响应组装与API路由测试"
+    },
+    "tests/test_products.py": {
+        "description": "商品列表字段、业务组装与路由响应测试"
+    },
+    "tests/test_purchase_plan_submission.py": {
+        "description": "截止自动下单与人工计划保存回归测试"
+    },
+    "tests/test_purchase_planning.py": {
+        "description": "进货计划与单张签收接口回归测试"
+    },
+    "tests/test_purchases.py": {
+        "description": "进货单查询、创建与签收业务测试"
+    },
+    "tests/test_quantity_confirmation.py": {
+        "description": "人工异常数量确认回归测试"
+    },
+    "tests/test_replenishment.py": {
+        "description": "自动补货及保底库存回归测试"
+    },
+    "tests/test_reports.py": {
+        "description": "营业概览业务校验与统一响应格式测试"
+    },
+    "tests/test_sales.py": {
+        "description": "销售单列表汇总、日期校验与路由响应测试"
+    },
+    "tests/test_security.py": {
+        "description": "密码哈希与JWT往返测试"
+    },
+    "tests/test_store_policy.py": {
+        "description": "门店隔离与跨店权限回归测试"
+    },
+    "tests/test_supplier_products.py": {
+        "description": "供应商商品目录接口与业务规则测试"
+    },
+    "tests/test_suppliers.py": {
+        "description": "供应商查询、创建与修改业务测试"
+    }
 }

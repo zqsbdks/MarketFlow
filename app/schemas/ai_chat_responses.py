@@ -38,6 +38,8 @@ class AiPendingActionResponse(BaseModel):
 
 # region AI聊天响应
 class AiChatResponse(BaseModel):
+    """AI回复及待人工确认操作，不表示模型建议的业务修改已经执行。"""
+
     conversation_id: int | None = None
     """返回模型回答，以及本轮产生的待确认数据修改。"""
 

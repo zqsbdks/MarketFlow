@@ -1,5 +1,9 @@
 # MarketFlow 项目功能说明与进度报告
 
+> 2026-10-05文档整理：当前启动与功能规则以[README](../README.md)为准，
+> 配置见[CONFIGURATION](CONFIGURATION.md)，代码阅读见[CODE_GUIDE](CODE_GUIDE.md)。
+> 最新整理验收见[说明与注释验收](verification/DOCUMENTATION_REVIEW_REPORT.md)。下文保留此前检查快照。
+
 ## 2026-10-04 自动订货计划与保底库存
 
 进货管理改为持久化订货计划：每天日本时间12:00锁定两天后到货日并自动生成单据，重复执行不重复下单。日期左侧显示明日已有订单的到货量，日期右侧新增保底库存（默认0）。系统按四周同曜日销量、批次过期和已订到货逐日计算建议，人工量（包括0）优先，支持恢复自动。后台已为30店生成840个七天部门计划；保底值表示预计销售后保留库存，库存充足不下单。详见[自动补货验收报告](verification/AUTOMATIC_REPLENISHMENT_REPORT.md)。

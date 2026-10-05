@@ -242,7 +242,12 @@ async def _run_stock_consistency_scheduler(stop_event: asyncio.Event) -> None:
 
 
 async def run_purchase_scheduler(stop_event: asyncio.Event) -> None:
-    """同时运行自动签收、每日临期刷新和半小时库存一致性检查。"""
+    """并行运行截止下单、自动签收、过期/临期处理及营业时间内库存一致性检查。
+
+    启动先补处理到期任务；后台异常记录日志，后续周期重试。
+    stop_event用于生命周期退出，任务使用独立会话并自行提交，不复用HTTP请求会话。
+    此调度器不包含联络事项关闭任务；联络事项有独立调度器。
+    """
 
     # 进程曾在计划时间停机时，启动后补处理到期的进货单与批次状态。
     try:

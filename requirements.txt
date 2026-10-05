@@ -1,19 +1,25 @@
+# Python 3.11+；生产直接依赖锁定版本，升级后需运行测试及 pip check。
+# HTTP API、ASGI 服务与环境变量解析。
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 pydantic-settings==2.15.0
 
+# 数据库：异步 ORM、迁移、MySQL 驱动。
 SQLAlchemy[asyncio]==2.0.52
 alembic==1.19.1
 aiomysql==0.3.2
 # MySQL 8 默认的 caching_sha2_password 认证需要 cryptography。
 cryptography==50.0.1
+# 异步 ORM 的同步桥接及跨平台日本时区数据库。
 greenlet==3.5.5
 tzdata==2026.3
 
+# 可选 Redis 缓存/分布式锁；未配置时使用进程内缓存。
 redis==6.4.0
 fastapi-cache2==0.2.2
 Jinja2==3.1.6
 
+# 登录令牌、Argon2 密码哈希及表单请求解析。
 PyJWT==2.13.0
 passlib[argon2]==1.7.4
 python-multipart==0.0.32

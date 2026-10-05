@@ -32,6 +32,10 @@ from app.schemas.inventory_discards import (
 
 
 async def validate_actor(employee_id: int, db: AsyncSession, *, write: bool = False) -> Employee:
+    """验证账号可用性；write=True时限制手动废弃角色及所属门店。
+
+    只校验账号级权限，具体商品及部门权限由load_product继续检查。
+    停用、未改初始密码或跨店写入均拒绝，读操作也不能使用不存在账号。"""
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
     if employee is None:
         raise HTTPException(401, "当前登录员工不存在")
@@ -50,6 +54,10 @@ async def validate_actor(employee_id: int, db: AsyncSession, *, write: bool = Fa
 async def load_product(
     product_id: int, employee: Employee, db: AsyncSession, *, lock: bool = False
 ) -> Product:
+    """读取本店商品并校验部门权限，lock=True用于真实废弃的串行化。
+
+    正式员工仅所属部门；必须是本店启用部门。锁定读取重新载入当前数据，
+    避免ORM旧对象或MySQL快照影响库存扣减。调用方负责事务提交或回滚。"""
     statement = (
         select(Product).where(Product.id == product_id).options(selectinload(Product.department))
     )
@@ -79,6 +87,10 @@ async def load_product(
 async def eligible_batches(
     product: Product, db: AsyncSession, *, lock: bool = False
 ) -> list[InventoryBatch]:
+    """按最早到期优先返回已到货、有剩余且未过期的可手动处理批次。
+
+    无到期日的批次排在后面，同到期日按到货时间及ID排序，保证稳定分配。
+    过期库存由自动流程处理。真正提交时lock=True，预览不持有写锁。"""
     now = business_now()
     statement = (
         select(InventoryBatch)
@@ -108,6 +120,10 @@ async def eligible_batches(
 def allocate(
     batches: list[InventoryBatch], request: DiscardPlanRequest
 ) -> list[tuple[InventoryBatch, int]]:
+    """在已排序批次中分配废弃数量，返回批次及本次扣减数量，不修改库存。
+
+    指定batch_id时只用该批次；否则顺序分配。总可用量不足即拒绝，不部分扣减。
+    返回结果用于预览或锁定后提交，预览结果不能作为库存仍充足的凭据。"""
     if request.batch_id is not None:
         batches = [batch for batch in batches if batch.id == request.batch_id]
         if not batches:
@@ -127,6 +143,7 @@ def allocate(
 
 
 def plan_items(allocation: list[tuple[InventoryBatch, int]]) -> list[DiscardItemResponse]:
+    """把分配结果转为成本和前后数量快照；金额使用批次进货成本而非现售价。"""
     return [
         DiscardItemResponse(
             batch_id=batch.id,
@@ -145,6 +162,7 @@ def plan_items(allocation: list[tuple[InventoryBatch, int]]) -> list[DiscardItem
 async def get_discard_stock(
     product_id: int, employee_id: int, db: AsyncSession
 ) -> DiscardStockResponse:
+    """返回员工可处理商品的批次、可用量和进货成本，不写入库存。"""
     employee = await validate_actor(employee_id, db, write=True)
     product = await load_product(product_id, employee, db)
     batches = await eligible_batches(product, db)
@@ -171,6 +189,7 @@ async def get_discard_stock(
 async def preview_discard(
     request: DiscardPlanRequest, employee_id: int, db: AsyncSession
 ) -> DiscardPlanResponse:
+    """预览废弃批次及实际成本；不加写锁、不保存，提交时必须重新校验。"""
     employee = await validate_actor(employee_id, db, write=True)
     product = await load_product(request.product_id, employee, db)
     items = plan_items(allocate(await eligible_batches(product, db), request))
@@ -273,6 +292,10 @@ async def record_discard(
 async def create_discard(
     request: DiscardCreateRequest, employee_id: int, db: AsyncSession
 ) -> DiscardResponse:
+    """按请求ID幂等地执行手动废弃，并将库存、损耗记录与审计一起提交。
+
+    先锁商品，再检查已有请求和批次；同一请求不能改用不同数量、原因或员工。
+    重复请求返回原记录而不再次扣减，发生异常由上层会话依赖回滚。"""
     employee = await validate_actor(employee_id, db, write=True)
     # 商品锁同时串行化同商品的销售、废弃和同一请求重试。
     product = await load_product(request.product_id, employee, db, lock=True)
@@ -332,6 +355,7 @@ async def create_discard(
 async def list_discards(
     request: DiscardListRequest, employee_id: int, db: AsyncSession
 ) -> DiscardListResponse:
+    """按授权门店、查询日期和筛选条件分页读取废弃记录及汇总。"""
     employee = await validate_actor(employee_id, db)
     if employee.role not in (
         EmployeeRole.STORE_MANAGER,

@@ -34,6 +34,11 @@ async def get_discard_analysis(
     include_breakdowns: bool = True,
     limit_days: int | None = 367,
 ) -> DiscardAnalysisResponse:
+    """按完整废弃日期统计数量和成本，并按原因、部门、门店拆分。
+
+    员工及门店读取范围先校验；只有总部可得到门店对比。
+    成本来自废弃时的批次成本快照，比例按损耗成本计算，不按数量计算。
+    无数据或总成本为0时返回空分组或0比例，避免除零。此查询不写入业务数据。"""
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
     if employee is None:
         raise HTTPException(401, "当前登录员工不存在")

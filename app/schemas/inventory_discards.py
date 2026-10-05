@@ -12,6 +12,8 @@ ManualDiscardReason = Literal["damaged", "spoiled", "contaminated", "other"]
 
 
 class DiscardPlanRequest(BaseModel):
+    """废弃预览数量与可选批次，只描述意图，不代表库存已锁定。"""
+
     model_config = ConfigDict(extra="forbid")
     product_id: int = Field(ge=1)
     quantity: int = Field(ge=1, le=1_000_000, strict=True)
@@ -19,6 +21,8 @@ class DiscardPlanRequest(BaseModel):
 
 
 class DiscardCreateRequest(DiscardPlanRequest):
+    """带请求ID和废弃原因的真实提交；同一ID不能改作其他废弃操作。"""
+
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     request_id: UUID
     reason_code: ManualDiscardReason
@@ -32,6 +36,8 @@ class DiscardCreateRequest(DiscardPlanRequest):
 
 
 class DiscardListRequest(BaseModel):
+    """废弃记录日期、商品、部门和原因筛选及分页参数。"""
+
     page: int = Field(1, ge=1)
     page_size: int = Field(20, ge=1, le=100)
     product_id: int | None = Field(None, ge=1)
@@ -43,6 +49,8 @@ class DiscardListRequest(BaseModel):
 
 
 class DiscardBatchResponse(BaseModel):
+    """可处理批次的剩余数量、到期日期及实际进货成本。"""
+
     batch_id: int
     batch_no: str
     expiration_date: date | None
@@ -51,6 +59,8 @@ class DiscardBatchResponse(BaseModel):
 
 
 class DiscardStockResponse(BaseModel):
+    """指定商品可处理的批次清单及可用总量。"""
+
     product_id: int
     product_no: str
     product_name: str
@@ -61,6 +71,8 @@ class DiscardStockResponse(BaseModel):
 
 
 class DiscardItemResponse(BaseModel):
+    """单批次废弃数量、成本及前后库存快照。"""
+
     model_config = ConfigDict(from_attributes=True)
     batch_id: int
     batch_no: str
@@ -73,6 +85,8 @@ class DiscardItemResponse(BaseModel):
 
 
 class DiscardPlanResponse(BaseModel):
+    """废弃预览结果，提交前仍须重新检查库存和权限。"""
+
     product_id: int
     product_name: str
     quantity: int
@@ -81,6 +95,8 @@ class DiscardPlanResponse(BaseModel):
 
 
 class DiscardResponse(BaseModel):
+    """已保存废弃单和明细，不以当前商品售价覆盖历史成本。"""
+
     model_config = ConfigDict(from_attributes=True)
     id: int
     store_id: int
@@ -100,6 +116,8 @@ class DiscardResponse(BaseModel):
 
 
 class DiscardListResponse(BaseModel):
+    """废弃记录分页结果及汇总，遵循所选门店读取范围。"""
+
     items: list[DiscardResponse]
     page: int
     page_size: int

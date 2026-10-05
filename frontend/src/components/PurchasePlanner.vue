@@ -19,6 +19,8 @@ function finishConfirmation(answer: boolean) {
 }
 onUnmounted(() => finishConfirmation(false))
 async function checkedSave(save: (token?: string) => Promise<QuantitySaveResult>, item: PurchasePlanningItem, date: string, amount: number) {
+  // HTTP成功不等于已保存：后端可能返回saved=false的确认挑战。
+  // 用户接受后才携带签名重试；过期挑战会重新展示，取消不写入异常值。
   let result = await save()
   while (result.confirmation_required) {
     confirmation.value = { item, date, amount, check: result }
@@ -45,14 +47,17 @@ const quantities = ref<Record<string, number>>({})
 const drafts = ref<Record<string, string>>({})
 const inputMethods = ref<Record<string, 'keyboard' | 'stepper'>>({})
 function markPointer(key: string, event: PointerEvent) {
+  // 原生number输入框右侧为加减控制区；之后的键盘或粘贴事件会重新标为keyboard。
   const bounds = (event.target as HTMLInputElement).getBoundingClientRect()
   inputMethods.value[key] = event.clientX >= bounds.right - 20 ? 'stepper' : 'keyboard'
 }
 function markInput(key: string, event: KeyboardEvent) {
+  // 方向键递增递减不属于误按重复数字，普通输入/删除恢复键盘检查规则。
   if (event.key === 'ArrowUp' || event.key === 'ArrowDown') inputMethods.value[key] = 'stepper'
   else if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') inputMethods.value[key] = 'keyboard'
 }
 function editDraft(key: string, value: string) {
+  // 保留字符串才能区分空输入与0；这里仅更新草稿，不触发后台保存。
   drafts.value[key] = value
   saved.value = false
 }
@@ -82,6 +87,8 @@ const rows = computed(() => (planning.value?.items || []).filter((item) => {
 
 function quantity(item: PurchasePlanningItem, date: string) { return quantities.value[`${date}:${item.supplier_product_id}`] || 0 }
 function highAutomaticQuantity(item: PurchasePlanningItem, day: PurchasePlanningDay) {
+  // 仅渲染橘红提示：不修改数量、不发请求、不影响截止任务。
+  // 取预测与上周同日实际销量较大值，避免单周高销量时过度提醒。
   const recentSales = Math.max(day.forecast_sales, day.last_week_sales)
   return !day.is_manual && drafts.value[`${day.date}:${item.supplier_product_id}`] === undefined
     && day.planned_quantity >= 50 && day.planned_quantity > recentSales * 5
@@ -90,6 +97,8 @@ function dayLocked(date: string) {
   return isPurchaseDayLocked(date, now.value)
 }
 function setQuantity(item: PurchasePlanningItem, date: string, value: number | null, input?: HTMLInputElement) {
+  // 结束编辑后才进入队列，避免5→50→500输入过程中提交中间数字。
+  // 队列按顺序保存每次替换量，确认取消或网络失败恢复已成功保存的量。
   if (dayLocked(date)) return
   if (value !== null && (!Number.isInteger(value) || value < 0 || value > 1000000)) {
     error.value = '请输入0至1000000之间的整数'; input?.focus(); return
@@ -112,6 +121,7 @@ function setQuantity(item: PurchasePlanningItem, date: string, value: number | n
         input?.focus(); input?.select()
         return
       }
+      // 使用本次实际提交量，不把后来在同一格输入的草稿误记为已保存。
       if (departmentId.value === department) confirmedQuantities.value[key] = amount ?? quantities.value[key] ?? 0
       error.value = ''
       saved.value = true
@@ -127,6 +137,7 @@ function setQuantity(item: PurchasePlanningItem, date: string, value: number | n
   })
 }
 function setMinimumStock(item: PurchasePlanningItem, value: number, input?: HTMLInputElement) {
+  // 保底库存属于供应目录设置，独立于某一天计划；保存后刷新所有受影响的建议日期。
   if (!Number.isInteger(value) || value < 0 || value > 1000000) {
     error.value = '请输入0至1000000之间的整数'; input?.focus(); return
   }
@@ -161,6 +172,7 @@ function dateHeading(value: string) {
   return `${value.slice(5)} (${new Intl.DateTimeFormat(displayLocale(), { weekday: 'short', timeZone: 'Asia/Tokyo' }).format(date)})`
 }
 async function loadPlanning() {
+  // 服务端数量更新已保存状态，drafts保持独立，不能因其他格子保存或时钟刷新丢失输入。
   if (!departmentId.value) { planning.value = null; return }
   loading.value = true
   error.value = ''
@@ -173,6 +185,7 @@ async function loadPlanning() {
 }
 watch(departmentId, () => { drafts.value = {}; void loadPlanning() }, { immediate: true })
 watch(() => (planning.value?.days || []).map(dayLocked).join(','), (value, previous) => {
+  // 仅在截止状态发生变化时重新读取计划；时钟每秒重绘不是每秒请求后端。
   if (previous && value !== previous && !saving.value && !loading.value) {
     void loadPlanning()
     emit('created')

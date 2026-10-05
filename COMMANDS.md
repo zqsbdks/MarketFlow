@@ -191,8 +191,8 @@ python -m pytest
 python -m scripts.check_database
 ```
 
-模板的 `alembic/versions` 初始为空。为新项目添加 ORM 模型、在
-`app/models/__init__.py` 导入模型，并准备一个空的专用数据库后，生成第一份迁移：
+项目已有迁移历史。换电脑或部署现有项目，只需执行upgrade head。
+只有修改ORM结构时才生成新的增量迁移：
 
 ```cmd
 python -m alembic revision --autogenerate -m "迁移说明"
@@ -230,6 +230,17 @@ python -m alembic check
 `alembic history` 判断当前库是否存在待执行迁移。不要继续生成新迁移来绕过错误，
 也不要复用另一个项目已经写入 `alembic_version` 的数据库。
 
+## 7.1 首次创建店长
+
+确认迁移完成，在本机.env设置自己的APP_INITIAL_MANAGER_PASSWORD，再执行：
+
+```powershell
+python -m scripts.bootstrap_manager
+```
+
+已有店长时脚本保持原账号不变，不用于找回或重置密码。后续创建员工使用管理界面。
+不要复制公开示例密码作为正式密码，也不要把实际密码写入提交记录。
+
 ## 8. 生成日语面试演示数据
 
 先确认数据库迁移已经执行完成，并使用初始化脚本创建了店长账号。业务表为空时，执行：
@@ -250,11 +261,8 @@ python -m alembic check
 
 补写模式检测到已有同类流水时会停止，避免重复创建记录。
 
-演示员工编号为 `EMP00002` 至 `EMP00009`，统一密码为：
-
-```text
-MarketFlow2026!
-```
+当前员工编号统一为E加5位数字。初始化账号和密码以脚本实际输出为准；
+已有密码不会因文档更新而改变，不在公开命令手册中列出可直接使用的密码。
 
 生成后如果前端仍显示旧的空列表，请重新启动后端。脚本会尝试清除 Redis 中的项目
 接口缓存；未配置 Redis 时，重启后端即可清除进程内存缓存。
@@ -270,13 +278,8 @@ python scripts/freeze_requirements.py
 脚本会使用当前 Python 解释器执行 `pip freeze`，并在根目录生成
 `requirements-freeze.txt`。确认内容后，可以再让 AI 将其整理为生产依赖和开发依赖。
 
-如果明确需要直接覆盖现有生产依赖，也可以手动执行：
-
-```cmd
-python -m pip freeze > requirements.txt
-```
-
-该命令会覆盖原文件，执行前应确认已经激活本项目 `.venv`。
+不要用pip freeze覆盖手工维护的生产/开发直接依赖文件。
+升级直接依赖后重新安装并运行pip check、测试与构建，快照只用于对照环境。
 
 ## 10. VS Code 一键任务
 
@@ -296,3 +299,19 @@ python -m pip freeze > requirements.txt
 - `Dependencies: 生成 freeze 快照`
 
 其中生成迁移任务会在运行前提示输入迁移说明。
+
+## 11. 前端与配置说明
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+# 检查时：
+npm test
+npm run build
+```
+
+文件用途别名在folder-alias.json，不需要重命名实际模块。
+环境变量见[配置文档](docs/CONFIGURATION.md)，业务流程见[代码阅读指南](docs/CODE_GUIDE.md)。
+自动订货由后台提交，不使用旧手动创建进货单接口。
+Windows通过单Web进程APP_RUN_SCHEDULER=true运行任务；Linux生产使用Compose独立scheduler。

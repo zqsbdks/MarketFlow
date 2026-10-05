@@ -31,6 +31,11 @@ def plan_cutoff(arrival: date) -> datetime:
 
 
 async def validate_plan_writer(request, actor_id: int, db: AsyncSession):
+    """重新校验账号、所属门店、部门及有效供应目录，返回可修改的目录项。
+
+    读店与写店必须都等于员工所属门店；店长可跨部门，正式员工仅本部门。
+    总部及契约工无此写权限，停用账号和未修改初始密码的账号也不能操作。
+    该函数不提交事务，权限检查不能被前端按钮状态或缓存结果代替。"""
     employee = await db.get(Employee, actor_id)
     store_id = db.info.get("write_store_id")
     if (
@@ -72,6 +77,11 @@ async def validate_plan_writer(request, actor_id: int, db: AsyncSession):
 
 
 async def save_minimum_stock(request: SaveMinimumStock, actor_id: int, db: AsyncSession) -> dict:
+    """锁定本店供应目录并保存保底库存，必要时先返回异常数量确认挑战。
+
+    保底值表示预测销售后的目标余量，不是最小下单量。异常首次请求saved=false，
+    此时不更改目录；确认后的数量变更与操作审计在本函数内一起提交。
+    确认签名绑定员工及具体数量，不能将其他商品的确认凭据用于本商品。"""
     catalog = await validate_plan_writer(request, actor_id, db)
     await db.refresh(catalog, with_for_update=True)
     before = catalog.minimum_stock
@@ -110,6 +120,12 @@ async def save_minimum_stock(request: SaveMinimumStock, actor_id: int, db: Async
 
 
 async def save_purchase_plan(request: SavePurchasePlan, actor_id: int, db: AsyncSession) -> dict:
+    """在到货日前两天12:00截止前保存单个商品的人工订货总量。
+
+    quantity=0表示人工取消该日订货，None表示移除覆盖、恢复自动计算。
+    先原子创建计划头，再获取行锁并重新检查截止时间，避免首次并发创建和越线保存。
+    异常输入只返回确认挑战，不写入数量；成功时保存人工覆盖与审计并提交。
+    后台automatic_quantities不被此操作覆盖，相同格子的15改25是替换而不是相加。"""
     catalog = await validate_plan_writer(request, actor_id, db)
     store_id = db.info.get("write_store_id")
     now = business_now()
@@ -195,6 +211,12 @@ async def save_purchase_plan(request: SavePurchasePlan, actor_id: int, db: Async
 
 
 async def submit_due_plan(plan_id: int, db: AsyncSession, now: datetime | None = None) -> bool:
+    """锁定到期计划并生成一次进货单，返回本次是否创建订单。
+
+    自动量与人工覆盖合并时以人工为准，0不进入明细，空计划暂不生成订单。
+    固定请求ID及purchase_id标记防止重复调度重复生成；补处理保留原截止时间。
+    本函数不commit，调用调度器必须把订单、计划标记和审计放在同一事务提交。
+    自动建议橘红标记只属于界面提示，不过滤明细，也不等待人工确认。"""
     now = now or business_now()
     plan = await db.scalar(
         select(PurchasePlan)
