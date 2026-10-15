@@ -43,9 +43,12 @@ class GeminiProvider(AiProviderAdapter):
     def _build_contents(self, messages: list[AiChatMessageRequest]) -> list[dict[str, Any]]:
         """Gemini 使用 model 角色，因此项目历史消息可以直接映射。"""
 
-        return [
-            {"role": message.role, "parts": [{"text": message.content}]} for message in messages
-        ]
+        result_values = []
+        for result_message in messages:
+            result_values.append(
+                {"role": result_message.role, "parts": [{"text": result_message.content}]}
+            )
+        return result_values
 
     def _parse_turn(self, response_data: dict[str, Any]) -> ProviderTurn:
         """提取 Gemini 第一个候选答案中的文字和函数调用。"""
@@ -155,9 +158,10 @@ class GeminiProvider(AiProviderAdapter):
         )
         turn = self._parse_turn(response)
         # continuation只保存原始用户消息之后的增量内容，避免下一轮重复用户历史。
-        previous_list = (
-            previous_contents if isinstance(previous_contents, list) else [previous_contents]
-        )
+        if isinstance(previous_contents, list):
+            previous_list = previous_contents
+        else:
+            previous_list = [previous_contents]
         turn.continuation = [*previous_list, function_response, turn.continuation]
         return turn
 

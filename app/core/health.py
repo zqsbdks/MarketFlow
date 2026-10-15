@@ -33,7 +33,10 @@ async def check_readiness() -> dict[str, str]:
             logger.exception("Redis readiness check failed")
             components["redis"] = "error"
 
-    components["status"] = "ok" if "error" not in components.values() else "error"
+    if "error" not in components.values():
+        components["status"] = "ok"
+    else:
+        components["status"] = "error"
     return components
 
 

@@ -12,6 +12,11 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def default_cors_origins():
+    """每个配置对象都创建自己的来源列表，避免共享可变列表。"""
+    return ["*"]
+
+
 class Settings(BaseSettings):
     """定义应用与 Alembic 共同使用的强类型运行配置。
 
@@ -61,7 +66,7 @@ class Settings(BaseSettings):
     ai_key_encryption_key: str | None = None
 
     # default_factory 确保不同 Settings 实例不会共享同一个可变列表。
-    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
+    cors_origins: list[str] = Field(default_factory=default_cors_origins)
 
     @model_validator(mode="after")
     def validate_production_safety(self) -> "Settings":

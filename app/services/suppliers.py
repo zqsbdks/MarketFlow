@@ -1,6 +1,6 @@
 """供应商管理业务逻辑。"""
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import (
     SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
     SUPPLIERS_CACHE_NAMESPACE,
+    SUPPLIERS_CACHE_SECONDS,
+    business_cache,
     clear_cache_namespaces,
 )
 from app.crud.auth import get_employee_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
+from app.crud.stores import first_active_store_id, get_store_by_id
 from app.crud.suppliers import (
     create_supplier,
     get_all_suppliers,
@@ -33,8 +36,54 @@ async def get_suppliers_list_service(
     is_active: bool | None,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> SupplierListResponse:
     """返回经过状态筛选和分页的供应商列表。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 根据Token中的员工ID读取当前操作人，并验证账号能否继续使用系统。
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -53,28 +102,12 @@ async def get_suppliers_list_service(
         )
 
     # offset表示当前页之前需要跳过多少条记录，例如第2页跳过page_size条。
-    offset = (page - 1) * page_size
-    suppliers, total = await get_all_suppliers(
-        offset=offset,
-        page_size=page_size,
-        is_active=is_active,
-        db=db,
-    )
-
-    # 将每个Supplier ORM对象转换成接口响应项。
-    items: list[SupplierItemResponse] = []
-    for supplier in suppliers:
-        item = SupplierItemResponse.model_validate(supplier)
-        items.append(item)
-
-    # 整数公式用于向上取整；没有供应商时总页数为0。
-    total_pages = (total + page_size - 1) // page_size
-    return SupplierListResponse(
-        items=items,
+    return await _cached_get_suppliers_list_service(
         page=page,
         page_size=page_size,
-        total=total,
-        total_pages=total_pages,
+        is_active=is_active,
+        current_employee_id=current_employee_id,
+        db=db,
     )
 
 
@@ -86,8 +119,54 @@ async def get_supplier_detail_service(
     supplier_id: int,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> SupplierItemResponse:
     """验证当前员工状态，并返回指定供应商的完整基础资料。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 根据Token中的员工ID读取当前操作人，并验证账号能否查看供应商资料。
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -106,14 +185,9 @@ async def get_supplier_detail_service(
         )
 
     # supplier_id来自URL；查询不到时返回明确的404，而不是返回空data。
-    supplier = await get_supplier_by_id(supplier_id=supplier_id, db=db)
-    if supplier is None:
-        raise HTTPException(
-            status_code=http_status.HTTP_404_NOT_FOUND,
-            detail="供应商不存在",
-        )
-
-    return SupplierItemResponse.model_validate(supplier)
+    return await _cached_get_supplier_detail_service(
+        supplier_id=supplier_id, current_employee_id=current_employee_id, db=db
+    )
 
 
 # endregion
@@ -126,8 +200,57 @@ async def update_supplier_status_service(
     current_employee_id: int,
     db: AsyncSession,
     reason: str | None = None,
+    *,
+    http_request: Request | None = None,
 ) -> SupplierItemResponse:
     """验证店长权限，修改供应商合作状态并返回数据库中的最新资料。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 修改状态属于管理操作，因此除了账号状态外还要验证店长角色。
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -197,8 +320,57 @@ async def update_supplier_service(
     request: SuppliersUpdateRequest,
     db: AsyncSession,
     current_employee_id: int,
+    *,
+    http_request: Request | None = None,
 ) -> SupplierItemResponse:
     """验证店长权限，按需修改供应商资料并返回数据库中的最新记录。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # current_employee_id来自登录令牌；先取得执行修改操作的当前员工。
     current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -264,7 +436,10 @@ async def update_supplier_service(
             )
 
     # CRUD只执行UPDATE；Service统一负责提交当前事务。
-    previous_data = {field: getattr(existing_supplier, field) for field in update_data}
+    previous_data_mapping = {}
+    for previous_data_field in update_data:
+        previous_data_mapping[previous_data_field] = getattr(existing_supplier, previous_data_field)
+    previous_data = previous_data_mapping
     await update_supplier(supplier_id=supplier_id, update_data=update_data, db=db)
     await create_operation_audit_log(
         employee_id=current_employee_id,
@@ -305,8 +480,57 @@ async def create_supplier_service(
     request: SuppliersCreateRequest,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> SupplierItemResponse:
     """验证店长权限，自动生成供应商编号并创建供应商。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # current_employee_id来自登录令牌，用它查询本次操作的员工。
     current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -396,3 +620,31 @@ __all__ = [
     "update_supplier_service",
     "update_supplier_status_service",
 ]
+
+
+@business_cache(expire=SUPPLIERS_CACHE_SECONDS, namespace=SUPPLIERS_CACHE_NAMESPACE)
+async def _cached_get_supplier_detail_service(
+    supplier_id: int, current_employee_id: int, db: AsyncSession
+) -> SupplierItemResponse:
+    supplier = await get_supplier_by_id(supplier_id=supplier_id, db=db)
+    if supplier is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="供应商不存在")
+    return SupplierItemResponse.model_validate(supplier)
+
+
+@business_cache(expire=SUPPLIERS_CACHE_SECONDS, namespace=SUPPLIERS_CACHE_NAMESPACE)
+async def _cached_get_suppliers_list_service(
+    page: int, page_size: int, is_active: bool | None, current_employee_id: int, db: AsyncSession
+) -> SupplierListResponse:
+    offset = (page - 1) * page_size
+    suppliers, total = await get_all_suppliers(
+        offset=offset, page_size=page_size, is_active=is_active, db=db
+    )
+    items: list[SupplierItemResponse] = []
+    for supplier in suppliers:
+        item = SupplierItemResponse.model_validate(supplier)
+        items.append(item)
+    total_pages = (total + page_size - 1) // page_size
+    return SupplierListResponse(
+        items=items, page=page, page_size=page_size, total=total, total_pages=total_pages
+    )

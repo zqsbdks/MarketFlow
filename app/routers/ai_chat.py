@@ -2,20 +2,18 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Path
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Header, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_verified_current_employee_id
 from app.dependencies.db import get_db
-from app.schemas.ai_chat_requests import AiChatRequest, AiProviderName
+from app.schemas.ai_chat_requests import AiChatRequest, AiCredentialRequest, AiProviderName
 from app.schemas.ai_chat_responses import AiActionExecutionResponse, AiChatResponse
 from app.schemas.base import ResponseModel
 from app.services.ai_actions import cancel_ai_action_service, confirm_ai_action_service
 from app.services.ai_credentials import (
     delete_ai_credential,
     has_ai_credential,
-    read_ai_credential,
     save_ai_credential,
 )
 from app.services.ai_memory import persistent_ai_chat_service as ai_chat_service
@@ -32,12 +30,6 @@ AiApiKeyHeader = Annotated[
 ]
 
 
-class AiCredentialRequest(BaseModel):
-    """配置员工自己的模型供应商密钥。"""
-
-    api_key: str = Field(..., min_length=10, max_length=255)
-
-
 # region AI实时聊天接口
 @ai_chat_router.post(
     "",
@@ -50,13 +42,15 @@ async def chat_with_ai(
     api_key: AiApiKeyHeader = None,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[AiChatResponse]:
     """验证账号后调用模型；查询可直接执行，修改只生成待确认操作。"""
 
-    resolved_key = api_key or await read_ai_credential(current_employee_id, request.provider, db)
     result = await ai_chat_service(
         request=request,
-        api_key=resolved_key,
+        api_key=api_key,
+        http_request=http_request,
         current_employee_id=current_employee_id,
         db=db,
     )
@@ -71,10 +65,14 @@ async def get_ai_credential_status(
     provider: AiProviderName,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[dict[str, bool]]:
     """只返回当前员工是否配置了该供应商的密钥。"""
 
-    configured = await has_ai_credential(current_employee_id, provider, db)
+    configured = await has_ai_credential(
+        current_employee_id, provider, db, http_request=http_request
+    )
     return ResponseModel(data={"configured": configured})
 
 
@@ -84,10 +82,14 @@ async def put_ai_credential(
     request: AiCredentialRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[dict[str, bool]]:
     """加密保存当前员工的 API Key。"""
 
-    await save_ai_credential(current_employee_id, provider, request.api_key, db)
+    await save_ai_credential(
+        current_employee_id, provider, request.api_key, db, http_request=http_request
+    )
     return ResponseModel(data={"configured": True})
 
 
@@ -96,10 +98,12 @@ async def remove_ai_credential(
     provider: AiProviderName,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[dict[str, bool]]:
     """移除当前员工保存的 API Key。"""
 
-    await delete_ai_credential(current_employee_id, provider, db)
+    await delete_ai_credential(current_employee_id, provider, db, http_request=http_request)
     return ResponseModel(data={"configured": False})
 
 
@@ -114,13 +118,13 @@ async def confirm_ai_action(
     action_id: int = Path(..., ge=1, description="待确认操作ID"),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[AiActionExecutionResponse]:
     """只有发起操作的员工可以确认；同一操作无法重复执行。"""
 
     result = await confirm_ai_action_service(
-        action_id=action_id,
-        employee_id=current_employee_id,
-        db=db,
+        action_id=action_id, employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[AiActionExecutionResponse](message="AI操作执行成功", data=result)
 
@@ -135,13 +139,13 @@ async def cancel_ai_action(
     action_id: int = Path(..., ge=1, description="待确认操作ID"),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[AiActionExecutionResponse]:
     """将等待确认的操作标记为取消。"""
 
     result = await cancel_ai_action_service(
-        action_id=action_id,
-        employee_id=current_employee_id,
-        db=db,
+        action_id=action_id, employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[AiActionExecutionResponse](message="AI操作已取消", data=result)
 

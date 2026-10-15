@@ -1,6 +1,6 @@
 """商品查询 API 路由。"""
 
-from fastapi import APIRouter, Body, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -33,6 +33,8 @@ async def get_products_list(
     request: ProductsListRequest = Depends(),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[ProductsListResponse]:
     """接收查询参数，并返回统一格式的商品列表响应。"""
 
@@ -47,6 +49,7 @@ async def get_products_list(
         low_stock=request.low_stock,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[ProductsListResponse](
@@ -69,6 +72,8 @@ async def get_product_detail(
     product_id: int = Path(..., description="商品ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[ItemResponse]:
     """接收商品 ID，并返回统一格式的商品详情响应。"""
 
@@ -76,6 +81,7 @@ async def get_product_detail(
         product_id=product_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[ItemResponse](
@@ -103,6 +109,8 @@ async def update_product_status(
     current_employee_id: int = Depends(get_current_employee_id),
     # db 是当前请求使用的异步数据库会话。
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[ItemResponse]:
     """接收商品 ID 和新状态，并返回修改后的完整商品详情。"""
 
@@ -112,6 +120,7 @@ async def update_product_status(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     # 状态接口与商品详情、资料修改接口使用相同的响应模型。
@@ -140,6 +149,8 @@ async def update_product(
     current_employee_id: int = Depends(get_current_employee_id),
     # db 是当前请求使用的异步数据库会话。
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[ItemResponse]:
     """接收商品 ID 和修改请求，并返回统一格式的商品详情响应。"""
 
@@ -149,6 +160,7 @@ async def update_product(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     # 使用项目统一响应结构包装修改后的商品详情。

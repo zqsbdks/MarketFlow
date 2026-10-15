@@ -540,9 +540,14 @@ async def create_purchases_and_batches(
             employee_by_department[employee.department_id] = employee
 
     products_by_department: dict[int, list[Product]] = defaultdict(list)
-    product_seed_by_number = {
-        f"P{index:05d}": seed for index, seed in enumerate(PRODUCT_SEEDS, start=1)
-    }
+    product_seed_by_number_mapping = {}
+    for product_seed_by_number_index, product_seed_by_number_seed in enumerate(
+        PRODUCT_SEEDS, start=1
+    ):
+        product_seed_by_number_mapping[f"P{product_seed_by_number_index:05d}"] = (
+            product_seed_by_number_seed
+        )
+    product_seed_by_number = product_seed_by_number_mapping
     for product in products:
         products_by_department[product.department_id].append(product)
 
@@ -569,10 +574,14 @@ async def create_purchases_and_batches(
             rotation = ((order_date - start_date).days + department_index * 2) % len(
                 department_products
             )
-            selected_products = [
-                department_products[(rotation + offset * 2) % len(department_products)]
-                for offset in range(4)
-            ]
+            selected_products_values = []
+            for selected_products_offset in range(4):
+                selected_products_values.append(
+                    department_products[
+                        (rotation + selected_products_offset * 2) % len(department_products)
+                    ]
+                )
+            selected_products = selected_products_values
 
             purchase = Purchase(
                 purchase_no=f"{number_prefix}PO{order_date:%Y%m%d}-{purchase_counter:04d}",
@@ -709,7 +718,12 @@ async def create_sales(
 ) -> list[Sale]:
     """按批次先进先出扣减库存，并创建约两个月的销售小票。"""
 
-    department_code_by_id = {department.id: code for code, department in departments.items()}
+    department_code_by_id_mapping = {}
+    for department_code_by_id_code, department_code_by_id_department in departments.items():
+        department_code_by_id_mapping[department_code_by_id_department.id] = (
+            department_code_by_id_code
+        )
+    department_code_by_id = department_code_by_id_mapping
     ledgers_by_product: dict[int, list[BatchLedger]] = defaultdict(list)
     for ledger in ledgers:
         ledgers_by_product[ledger.product.id].append(ledger)
@@ -719,23 +733,26 @@ async def create_sales(
     sales: list[Sale] = []
     sale_counter = 1
     current_date = start_date
-    active_products = [item for item in products if item.status == ProductStatus.ON_SALE]
+    active_products_values = []
+    for active_products_item in products:
+        if active_products_item.status == ProductStatus.ON_SALE:
+            active_products_values.append(active_products_item)
+    active_products = active_products_values
 
     while current_date <= end_date:
         # 半年数据只扫描当天可用的批次，避免每笔销售遍历全部历史库存。
         day_end = datetime.combine(current_date, time.max)
-        daily_ledgers = {
-            product_id: [
-                ledger
-                for ledger in product_ledgers
-                if ledger.batch.arrived_at <= day_end
-                and (
-                    ledger.batch.expiration_date is None
-                    or ledger.batch.expiration_date >= current_date
-                )
-            ]
-            for product_id, product_ledgers in ledgers_by_product.items()
-        }
+        daily_ledgers_mapping = {}
+        for daily_ledgers_product_id, daily_ledgers_product_ledgers in ledgers_by_product.items():
+            result_values = []
+            for result_ledger in daily_ledgers_product_ledgers:
+                if result_ledger.batch.arrived_at <= day_end and (
+                    result_ledger.batch.expiration_date is None
+                    or result_ledger.batch.expiration_date >= current_date
+                ):
+                    result_values.append(result_ledger)
+            daily_ledgers_mapping[daily_ledgers_product_id] = result_values
+        daily_ledgers = daily_ledgers_mapping
         # 周末客流高于工作日；月底最后一天数据保持较少，便于现场继续扫码演示。
         if current_date == end_date:
             daily_sale_count = 12
@@ -1029,8 +1046,16 @@ async def create_audit_logs(
         )
 
     # 按成交时间重放每一条销售明细，计算每个批次在扣减前后的准确剩余数量。
-    running_quantities = {ledger.batch.id: ledger.batch.initial_quantity for ledger in ledgers}
-    ledger_by_batch_id = {ledger.batch.id: ledger for ledger in ledgers}
+    running_quantities_mapping = {}
+    for running_quantities_ledger in ledgers:
+        running_quantities_mapping[running_quantities_ledger.batch.id] = (
+            running_quantities_ledger.batch.initial_quantity
+        )
+    running_quantities = running_quantities_mapping
+    ledger_by_batch_id_mapping = {}
+    for ledger_by_batch_id_ledger in ledgers:
+        ledger_by_batch_id_mapping[ledger_by_batch_id_ledger.batch.id] = ledger_by_batch_id_ledger
+    ledger_by_batch_id = ledger_by_batch_id_mapping
     for sale in sorted(sales, key=lambda item: (item.sold_at, item.id)):
         for sale_item in sorted(sale.items, key=lambda item: item.id):
             batch_id = sale_item.inventory_batch_id
@@ -1042,11 +1067,10 @@ async def create_audit_logs(
             if after_quantity < 0:
                 raise RuntimeError(f"批次 {ledger.batch.batch_no} 的演示销售数量超过库存")
             running_quantities[batch_id] = after_quantity
-            after_status = (
-                InventoryBatchStatus.SOLD_OUT
-                if after_quantity == 0
-                else InventoryBatchStatus.AVAILABLE
-            )
+            if after_quantity == 0:
+                after_status = InventoryBatchStatus.SOLD_OUT
+            else:
+                after_status = InventoryBatchStatus.AVAILABLE
             audit_logs.append(
                 OperationAuditLog(
                     employee_id=None,
@@ -1113,7 +1137,10 @@ async def clear_project_response_cache() -> int:
     if client is None:
         return 0
 
-    cache_keys = [key async for key in client.scan_iter(match="fastapi-cache:*")]
+    cache_keys_values = []
+    async for cache_keys_key in client.scan_iter(match="fastapi-cache:*"):
+        cache_keys_values.append(cache_keys_key)
+    cache_keys = cache_keys_values
     if not cache_keys:
         return 0
     return int(await client.delete(*cache_keys))
@@ -1152,11 +1179,20 @@ async def backfill_inventory_movement_logs() -> tuple[int, int]:
         if not batches:
             raise RuntimeError("数据库中没有库存批次，无法补写库存流水")
 
-        ledgers = [
-            BatchLedger(batch=batch, product=batch.product, unit_cost=Decimal("0.00"))
-            for batch in batches
-        ]
-        running_quantities = {batch.id: batch.initial_quantity for batch in batches}
+        ledgers_values = []
+        for ledgers_batch in batches:
+            ledgers_values.append(
+                BatchLedger(
+                    batch=ledgers_batch, product=ledgers_batch.product, unit_cost=Decimal("0.00")
+                )
+            )
+        ledgers = ledgers_values
+        running_quantities_mapping_new = {}
+        for running_quantities_batch in batches:
+            running_quantities_mapping_new[running_quantities_batch.id] = (
+                running_quantities_batch.initial_quantity
+            )
+        running_quantities = running_quantities_mapping_new
         logs: list[OperationAuditLog] = []
 
         for batch in batches:
@@ -1196,11 +1232,10 @@ async def backfill_inventory_movement_logs() -> tuple[int, int]:
                 if after_quantity < 0:
                     raise RuntimeError(f"批次 ID {batch_id} 的销售数量超过初始库存")
                 running_quantities[batch_id] = after_quantity
-                after_status = (
-                    InventoryBatchStatus.SOLD_OUT
-                    if after_quantity == 0
-                    else InventoryBatchStatus.AVAILABLE
-                )
+                if after_quantity == 0:
+                    after_status = InventoryBatchStatus.SOLD_OUT
+                else:
+                    after_status = InventoryBatchStatus.AVAILABLE
                 logs.append(
                     OperationAuditLog(
                         employee_id=None,
@@ -1222,7 +1257,10 @@ async def backfill_inventory_movement_logs() -> tuple[int, int]:
                 )
                 sale_deduction_count += 1
 
-        batch_by_id = {batch.id: batch for batch in batches}
+        batch_by_id_mapping = {}
+        for batch_by_id_batch in batches:
+            batch_by_id_mapping[batch_by_id_batch.id] = batch_by_id_batch
+        batch_by_id = batch_by_id_mapping
         for ledger in ledgers:
             batch = batch_by_id[ledger.batch.id]
             if running_quantities[batch.id] != batch.remaining_quantity:

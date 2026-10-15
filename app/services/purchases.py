@@ -1,24 +1,32 @@
 """进货管理的业务逻辑。"""
 
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from uuid import uuid4
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.business_time import business_now
+from app.crud import purchases as data_access
 from app.crud.auth import get_employee_by_id
+from app.crud.business_sequence import next_business_sequence
 from app.crud.employees import get_department_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.purchases import (
-    auto_receive_due_purchases,
     get_all_purchases,
     get_purchase_by_client_request_id,
     get_purchase_by_id,
 )
-from app.crud.purchases import create_purchase as create_purchase_crud
-from app.models.enums import EmployeeRole, PurchaseStatus
+from app.crud.stores import department_is_enabled, first_active_store_id, get_store_by_id
+from app.models.enums import EmployeeRole, InventoryBatchStatus, ProductStatus, PurchaseStatus
+from app.models.inventory_batch import InventoryBatch
+from app.models.product import Product
+from app.models.purchase import Purchase
+from app.models.purchase_item import PurchaseItem
+from app.schemas.base import ResponseModel
 from app.schemas.purchases_requests import CreatePurchaseRequest
 from app.schemas.purchases_responses import (
     PurchaseDetailResponse,
@@ -39,8 +47,54 @@ async def get_purchases_list_service(
     purchase_status: PurchaseStatus | None,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> PurchaseListResponse:
     """验证当前员工状态，并返回筛选和分页后的进货单列表。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
     if current_employee is None:
@@ -116,8 +170,54 @@ async def get_purchase_detail_service(
     purchase_id: int,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> PurchaseDetailResponse:
     """验证当前员工状态，并返回进货单及其全部商品明细。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
     if current_employee is None:
@@ -195,10 +295,62 @@ async def create_purchase_service(
     purchase: CreatePurchaseRequest,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> PurchaseDetailResponse:
     """校验请求并创建进货单，最后返回完整的进货单详情。"""
 
-    request_id = str(purchase.client_request_id) if purchase.client_request_id else None
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
+
+    if purchase.client_request_id:
+        request_id = str(purchase.client_request_id)
+    else:
+        request_id = None
     if request_id:
         existing_purchase = await get_purchase_by_client_request_id(request_id, db)
         if existing_purchase is not None:
@@ -264,7 +416,10 @@ async def create_purchase_service(
         )
 
     # 同一张进货单不能重复添加同一个供应商商品目录项目。
-    supplier_product_ids = [item.supplier_product_id for item in purchase.items]
+    supplier_product_ids_values = []
+    for supplier_product_ids_item in purchase.items:
+        supplier_product_ids_values.append(supplier_product_ids_item.supplier_product_id)
+    supplier_product_ids = supplier_product_ids_values
     if len(supplier_product_ids) != len(set(supplier_product_ids)):
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -285,13 +440,25 @@ async def create_purchase_service(
 
     try:
         # CRUD 同时新增 purchase 主表和 purchase_item 明细表，但不会提交事务。
-        new_purchase = await create_purchase_crud(
+        new_purchase = await create_purchase_records(
             purchase=purchase,
             created_by=current_employee_id,
             db=db,
         )
 
         # 主表和明细由同一个 CRUD 创建，这里用一条审计记录描述整张进货单的创建。
+        items_value_values = []
+        for items_value_item in new_purchase.items:
+            items_value_values.append(
+                {
+                    "purchase_item_id": items_value_item.id,
+                    "supplier_product_id": items_value_item.supplier_product_id,
+                    "quantity": items_value_item.quantity,
+                    "unit_cost": items_value_item.unit_cost,
+                    "subtotal": items_value_item.subtotal,
+                }
+            )
+        items_value = items_value_values
         await create_operation_audit_log(
             employee_id=current_employee_id,
             module="purchase",
@@ -305,16 +472,7 @@ async def create_purchase_service(
                 "status": new_purchase.status,
                 "total_amount": new_purchase.total_amount,
                 "item_count": len(new_purchase.items),
-                "items": [
-                    {
-                        "purchase_item_id": item.id,
-                        "supplier_product_id": item.supplier_product_id,
-                        "quantity": item.quantity,
-                        "unit_cost": item.unit_cost,
-                        "subtotal": item.subtotal,
-                    }
-                    for item in new_purchase.items
-                ],
+                "items": items_value,
             },
             reason=None,
             db=db,
@@ -358,10 +516,56 @@ async def create_purchase_service(
 
 # region 自动签收进货单
 async def auto_receive_purchases_service(
-    current_employee_id: int,
-    db: AsyncSession,
+    current_employee_id: int, db: AsyncSession, *, http_request: Request | None = None
 ) -> list[PurchaseDetailResponse]:
     """由店长触发模拟任务，签收全部已达到预计时间的进货单。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     current_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
     if current_employee is None:
@@ -424,9 +628,61 @@ async def auto_receive_purchases_service(
 
 # region 单张进货单手动签收
 async def receive_purchase_service(
-    purchase_id: int, current_employee_id: int, db: AsyncSession
+    purchase_id: int,
+    current_employee_id: int,
+    db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> PurchaseDetailResponse:
     """只签收指定待到货订单；库存、批次、审计与状态在同一事务提交。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
+
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
     if employee is None:
         raise HTTPException(401, "当前登录员工不存在")
@@ -476,3 +732,267 @@ __all__ = [
     "get_purchases_list_service",
     "receive_purchase_service",
 ]
+
+
+async def reject_manual_purchase_service(
+    request: CreatePurchaseRequest,
+    current_employee_id: int,
+    db: AsyncSession,
+    *,
+    http_request: Request | None = None,
+) -> ResponseModel[PurchaseDetailResponse]:
+    """接收进货单汇总及商品明细，并返回进货单汇总及商品明细。"""
+    raise HTTPException(409, "请保存订货计划，进货单将在截止时间自动生成")
+
+
+async def create_purchase_records(
+    purchase: CreatePurchaseRequest,
+    created_by: int,
+    db: AsyncSession,
+    *,
+    ordered_at_override: datetime | None = None,
+) -> Purchase:
+    """创建一张进货单及其全部进货明细，并发送到当前数据库事务。"""
+    ordered_at = ordered_at_override or business_now()
+    expected_arrival_at = ordered_at + timedelta(days=2)
+    if purchase.expected_arrival_date is not None:
+        expected_arrival_at = datetime.combine(purchase.expected_arrival_date, time(hour=12))
+    purchase_no_prefix = f"PUR{ordered_at:%Y%m%d}"
+    next_number = await next_business_sequence(f"purchase:{ordered_at:%Y%m%d}", db)
+    purchase_no = f"{purchase_no_prefix}{next_number:04d}"
+    supplier_product_ids_values_new = []
+    for supplier_product_ids_item_item in purchase.items:
+        supplier_product_ids_values_new.append(supplier_product_ids_item_item.supplier_product_id)
+    supplier_product_ids = supplier_product_ids_values_new
+    catalog_result = await data_access.get_order_catalog(
+        db=db, supplier_product_ids=supplier_product_ids
+    )
+    catalog_products_mapping = {}
+    for catalog_products_catalog_product in catalog_result.all():
+        catalog_products_mapping[catalog_products_catalog_product.id] = (
+            catalog_products_catalog_product
+        )
+    catalog_products = catalog_products_mapping
+    missing_ids = sorted(set(supplier_product_ids) - catalog_products.keys())
+    if missing_ids:
+        missing_text = ", ".join(str(item_id) for item_id in missing_ids)
+        raise ValueError(f"供应商商品目录不存在：{missing_text}")
+    purchase_items: list[PurchaseItem] = []
+    total_amount = Decimal("0.00")
+    for requested_item in purchase.items:
+        catalog_product = catalog_products[requested_item.supplier_product_id]
+        subtotal = catalog_product.unit_cost * requested_item.quantity
+        total_amount += subtotal
+        production_date = requested_item.production_date
+        if production_date is None:
+            production_date = expected_arrival_at.date()
+        expiration_date = requested_item.expiration_date
+        if expiration_date is None:
+            if catalog_product.shelf_life_days is None:
+                raise ValueError(
+                    f"供应商商品目录ID {catalog_product.id} 未设置默认保质期，无法自动计算到期日期"
+                )
+            expiration_date = production_date + timedelta(days=catalog_product.shelf_life_days)
+        if expiration_date < production_date:
+            raise ValueError(f"供应商商品目录ID {catalog_product.id} 的到期日期不能早于生产日期")
+        product_id = None
+        product_no_snapshot = None
+        for existing_product in catalog_product.products:
+            if existing_product.store_id == db.info.get("write_store_id", 1):
+                product_id = existing_product.id
+                product_no_snapshot = existing_product.product_no
+                break
+        purchase_items.append(
+            PurchaseItem(
+                store_id=db.info.get("write_store_id", 1),
+                product_id=product_id,
+                supplier_product_id=catalog_product.id,
+                supplier_id=catalog_product.supplier_id,
+                product_no_snapshot=product_no_snapshot,
+                product_name_snapshot=catalog_product.name,
+                supplier_name_snapshot=catalog_product.supplier.name,
+                quantity=requested_item.quantity,
+                unit_cost=catalog_product.unit_cost,
+                subtotal=subtotal,
+                production_date=production_date,
+                expiration_date=expiration_date,
+            )
+        )
+    if purchase.client_request_id:
+        client_request_id_value = str(purchase.client_request_id)
+    else:
+        client_request_id_value = None
+    new_purchase = Purchase(
+        store_id=db.info.get("write_store_id", 1),
+        purchase_no=purchase_no,
+        client_request_id=client_request_id_value,
+        department_id=purchase.department_id,
+        created_by=created_by,
+        received_by=None,
+        ordered_at=ordered_at,
+        expected_arrival_at=expected_arrival_at,
+        arrived_at=None,
+        total_amount=total_amount,
+        status=PurchaseStatus.PENDING,
+        items=purchase_items,
+    )
+    data_access.add_purchase_record(db=db, new_purchase=new_purchase)
+    await db.flush()
+    return new_purchase
+
+
+async def auto_receive_due_purchases(
+    arrived_at: datetime,
+    employee_id: int | None,
+    db: AsyncSession,
+    only_purchase_id: int | None = None,
+) -> list[Purchase]:
+    """签收所有达到预计到货时间的待到货进货单，并同步商品与批次库存。"""
+    due_purchases = list(
+        (
+            await data_access.get_due_purchases(
+                db=db, arrived_at=arrived_at, only_purchase_id=only_purchase_id
+            )
+        ).all()
+    )
+    product_number = int(await data_access.get_latest_product_number(db=db) or 0)
+    batch_number = int(await data_access.get_latest_batch_number(db=db, arrived_at=arrived_at) or 0)
+    for purchase in due_purchases:
+        if db.info.get("store_context"):
+            if not await department_is_enabled(purchase.store_id, purchase.department_id, db):
+                raise HTTPException(400, "本店未启用此部门")
+        db.info["write_store_id"] = purchase.store_id
+        if only_purchase_id is None:
+            receiver = await data_access.get_default_receiving_employee(db=db, purchase=purchase)
+        else:
+            receiver = await data_access.get_manual_receiving_employee(
+                db=db, employee_id=employee_id
+            )
+        if receiver is None:
+            raise ValueError(f"部门ID {purchase.department_id} 没有可用的正式员工")
+        for purchase_item in purchase.items:
+            catalog_product = purchase_item.supplier_product
+            product = await data_access.get_received_product(
+                db=db, catalog_product=catalog_product, purchase=purchase
+            )
+            product_was_created = product is None
+            if product is None:
+                if catalog_product.category_id is None or catalog_product.category is None:
+                    raise ValueError(f"供应商商品目录ID {catalog_product.id} 尚未设置商品分类")
+                if catalog_product.category.department_id != purchase.department_id:
+                    raise ValueError(f"供应商商品目录ID {catalog_product.id} 的分类不属于进货部门")
+                product_number += 1
+                product = Product(
+                    store_id=purchase.store_id,
+                    product_no="NEW" + uuid4().hex[:16],
+                    name=catalog_product.name,
+                    supplier_product_id=catalog_product.id,
+                    department_id=purchase.department_id,
+                    category_id=catalog_product.category_id,
+                    purchase_price=purchase_item.unit_cost,
+                    sale_price=purchase_item.unit_cost * Decimal("2"),
+                    stock_quantity=0,
+                    expiry_warning_days=1,
+                    status=ProductStatus.ON_SALE,
+                )
+                data_access.add_received_product(db=db, product=product)
+                await db.flush()
+                product.product_no = f"P{product.id:05d}"
+            before_product_stock = product.stock_quantity
+            before_purchase_price = product.purchase_price
+            product.purchase_price = purchase_item.unit_cost
+            product.stock_quantity += purchase_item.quantity
+            purchase_item.product_id = product.id
+            batch_number += 1
+            inventory_batch = InventoryBatch(
+                store_id=purchase.store_id,
+                batch_no="NEW" + uuid4().hex[:16],
+                product_id=product.id,
+                purchase_item_id=purchase_item.id,
+                production_date=purchase_item.production_date,
+                expiration_date=purchase_item.expiration_date,
+                initial_quantity=purchase_item.quantity,
+                remaining_quantity=purchase_item.quantity,
+                status=InventoryBatchStatus.AVAILABLE,
+                arrived_at=arrived_at,
+            )
+            data_access.add_received_batch(db=db, inventory_batch=inventory_batch)
+            await db.flush()
+            inventory_batch.batch_no = f"BAT{arrived_at:%Y%m%d}{inventory_batch.id:06d}"
+            if product_was_created:
+                action_value_item = "create_from_purchase"
+            else:
+                action_value_item = "increase_stock"
+            if product_was_created:
+                before_data_value = None
+            else:
+                before_data_value = {
+                    "stock_quantity": before_product_stock,
+                    "purchase_price": before_purchase_price,
+                }
+            await create_operation_audit_log(
+                employee_id=employee_id,
+                module="product",
+                action=action_value_item,
+                target_type="product",
+                target_id=product.id,
+                before_data=before_data_value,
+                after_data={
+                    "product_no": product.product_no,
+                    "stock_quantity": product.stock_quantity,
+                    "purchase_price": product.purchase_price,
+                },
+                reason="进货单签收入库",
+                db=db,
+            )
+            await create_operation_audit_log(
+                employee_id=employee_id,
+                module="inventory",
+                action="create_batch",
+                target_type="inventory_batch",
+                target_id=inventory_batch.id,
+                before_data=None,
+                after_data={
+                    "batch_no": inventory_batch.batch_no,
+                    "product_id": inventory_batch.product_id,
+                    "purchase_item_id": inventory_batch.purchase_item_id,
+                    "remaining_quantity": inventory_batch.remaining_quantity,
+                    "expiration_date": inventory_batch.expiration_date,
+                    "status": inventory_batch.status,
+                },
+                reason="进货单签收入库",
+                db=db,
+            )
+        before_purchase_status = purchase.status
+        purchase.received_by = receiver.id
+        purchase.arrived_at = arrived_at
+        purchase.status = PurchaseStatus.ARRIVED
+        db.expire(purchase, ["received_by_employee"])
+        if employee_id is None:
+            action_value = "auto_receive"
+        else:
+            action_value = "manual_receive"
+        if only_purchase_id is not None:
+            reason_value = "单张进货单手动签收"
+        else:
+            if employee_id is None:
+                reason_value = "系统按预计到货时间自动签收"
+            else:
+                reason_value = "店长手动补执行签收"
+        await create_operation_audit_log(
+            employee_id=employee_id,
+            module="purchase",
+            action=action_value,
+            target_type="purchase",
+            target_id=purchase.id,
+            before_data={"status": before_purchase_status},
+            after_data={
+                "status": purchase.status,
+                "received_by": purchase.received_by,
+                "arrived_at": purchase.arrived_at,
+            },
+            reason=reason_value,
+            db=db,
+        )
+    await db.flush()
+    return due_purchases

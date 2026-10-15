@@ -1,7 +1,7 @@
 """接口与业务查询缓存：命名空间、稳定键、类型化结果恢复及故障降级。
 
-HTTP接口缓存使用请求键，销量预测和历史报表使用business_cache装饰器。
-两者共用Redis或进程内后端，不缓存业务写入及实时库存，不替代上层权限校验。
+接口在Service完成权限检查后缓存查询结果，销量预测和历史报表也使用business_cache装饰器。
+缓存共用Redis或进程内后端，不缓存业务写入及实时库存，不替代上层权限校验。
 """
 
 import hashlib
@@ -110,26 +110,30 @@ def business_cache(
                     return await func(*args, **kwargs)
             except AssertionError:
                 return await func(*args, **kwargs)
-            scope = (
-                {}
-                if shared_forecast
-                else {
-                    key: db.info.get(key)
-                    for key in (
-                        "read_store_id",
-                        "actor_id",
-                        "actor_role",
-                        "own_store_id",
-                        "store_context",
-                        "company_catalog_read",
-                    )
-                }
-            )
+            if shared_forecast:
+                scope = {}
+            else:
+                scope_mapping = {}
+                for scope_key in (
+                    "read_store_id",
+                    "actor_id",
+                    "actor_role",
+                    "own_store_id",
+                    "store_context",
+                    "company_catalog_read",
+                ):
+                    scope_mapping[scope_key] = db.info.get(scope_key)
+                scope = scope_mapping
+            arguments_value_mapping = {}
+            for arguments_value_key, arguments_value_value in arguments.items():
+                if arguments_value_key != "db":
+                    arguments_value_mapping[arguments_value_key] = arguments_value_value
+            arguments_value = arguments_value_mapping
             payload = {
                 "function": f"{func.__module__}.{func.__qualname__}",
                 "scope": scope,
                 "database": db.get_bind().engine.url.render_as_string(hide_password=True),
-                "arguments": {key: value for key, value in arguments.items() if key != "db"},
+                "arguments": arguments_value,
             }
             digest = hashlib.sha256(
                 json.dumps(payload, sort_keys=True, default=str).encode()

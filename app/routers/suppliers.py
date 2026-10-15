@@ -1,14 +1,8 @@
 """供应商管理 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
-from fastapi_cache.decorator import cache
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import (
-    SUPPLIERS_CACHE_NAMESPACE,
-    SUPPLIERS_CACHE_SECONDS,
-    request_cache_key_builder,
-)
 from app.dependencies.auth import get_current_employee_id, get_verified_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
@@ -37,15 +31,12 @@ suppliers_router = APIRouter(prefix="/suppliers", tags=["suppliers"])
     summary="获取供应商列表",
     description="店长分页获取供应商列表，并可按照启用状态筛选。",
 )
-@cache(
-    expire=SUPPLIERS_CACHE_SECONDS,
-    namespace=SUPPLIERS_CACHE_NAMESPACE,
-    key_builder=request_cache_key_builder,
-)
 async def get_suppliers_list(
     db: AsyncSession = Depends(get_db),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     request: SuppliersListRequest = Depends(),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierListResponse]:
     """接收分页和状态参数，并使用统一响应格式返回供应商列表。"""
 
@@ -55,6 +46,7 @@ async def get_suppliers_list(
         is_active=request.is_active,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[SupplierListResponse](
@@ -73,15 +65,12 @@ async def get_suppliers_list(
     summary="获取供应商详情",
     description="获取供应商详情。",
 )
-@cache(
-    expire=SUPPLIERS_CACHE_SECONDS,
-    namespace=SUPPLIERS_CACHE_NAMESPACE,
-    key_builder=request_cache_key_builder,
-)
 async def get_supplier_detail(
     supplier_id: int = Path(..., description="供应商ID", ge=1),
     db: AsyncSession = Depends(get_db),
     current_employee_id: int = Depends(get_verified_current_employee_id),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierItemResponse]:
     """接收供应商ID，并使用统一响应格式返回供应商详情。"""
 
@@ -89,6 +78,7 @@ async def get_supplier_detail(
         supplier_id=supplier_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[SupplierItemResponse](
@@ -112,15 +102,18 @@ async def update_supplier_status(
     supplier_id: int = Path(..., description="供应商ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierItemResponse]:
     """接收供应商ID和启用状态参数，并使用统一响应格式返回修改后的供应商信息。"""
 
     supplier = await update_supplier_status_service(
         supplier_id=supplier_id,
-        is_active=status.is_active,  # 请求体中明确提交的新合作状态。
+        is_active=status.is_active,
         reason=status.reason,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[SupplierItemResponse](
@@ -145,6 +138,8 @@ async def update_supplier_details(
     supplier_id: int = Path(..., description="供应商ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierItemResponse]:
     """接收供应商ID和修改后的供应商信息，并使用统一响应格式返回修改后的供应商信息。"""
 
@@ -154,6 +149,7 @@ async def update_supplier_details(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[SupplierItemResponse](
@@ -177,14 +173,14 @@ async def create_supplier(
     request: SuppliersCreateRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierItemResponse]:
     """接收供应商信息，并使用统一响应格式返回创建后的供应商信息。"""
 
     # request是前端提交的创建内容；Service负责权限、数据和重复值校验。
     created_supplier = await create_supplier_service(
-        request=request,
-        current_employee_id=current_employee_id,
-        db=db,
+        request=request, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
 
     return ResponseModel[SupplierItemResponse](

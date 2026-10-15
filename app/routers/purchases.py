@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -21,6 +21,7 @@ from app.services.purchases import (
     get_purchase_detail_service,
     get_purchases_list_service,
     receive_purchase_service,
+    reject_manual_purchase_service,
 )
 
 # 最终接口地址统一以 /api/v1/purchases 开头。
@@ -47,8 +48,12 @@ async def receive_purchase(
     purchase_id: int = Path(..., ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[PurchaseDetailResponse]:
-    result = await receive_purchase_service(purchase_id, current_employee_id, db)
+    result = await receive_purchase_service(
+        purchase_id, current_employee_id, db, http_request=http_request
+    )
     return ResponseModel[PurchaseDetailResponse](message="进货单签收成功", data=result)
 
 
@@ -61,8 +66,18 @@ async def minimum_stock(
     request: SaveMinimumStock,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    return ResponseModel(data=await save_minimum_stock(request, current_employee_id, db))
+    return ResponseModel(
+        data=await save_minimum_stock(
+            request,
+            current_employee_id,
+            db,
+            http_request=http_request,
+            access_employee_id=current_employee_id,
+        )
+    )
 
 
 @purchases_router.put("/planning", summary="保存到货日订货数量")
@@ -70,8 +85,18 @@ async def save_planning(
     request: SavePurchasePlan,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    return ResponseModel(data=await save_purchase_plan(request, current_employee_id, db))
+    return ResponseModel(
+        data=await save_purchase_plan(
+            request,
+            current_employee_id,
+            db,
+            http_request=http_request,
+            access_employee_id=current_employee_id,
+        )
+    )
 
 
 @purchases_router.get("/planning", summary="获取七天进货计划参考")
@@ -80,9 +105,19 @@ async def purchase_planning(
     arrival_date: date | None = Query(None),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
     """展示持久化订货计划、已有到货、上周销量与可售库存。"""
-    return ResponseModel(data=await get_purchase_planning(department_id, arrival_date, db))
+    return ResponseModel(
+        data=await get_purchase_planning(
+            department_id,
+            arrival_date,
+            db,
+            http_request=http_request,
+            access_employee_id=current_employee_id,
+        )
+    )
 
 
 @purchases_router.get(
@@ -95,6 +130,8 @@ async def list_purchases(
     request: PurchasesListRequest = Depends(),
     db: AsyncSession = Depends(get_db),
     current_employee_id: int = Depends(get_current_employee_id),
+    *,
+    http_request: Request,
 ) -> ResponseModel[PurchaseListResponse]:
     """接收列表查询参数，并使用统一响应格式返回进货单列表。"""
 
@@ -108,6 +145,7 @@ async def list_purchases(
         purchase_status=request.status,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[PurchaseListResponse](
         message="获取进货单列表成功",
@@ -128,12 +166,13 @@ async def list_purchases(
 async def auto_receive_purchases(
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[list[PurchaseDetailResponse]]:
     """模拟每天12点执行的自动签收任务；当前由店长调用接口触发。"""
 
     purchases = await auto_receive_purchases_service(
-        current_employee_id=current_employee_id,
-        db=db,
+        current_employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[list[PurchaseDetailResponse]](
         message=f"自动签收完成，共签收{len(purchases)}张进货单",
@@ -155,6 +194,8 @@ async def get_purchase_detail(
     purchase_id: int = Path(..., description="进货单ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[PurchaseDetailResponse]:
     """接收进货单ID，并返回进货单汇总及商品明细。"""
 
@@ -162,6 +203,7 @@ async def get_purchase_detail(
         purchase_id=purchase_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[PurchaseDetailResponse](
         message="获取进货单详情成功",
@@ -184,10 +226,12 @@ async def create_purchase(
     request: CreatePurchaseRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[PurchaseDetailResponse]:
-    """接收进货单汇总及商品明细，并返回进货单汇总及商品明细。"""
-
-    raise HTTPException(409, "请保存订货计划，进货单将在截止时间自动生成")
+    return await reject_manual_purchase_service(
+        request=request, current_employee_id=current_employee_id, db=db, http_request=http_request
+    )
 
 
 # endregion

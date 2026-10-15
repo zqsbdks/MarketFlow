@@ -6,25 +6,25 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import func, select
+from store_fixtures import set_request_store
 from test_store_policy import request
 
 from app.core.business_time import business_now
-from app.core.store_policy import configure_store_context
 from app.models.ai_conversation import AiConversation, AiMessage
 from app.models.ai_pending_action import AiPendingAction
 from app.models.employee import Employee
 from app.models.product import Product
-from app.routers.ai_conversations import get_conversation
-from app.routers.stores import transfer_employee
 from app.schemas.ai_chat_requests import AiChatRequest
 from app.schemas.ai_chat_responses import AiChatResponse
 from app.schemas.stores import EmployeeTransferRequest
 from app.services import ai_memory
 from app.services.ai_actions import confirm_ai_action_service
+from app.services.ai_conversations import get_conversation_service as get_conversation
+from app.services.stores import transfer_employee_service as transfer_employee
 
 
 async def context(db, employee=2, store="1"):
-    await configure_store_context(
+    await set_request_store(
         request("/api/v1/ai-chat", "POST", store), await db.get(Employee, employee), db
     )
 
@@ -117,7 +117,7 @@ async def test_transfer_revokes_old_history_and_cancels_pending_actions(store_da
         db.add_all([conversation, action])
         await db.commit()
         id_, action_id = conversation.id, action.id
-        await configure_store_context(
+        await set_request_store(
             request("/api/v1/stores/employees/2/assignment", "PUT"), await db.get(Employee, 4), db
         )
         await transfer_employee(2, EmployeeTransferRequest(store_id=2, department_id=1), 4, db)

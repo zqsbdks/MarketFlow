@@ -299,21 +299,24 @@ MARKETFLOW_TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "description": "提出上架或停售一个商品。只生成待确认操作，绝不直接修改数据库。",
         "parameters": ProductStatusArguments.model_json_schema(),
     },
-    *[
-        {
-            "name": f"prepare_{action_type}",
-            "description": (
-                f"提出{ACTION_NAMES[action_type]}。只生成待确认卡片，用户确认后才执行。"
-            ),
-            "parameters": parameter_model.model_json_schema(),
-        }
-        for action_type, parameter_model in ACTION_PARAMETER_MODELS.items()
-    ],
 ]
 
-TOOL_DEFINITIONS_BY_NAME = {
-    definition["name"]: definition for definition in MARKETFLOW_TOOL_DEFINITIONS
-}
+# 把允许的业务操作逐项加入工具列表。
+for action_type, parameter_model in ACTION_PARAMETER_MODELS.items():
+    MARKETFLOW_TOOL_DEFINITIONS.append(
+        {
+            "name": f"prepare_{action_type}",
+            "description": f"提出{ACTION_NAMES[action_type]}。只生成待确认卡片，用户确认后才执行。",
+            "parameters": parameter_model.model_json_schema(),
+        }
+    )
+
+TOOL_DEFINITIONS_BY_NAME_mapping = {}
+for TOOL_DEFINITIONS_BY_NAME_definition in MARKETFLOW_TOOL_DEFINITIONS:
+    TOOL_DEFINITIONS_BY_NAME_mapping[TOOL_DEFINITIONS_BY_NAME_definition["name"]] = (
+        TOOL_DEFINITIONS_BY_NAME_definition
+    )
+TOOL_DEFINITIONS_BY_NAME = TOOL_DEFINITIONS_BY_NAME_mapping
 
 DEFAULT_TOOL_NAMES = {
     "search_products",
@@ -419,11 +422,11 @@ def select_marketflow_tools(user_message: str) -> list[dict[str, Any]]:
         selected_names.update(DEFAULT_TOOL_NAMES)
 
     # 保持主定义列表中的固定顺序，便于测试和排查供应商请求。
-    return [
-        definition
-        for definition in MARKETFLOW_TOOL_DEFINITIONS
-        if definition["name"] in selected_names
-    ]
+    result_values = []
+    for result_definition in MARKETFLOW_TOOL_DEFINITIONS:
+        if result_definition["name"] in selected_names:
+            result_values.append(result_definition)
+    return result_values
 
 
 # endregion
@@ -557,10 +560,14 @@ async def execute_marketflow_tool(
                 current_employee_id=employee_id,
                 db=db,
             )
+            items_value_values = []
+            for items_value_item in departments:
+                items_value_values.append(items_value_item.model_dump(mode="json"))
+            items_value = items_value_values
             return ToolExecutionResult(
                 data={
                     "ok": True,
-                    "items": [item.model_dump(mode="json") for item in departments],
+                    "items": items_value,
                 }
             )
 
@@ -571,10 +578,16 @@ async def execute_marketflow_tool(
                 current_employee_id=employee_id,
                 db=db,
             )
+            items_value_item_item_values = []
+            for items_value_item_item_item in categories:
+                items_value_item_item_values.append(
+                    items_value_item_item_item.model_dump(mode="json")
+                )
+            items_value_item_item = items_value_item_item_values
             return ToolExecutionResult(
                 data={
                     "ok": True,
-                    "items": [item.model_dump(mode="json") for item in categories],
+                    "items": items_value_item_item,
                 }
             )
 
@@ -780,7 +793,10 @@ async def execute_marketflow_tool(
                 department_id=product.department.id,
                 db=db,
             )
-            status_name = "上架" if status_values.status == ProductStatus.ON_SALE else "停售"
+            if status_values.status == ProductStatus.ON_SALE:
+                status_name = "上架"
+            else:
+                status_name = "停售"
             summary = f"将商品 {product.product_no}（{product.name}）修改为{status_name}状态"
             action_arguments = status_values.model_dump(mode="json")
             action = await create_ai_pending_action(

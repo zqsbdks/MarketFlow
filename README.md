@@ -43,7 +43,7 @@
 ## 目录和阅读顺序
 
 ```text
-app/core/          配置、数据库、安全、缓存、门店隔离与调度
+app/core/          配置、数据库连接、安全、缓存与后台调度
 app/models/        SQLAlchemy模型与约束
 app/schemas/       Pydantic输入校验及输出类型
 app/crud/          数据库查询和写入

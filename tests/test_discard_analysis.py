@@ -5,9 +5,9 @@ from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
+from store_fixtures import set_request_store
 from test_store_policy import request as http_request
 
-from app.core.store_policy import configure_store_context
 from app.models.inventory_discard import InventoryDiscard
 from app.schemas.discard_analysis import DiscardAnalysisRequest
 from app.services.discard_analysis import get_discard_analysis
@@ -56,7 +56,7 @@ async def test_full_date_and_store_scope(analysis_database):
 
     async with analysis_database() as db:
         actor = await db.get(Employee, 1)
-        await configure_store_context(
+        await set_request_store(
             http_request(path="/api/v1/reports/discard-analysis", store="1"), actor, db
         )
         result = await get_discard_analysis(db, 1, query())
@@ -74,7 +74,7 @@ async def test_company_totals_and_forbidden_all(analysis_database):
 
     async with analysis_database() as db:
         actor = await db.get(Employee, 4)
-        await configure_store_context(
+        await set_request_store(
             http_request(path="/api/v1/reports/discard-analysis", store="all"), actor, db
         )
         result = await get_discard_analysis(db, 4, query())
@@ -85,8 +85,11 @@ async def test_company_totals_and_forbidden_all(analysis_database):
     async with analysis_database() as db:
         actor = await db.get(Employee, 1)
         with pytest.raises(HTTPException) as exc:
-            await configure_store_context(
-                http_request(path="/api/v1/reports/discard-analysis", store="all"), actor, db
+            await get_discard_analysis(
+                db,
+                1,
+                query(),
+                http_request=http_request(path="/api/v1/reports/discard-analysis", store="all"),
             )
         assert exc.value.status_code == 403
 
@@ -124,7 +127,7 @@ async def test_analytics_loss_metrics_are_optional_and_do_not_force_sales_query(
     sales = AsyncMock(return_value=(None, [], []))
     monkeypatch.setattr(reports, "get_report_analytics", sales)
     async with analysis_database() as db:
-        await configure_store_context(
+        await set_request_store(
             http_request(path="/api/v1/reports/analytics", store="1"), await db.get(Employee, 1), db
         )
         result = await reports.get_report_analytics_service(
@@ -175,7 +178,7 @@ async def test_analytics_loss_ratio_does_not_return_unselected_revenue(
     )
     monkeypatch.setattr(reports, "get_report_analytics", sales)
     async with analysis_database() as db:
-        await configure_store_context(
+        await set_request_store(
             http_request(path="/api/v1/reports/analytics", store="1"), await db.get(Employee, 1), db
         )
         result = await reports.get_report_analytics_service(

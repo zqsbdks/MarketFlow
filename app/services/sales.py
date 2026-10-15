@@ -3,23 +3,33 @@
 from datetime import datetime, time
 from decimal import Decimal
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.business_time import business_now
+from app.crud import sales as data_access
 from app.crud.auth import get_employee_by_id
+from app.crud.business_sequence import next_business_sequence
+from app.crud.operation_audit_logs import create_operation_audit_log
 from app.crud.sales import (
     InsufficientStockError,
-    create_sale,
     get_sale_by_client_request_id,
     get_sales_detail,
     get_sales_list,
 )
+from app.crud.stores import department_is_enabled, first_active_store_id, get_store_by_id
 from app.models.discount_rule import DiscountRule
-from app.models.enums import DiscountType, ProductStatus
+from app.models.enums import (
+    DiscountType,
+    EmployeeRole,
+    InventoryBatchStatus,
+    ProductStatus,
+    SaleSource,
+)
 from app.models.sale import Sale
+from app.models.sale_item import SaleItem
 from app.schemas.sales_requests import CreateSaleRequest
 from app.schemas.sales_responses import (
     SaleDetailItemResponse,
@@ -97,8 +107,54 @@ async def get_sales_list_service(
     sale_no: str | None,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> SalesListResponse:
     """验证当前员工和日期范围，并组装销售单分页列表。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     employee = await get_employee_by_id(
         employee_id=current_employee_id,
@@ -162,6 +218,10 @@ async def get_sales_list_service(
         for item in sale.items:
             total_quantity += item.quantity
 
+        response_items_set = set()
+        for response_items_item in sale.items:
+            response_items_set.add(response_items_item.product_id)
+        response_items = response_items_set
         sale_item = SalesItemResponse(
             sale_no=sale.sale_no,
             sold_at=sale.sold_at,
@@ -170,7 +230,7 @@ async def get_sales_list_service(
             total_amount=sale.total_amount,
             total_quantity=total_quantity,
             # 同一商品可能因为跨批次被拆成多条明细，种类数按商品ID去重。
-            item_count=len({item.product_id for item in sale.items}),
+            item_count=len(response_items),
         )
         sale_items.append(sale_item)
 
@@ -193,8 +253,54 @@ async def preview_sale_price_service(
     request: CreateSaleRequest,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> SalePricePreviewResponse:
     """验证收银员工，并按当前生效规则计算价格但不扣库存、不创建销售单。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 第一步：价格预览也属于内部收银功能，因此需要验证员工账号状态。
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -245,6 +351,22 @@ async def preview_sale_price_service(
         discount_amount = original_subtotal - subtotal
         rule = price.discount_rule
 
+        if rule is not None:
+            discount_rule_id_value = rule.id
+        else:
+            discount_rule_id_value = None
+        if rule is not None:
+            discount_rule_name_value = rule.name
+        else:
+            discount_rule_name_value = None
+        if rule is not None:
+            discount_type_value = rule.discount_type
+        else:
+            discount_type_value = None
+        if rule is not None:
+            discount_value_value = rule.discount_value
+        else:
+            discount_value_value = None
         preview_items.append(
             SaleDetailItemResponse(
                 product_id=price.product.id,
@@ -255,10 +377,10 @@ async def preview_sale_price_service(
                 original_subtotal=original_subtotal,
                 discount_amount=discount_amount,
                 subtotal=subtotal,
-                discount_rule_id=rule.id if rule is not None else None,
-                discount_rule_name=rule.name if rule is not None else None,
-                discount_type=rule.discount_type if rule is not None else None,
-                discount_value=rule.discount_value if rule is not None else None,
+                discount_rule_id=discount_rule_id_value,
+                discount_rule_name=discount_rule_name_value,
+                discount_type=discount_type_value,
+                discount_value=discount_value_value,
             )
         )
         original_total_amount += original_subtotal
@@ -283,8 +405,57 @@ async def create_sale_service(
     current_employee_id: int,
     # db：当前 HTTP 请求使用的异步数据库会话。
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> SaleDetailResponse:
     """验证收银员工，在营业时间内创建销售并扣减未过期批次库存。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 第一步：验证操作员工存在、账号启用并且已经修改初始密码。
     employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
@@ -303,7 +474,10 @@ async def create_sale_service(
         )
 
     # 相同幂等ID已完成结账时直接返回原小票，避免双击按钮重复扣减库存。
-    request_id = str(request.client_request_id) if request.client_request_id else None
+    if request.client_request_id:
+        request_id = str(request.client_request_id)
+    else:
+        request_id = None
     if request_id:
         existing_sale = await get_sale_by_client_request_id(request_id, db)
         if existing_sale is not None:
@@ -399,11 +573,53 @@ async def create_sale_service(
 
 # region 获取销售单详情
 async def get_sales_detail_service(
-    sale_no: str,
-    db: AsyncSession,
-    current_employee_id: int,
+    sale_no: str, db: AsyncSession, current_employee_id: int, *, http_request: Request | None = None
 ) -> SaleDetailResponse:
     """验证当前员工，并组装指定销售单及其商品明细。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     employee = await get_employee_by_id(
         employee_id=current_employee_id,
@@ -449,3 +665,193 @@ __all__ = [
     "get_sales_list_service",
     "preview_sale_price_service",
 ]
+
+
+async def create_sale(
+    requested_quantities: dict[int, int],
+    final_unit_prices: dict[int, Decimal],
+    applied_discount_rules: dict[int, DiscountRule | None],
+    sold_at: datetime,
+    employee_id: int,
+    client_request_id: str | None,
+    db: AsyncSession,
+) -> Sale:
+    """按先到期先销售原则扣减批次库存，并创建销售单和批次级明细。"""
+    original_total_amount = Decimal("0.00")
+    total_discount_amount = Decimal("0.00")
+    total_amount = Decimal("0.00")
+    total_cost = Decimal("0.00")
+    sale_items: list[SaleItem] = []
+    for product_id in sorted(requested_quantities):
+        requested_quantity = requested_quantities[product_id]
+        product = await data_access.get_sale_product_for_update(db=db, product_id=product_id)
+        if product is None:
+            raise LookupError(product_id)
+
+        # 保存前直接检查门店部门配置。
+        if db.info.get("store_context"):
+            if not await department_is_enabled(product.store_id, product.department_id, db):
+                raise HTTPException(400, "本店未启用此部门")
+        if product.status != ProductStatus.ON_SALE:
+            raise PermissionError(product.name)
+        original_unit_price = product.sale_price.quantize(Decimal("0.01"))
+        final_unit_price = final_unit_prices.get(product.id, original_unit_price)
+        if final_unit_price > original_unit_price:
+            final_unit_price = original_unit_price
+        applied_rule = applied_discount_rules.get(product.id)
+        batches = list(
+            (await data_access.get_saleable_batches_for_update(db=db, product_id=product_id)).all()
+        )
+        available_quantity = sum(batch.remaining_quantity for batch in batches)
+        if available_quantity < requested_quantity:
+            raise InsufficientStockError(
+                product_name=product.name,
+                requested=requested_quantity,
+                available=available_quantity,
+            )
+        quantity_left = requested_quantity
+        for batch in batches:
+            if quantity_left == 0:
+                break
+            before_batch_quantity = batch.remaining_quantity
+            before_batch_status = batch.status
+            deducted_quantity = min(batch.remaining_quantity, quantity_left)
+            batch.remaining_quantity -= deducted_quantity
+            if batch.remaining_quantity == 0:
+                batch.status = InventoryBatchStatus.SOLD_OUT
+            unit_cost = batch.purchase_item.unit_cost
+            original_subtotal = original_unit_price * deducted_quantity
+            subtotal = final_unit_price * deducted_quantity
+            discount_amount = original_subtotal - subtotal
+            cost_subtotal = unit_cost * deducted_quantity
+            if applied_rule is not None:
+                discount_rule_id_value_item = applied_rule.id
+            else:
+                discount_rule_id_value_item = None
+            if applied_rule is not None:
+                discount_rule_name_snapshot_value = applied_rule.name
+            else:
+                discount_rule_name_snapshot_value = None
+            if applied_rule is not None:
+                discount_type_snapshot_value = applied_rule.discount_type.value
+            else:
+                discount_type_snapshot_value = None
+            if applied_rule is not None:
+                discount_value_snapshot_value = applied_rule.discount_value
+            else:
+                discount_value_snapshot_value = None
+            sale_items.append(
+                SaleItem(
+                    store_id=db.info.get("write_store_id") or 1,
+                    product_id=product.id,
+                    inventory_batch_id=batch.id,
+                    product_no_snapshot=product.product_no,
+                    product_name_snapshot=product.name,
+                    department_id=product.department_id,
+                    quantity=deducted_quantity,
+                    original_unit_price=original_unit_price,
+                    unit_price=final_unit_price,
+                    discount_amount=discount_amount,
+                    discount_rule_id=discount_rule_id_value_item,
+                    discount_rule_name_snapshot=discount_rule_name_snapshot_value,
+                    discount_type_snapshot=discount_type_snapshot_value,
+                    discount_value_snapshot=discount_value_snapshot_value,
+                    unit_cost=unit_cost,
+                    subtotal=subtotal,
+                    cost_subtotal=cost_subtotal,
+                )
+            )
+            original_total_amount += original_subtotal
+            total_discount_amount += discount_amount
+            total_amount += subtotal
+            total_cost += cost_subtotal
+            quantity_left -= deducted_quantity
+            await create_operation_audit_log(
+                employee_id=employee_id,
+                module="inventory",
+                action="sale_deduction",
+                target_type="inventory_batch",
+                target_id=batch.id,
+                before_data={
+                    "remaining_quantity": before_batch_quantity,
+                    "status": before_batch_status,
+                },
+                after_data={
+                    "remaining_quantity": batch.remaining_quantity,
+                    "status": batch.status,
+                    "deducted_quantity": deducted_quantity,
+                },
+                reason="创建销售单时自动扣减库存",
+                db=db,
+            )
+        before_product_stock = product.stock_quantity
+        await db.flush()
+        product.stock_quantity = int(
+            await data_access.get_product_stock_total(db=db, product=product) or 0
+        )
+        await create_operation_audit_log(
+            employee_id=employee_id,
+            module="product",
+            action="sync_stock_after_sale",
+            target_type="product",
+            target_id=product.id,
+            before_data={"stock_quantity": before_product_stock},
+            after_data={"stock_quantity": product.stock_quantity},
+            reason="销售扣减批次后重新汇总商品库存",
+            db=db,
+        )
+    sale_no_prefix = f"S{sold_at:%Y%m%d}"
+    next_number = await next_business_sequence(f"sale:{sold_at:%Y%m%d}", db)
+    sale = Sale(
+        store_id=db.info.get("write_store_id") or 1,
+        sale_no=f"{sale_no_prefix}{next_number:04d}",
+        client_request_id=client_request_id,
+        sold_at=sold_at,
+        original_total_amount=original_total_amount,
+        discount_amount=total_discount_amount,
+        total_amount=total_amount,
+        total_cost=total_cost,
+        gross_profit=total_amount - total_cost,
+        source=SaleSource.POS,
+        items=sale_items,
+    )
+    data_access.add_sale_record(db=db, sale=sale)
+    await db.flush()
+    items_value_values = []
+    for items_value_item in sale.items:
+        items_value_values.append(
+            {
+                "sale_item_id": items_value_item.id,
+                "product_id": items_value_item.product_id,
+                "inventory_batch_id": items_value_item.inventory_batch_id,
+                "quantity": items_value_item.quantity,
+                "original_unit_price": items_value_item.original_unit_price,
+                "unit_price": items_value_item.unit_price,
+                "discount_amount": items_value_item.discount_amount,
+                "discount_rule_id": items_value_item.discount_rule_id,
+                "subtotal": items_value_item.subtotal,
+            }
+        )
+    items_value = items_value_values
+    await create_operation_audit_log(
+        employee_id=employee_id,
+        module="sale",
+        action="create",
+        target_type="sale",
+        target_id=sale.id,
+        before_data=None,
+        after_data={
+            "sale_no": sale.sale_no,
+            "original_total_amount": sale.original_total_amount,
+            "discount_amount": sale.discount_amount,
+            "total_amount": sale.total_amount,
+            "total_cost": sale.total_cost,
+            "gross_profit": sale.gross_profit,
+            "item_count": len(sale.items),
+            "sold_at": sale.sold_at,
+            "items": items_value,
+        },
+        reason=None,
+        db=db,
+    )
+    return sale

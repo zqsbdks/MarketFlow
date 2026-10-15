@@ -338,13 +338,22 @@ async def purchases(db, store, manager, products, catalogs, start, now, rng, vol
 
 
 async def sales(db, store, products, ledgers, rules, departments, start, now, rng, volume):
-    codes = {department.id: code for code, department in departments.items()}
+    codes_mapping = {}
+    for codes_code, codes_department in departments.items():
+        codes_mapping[codes_department.id] = codes_code
+    codes = codes_mapping
     # Persistent local preferences produce genuinely different rankings at each store.
-    preference = {p.id: rng.uniform(0.65, 1.5) for p in products}
+    preference_mapping = {}
+    for preference_p in products:
+        preference_mapping[preference_p.id] = rng.uniform(0.65, 1.5)
+    preference = preference_mapping
     counter = 0
     day = start
     while day <= now.date():
-        weekend = 1.22 if day.isoweekday() >= 6 else 0.93
+        if day.isoweekday() >= 6:
+            weekend = 1.22
+        else:
+            weekend = 0.93
         seasonal = 1 + 0.08 * ((day.month + store.id) % 3 - 1)
         count = max(1, round(rng.randint(82, 103) * weekend * seasonal * volume))
         moments = sorted(
@@ -361,23 +370,28 @@ async def sales(db, store, products, ledgers, rules, departments, start, now, rn
             )
             for _ in range(count)
         )
-        lots_today = {
-            p.id: [
-                (b, c) for b, c in ledgers[p.id] if b.arrived_at.date() <= day <= b.expiration_date
-            ]
-            for p in products
-        }
+        lots_today_mapping = {}
+        for lots_today_p in products:
+            result_values = []
+            for result_b, result_c in ledgers[lots_today_p.id]:
+                if result_b.arrived_at.date() <= day <= result_b.expiration_date:
+                    result_values.append((result_b, result_c))
+            lots_today_mapping[lots_today_p.id] = result_values
+        lots_today = lots_today_mapping
         daily = []
         for moment in moments:
             if moment > now:
                 continue
-            available = [
-                p
-                for p in products
+            available_values = []
+            for available_p in products:
                 if any(
-                    b.remaining_quantity > 0 and b.arrived_at <= moment for b, _ in lots_today[p.id]
-                )
-            ]
+                    (
+                        b.remaining_quantity > 0 and b.arrived_at <= moment
+                        for b, _ in lots_today[available_p.id]
+                    )
+                ):
+                    available_values.append(available_p)
+            available = available_values
             if not available:
                 continue
             selected = []
@@ -489,7 +503,10 @@ async def notices(db, store, manager, employees, departments, start, now, rng):
             title, content, priority, _, _ = rng.choice(TEMPLATES)
             created = datetime.combine(day, time(8, rng.randrange(45)))
             deadline = created + timedelta(days=rng.choice([1, 2, 3]))
-            status = "closed" if deadline < now else "published"
+            if deadline < now:
+                status = "closed"
+            else:
+                status = "published"
             if rng.random() < 0.08:
                 status = rng.choice(["draft", "withdrawn"])
             notice = ContactNotice(
@@ -551,12 +568,12 @@ async def seed_store(store_id):
         start = (await db.scalar(select(func.min(Sale.sold_at)).where(Sale.store_id == 1))).date()
         rng = random.Random(2026100400 + store.id)
         volume = rng.uniform(0.88, 1.17)
-        departments = {
-            d.code: d
-            for d in (
-                await db.scalars(select(Department).where(Department.is_active.is_(True)))
-            ).all()
-        }
+        departments_mapping = {}
+        for departments_d in (
+            await db.scalars(select(Department).where(Department.is_active.is_(True)))
+        ).all():
+            departments_mapping[departments_d.code] = departments_d
+        departments = departments_mapping
         manager, employees, products, catalogs = await master_data(
             db, store, departments, rng, start
         )
@@ -778,7 +795,11 @@ async def main(store_id=None, workers=3):
             *(run(item) for item in ([store_id] if store_id else ids)),
             return_exceptions=True,
         )
-        failures = [result for result in results if isinstance(result, BaseException)]
+        failures_values = []
+        for failures_result in results:
+            if isinstance(failures_result, BaseException):
+                failures_values.append(failures_result)
+        failures = failures_values
         if failures:
             raise RuntimeError(f"{len(failures)} store transactions failed: {failures}")
     finally:

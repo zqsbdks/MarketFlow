@@ -58,27 +58,34 @@ async def main():
                     )
                 ).all()
             )
-            amounts = {
-                sid: {
-                    "revenue": str(revenue),
-                    "cost": str(cost),
-                    "gross_profit": str(profit),
-                    "first_sale": first.isoformat(),
-                    "last_sale": last.isoformat(),
+            amounts_mapping = {}
+            for (
+                amounts_sid,
+                amounts_revenue,
+                amounts_cost,
+                amounts_profit,
+                amounts_first,
+                amounts_last,
+            ) in (
+                await db.execute(
+                    select(
+                        Sale.store_id,
+                        func.sum(Sale.total_amount),
+                        func.sum(Sale.total_cost),
+                        func.sum(Sale.gross_profit),
+                        func.min(Sale.sold_at),
+                        func.max(Sale.sold_at),
+                    ).group_by(Sale.store_id)
+                )
+            ).all():
+                amounts_mapping[amounts_sid] = {
+                    "revenue": str(amounts_revenue),
+                    "cost": str(amounts_cost),
+                    "gross_profit": str(amounts_profit),
+                    "first_sale": amounts_first.isoformat(),
+                    "last_sale": amounts_last.isoformat(),
                 }
-                for sid, revenue, cost, profit, first, last in (
-                    await db.execute(
-                        select(
-                            Sale.store_id,
-                            func.sum(Sale.total_amount),
-                            func.sum(Sale.total_cost),
-                            func.sum(Sale.gross_profit),
-                            func.min(Sale.sold_at),
-                            func.max(Sale.sold_at),
-                        ).group_by(Sale.store_id)
-                    )
-                ).all()
-            }
+            amounts = amounts_mapping
             completed = set(
                 (
                     await db.scalars(

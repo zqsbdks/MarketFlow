@@ -4,33 +4,37 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category import Category
+from app.models.store import StoreDepartment
 
 
 # region 根据ID查询分类
-async def get_category_by_id(
-    category_id: int,
-    db: AsyncSession,
-) -> Category | None:
+async def get_category_by_id(category_id: int, db: AsyncSession) -> Category | None:
     """根据主键查询一个商品分类。"""
-
-    return await db.get(Category, category_id)
+    store_query_1 = select(Category).where(Category.id == category_id)
+    if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+        enabled_departments = select(StoreDepartment.department_id).where(
+            StoreDepartment.store_id == db.info["read_store_id"],
+            StoreDepartment.is_active.is_(True),
+        )
+        store_query_1 = store_query_1.where(Category.department_id.in_(enabled_departments))
+    return await db.scalar(store_query_1)
 
 
 # endregion
 
 
 # region 获取商品分类列表
-async def get_categories_list(
-    department_id: int | None,
-    db: AsyncSession,
-) -> list[Category]:
+async def get_categories_list(department_id: int | None, db: AsyncSession) -> list[Category]:
     """查询全部分类，传入部门 ID 时只查询该部门的分类。"""
-
     statement = select(Category)
-
+    if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+        enabled_departments = select(StoreDepartment.department_id).where(
+            StoreDepartment.store_id == db.info["read_store_id"],
+            StoreDepartment.is_active.is_(True),
+        )
+        statement = statement.where(Category.department_id.in_(enabled_departments))
     if department_id is not None:
         statement = statement.where(Category.department_id == department_id)
-
     statement = statement.order_by(Category.id.asc())
     result = await db.scalars(statement)
     return list(result.all())

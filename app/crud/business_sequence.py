@@ -12,7 +12,10 @@ from app.models.business_sequence import BusinessSequence
 async def next_business_sequence(sequence_key: str, db: AsyncSession) -> int:
     """原子分配下一个流水号；同一计数器的并发请求会按行锁依次执行。"""
 
-    dialect_name = db.bind.dialect.name if db.bind is not None else "mysql"
+    if db.bind is not None:
+        dialect_name = db.bind.dialect.name
+    else:
+        dialect_name = "mysql"
     values = {"sequence_key": sequence_key, "current_value": 0}
     create_statement: Insert
     if dialect_name == "sqlite":

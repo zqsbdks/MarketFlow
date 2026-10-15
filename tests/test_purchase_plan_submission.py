@@ -6,7 +6,6 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import func, select
 
-from app.crud.purchases import create_purchase
 from app.models.purchase import Purchase
 from app.models.purchase_item import PurchaseItem
 from app.models.purchase_plan import PurchasePlan
@@ -14,6 +13,7 @@ from app.schemas.purchase_plan import SavePurchasePlan
 from app.schemas.purchases_requests import CreatePurchaseRequest
 from app.services import purchase_plan_submission as service
 from app.services.purchase_planning import get_purchase_planning
+from app.services.purchases import create_purchase_records as create_purchase
 
 
 def payload(quantity=15, catalog=1):

@@ -1,14 +1,8 @@
 """供应商商品目录 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
-from fastapi_cache.decorator import cache
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import (
-    SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
-    SUPPLIER_PRODUCTS_CACHE_SECONDS,
-    request_cache_key_builder,
-)
 from app.dependencies.auth import get_current_employee_id, get_verified_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
@@ -43,15 +37,12 @@ supplier_products_router = APIRouter(
     summary="获取供应商商品列表",
     description="分页获取供应商商品目录，并可按供应商、商品名称和供应状态筛选。",
 )
-@cache(
-    expire=SUPPLIER_PRODUCTS_CACHE_SECONDS,
-    namespace=SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
-    key_builder=request_cache_key_builder,
-)
 async def get_supplier_products_list(
     request: SupplierProductsListRequest = Depends(),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierProductListResponse]:
     """接收查询参数，并使用统一响应格式返回供应商商品列表。"""
 
@@ -63,6 +54,7 @@ async def get_supplier_products_list(
         is_active=request.is_active,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[SupplierProductListResponse](
         message="获取供应商商品列表成功",
@@ -80,15 +72,12 @@ async def get_supplier_products_list(
     summary="获取供应商商品详情",
     description="根据供应商商品目录ID获取详细资料。",
 )
-@cache(
-    expire=SUPPLIER_PRODUCTS_CACHE_SECONDS,
-    namespace=SUPPLIER_PRODUCTS_CACHE_NAMESPACE,
-    key_builder=request_cache_key_builder,
-)
 async def get_supplier_product_detail(
     supplier_product_id: int = Path(..., description="供应商商品目录ID", ge=1),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierProductItemResponse]:
     """接收目录ID，并返回对应的供应商商品详情。"""
 
@@ -96,6 +85,7 @@ async def get_supplier_product_detail(
         supplier_product_id=supplier_product_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[SupplierProductItemResponse](
         message="获取供应商商品详情成功",
@@ -117,13 +107,13 @@ async def create_supplier_product(
     request: SupplierProductCreateRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierProductItemResponse]:
     """接收商品资料，并返回创建后的供应商商品。"""
 
     supplier_product = await create_supplier_product_service(
-        request=request,
-        current_employee_id=current_employee_id,
-        db=db,
+        request=request, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[SupplierProductItemResponse](
         message="创建供应商商品成功",
@@ -146,6 +136,8 @@ async def update_supplier_product_status(
     supplier_product_id: int = Path(..., description="供应商商品目录ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierProductItemResponse]:
     """接收目录ID和新状态，并返回修改后的供应商商品。"""
 
@@ -155,6 +147,7 @@ async def update_supplier_product_status(
         reason=request.reason,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[SupplierProductItemResponse](
         message="修改供应商商品状态成功",
@@ -177,6 +170,8 @@ async def update_supplier_product_details(
     supplier_product_id: int = Path(..., description="供应商商品目录ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SupplierProductItemResponse]:
     """接收目录ID和实际修改字段，并返回修改后的供应商商品。"""
 
@@ -185,6 +180,7 @@ async def update_supplier_product_details(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[SupplierProductItemResponse](
         message="修改供应商商品详情成功",

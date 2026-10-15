@@ -125,8 +125,7 @@ async def test_current_employee_id_returns_integer(monkeypatch) -> None:
     async def fake_employee(**_kwargs):
         return type("EmployeeStub", (), {"is_active": True})()
 
-    monkeypatch.setattr("app.dependencies.auth.get_employee_by_id", fake_employee)
-    monkeypatch.setattr("app.core.store_policy.configure_store_context", AsyncMock())
+    monkeypatch.setattr("app.services.auth.get_employee_by_id", fake_employee)
     employee_id = await get_current_employee_id(_request(), {"sub": "123"}, AsyncMock())
 
     assert employee_id == 123

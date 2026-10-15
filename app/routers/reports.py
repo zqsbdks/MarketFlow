@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -47,6 +47,8 @@ async def overview(
     request: ReportRequest = Depends(),
     employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[ReportResponse]:
     """接收报表查询参数，并返回统一格式的营业概览。"""
 
@@ -56,6 +58,7 @@ async def overview(
         start_time=request.start_time,
         end_time=request.end_time,
         department_id=request.department_id,
+        http_request=http_request,
     )
 
     return ResponseModel[ReportResponse](
@@ -78,6 +81,8 @@ async def get_sales_rankings(
     request: RankingsRequest = Depends(),
     employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[RankingsResponse]:
     """接收排行查询参数，并返回统一格式的销售排行。"""
 
@@ -93,6 +98,7 @@ async def get_sales_rankings(
         sort_order=request.sort_order,
         page=request.page,
         page_size=request.page_size,
+        http_request=http_request,
     )
 
     return ResponseModel[RankingsResponse](
@@ -117,6 +123,8 @@ async def get_departments(
     db: AsyncSession = Depends(get_db),
     employee_id: int = Depends(get_current_employee_id),
     request: DepartmentRequest = Depends(),
+    *,
+    http_request: Request,
 ) -> ResponseModel[list[DepartmentResponse]]:
     """接收时间查询参数，并返回统一格式的部门营业对比。"""
 
@@ -125,6 +133,7 @@ async def get_departments(
         employee_id=employee_id,
         start_time=request.start_time,
         end_time=request.end_time,
+        http_request=http_request,
     )
 
     return ResponseModel[list[DepartmentResponse]](
@@ -148,6 +157,8 @@ async def get_report_analytics(
     request: Annotated[ReportAnalyticsRequest, Query()],
     employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[ReportAnalyticsResponse]:
     """接收多个指标名称，并返回统一格式的按需营业分析。
 
@@ -162,13 +173,14 @@ async def get_report_analytics(
 
     # Router只负责接收参数；权限验证、指标计算和响应组装都交给Service处理。
     analytics = await get_report_analytics_service(
-        db=db,  # 当前请求的数据库会话。
-        employee_id=employee_id,  # 当前登录员工ID，用来验证查看报表的权限。
-        start_time=request.start_time,  # 用户选择的统计开始时间，包含该时刻。
-        end_time=request.end_time,  # 用户选择的统计结束时间，不包含该时刻。
-        department_id=request.department_id,  # 部门ID；None表示查询全店。
-        interval=request.interval,  # 趋势粒度：小时、日、月或年。
-        metrics=request.metrics,  # 用户勾选的指标；未勾选指标不会计算和返回。
+        db=db,
+        employee_id=employee_id,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        department_id=request.department_id,
+        interval=request.interval,
+        metrics=request.metrics,
+        http_request=http_request,
     )
 
     return ResponseModel[ReportAnalyticsResponse](
@@ -191,8 +203,10 @@ async def discard_analysis(
     request: Annotated[DiscardAnalysisRequest, Query()],
     employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscardAnalysisResponse]:
-    data = await get_discard_analysis(db, employee_id, request)
+    data = await get_discard_analysis(db, employee_id, request, http_request=http_request)
     return ResponseModel(code=200, message="获取废弃损耗分析成功", data=data)
 
 

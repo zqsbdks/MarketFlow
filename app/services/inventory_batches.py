@@ -1,20 +1,19 @@
 """库存批次业务逻辑。"""
 
-from datetime import date
+from datetime import date, timedelta
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.business_time import business_now
+from app.crud import inventory_batches as data_access
 from app.crud.auth import get_employee_by_id
-from app.crud.inventory_batches import (
-    discard_expired_inventory_batch,
-    get_inventory_batch_by_id,
-    get_inventory_batches_list,
-    update_inventory_batch_quantity,
-)
+from app.crud.inventory_batches import get_inventory_batch_by_id, get_inventory_batches_list
+from app.crud.operation_audit_logs import create_operation_audit_log
+from app.crud.stores import department_is_enabled, first_active_store_id, get_store_by_id
 from app.models.enums import EmployeeRole, InventoryBatchStatus
+from app.models.inventory_batch import InventoryBatch
 from app.schemas.inventory_batches_requests import (
     InventoryBatchDiscardRequest,
     InventoryBatchQuantityUpdateRequest,
@@ -44,8 +43,54 @@ async def get_inventory_batches_list_service(
     current_employee_id: int,
     # db：当前请求使用的异步数据库会话。
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> InventoryBatchListResponse:
     """验证当前账号有效，并组装全部部门的分页库存批次列表。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 第一步：查询当前登录员工并检查账号的最新状态。
     current_employee = await get_employee_by_id(
@@ -137,8 +182,57 @@ async def update_inventory_batch_quantity_service(
     request: InventoryBatchQuantityUpdateRequest,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> InventoryBatchDetailResponse:
     """校验账号及部门权限，修改批次库存并同步商品总库存。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 第一步：执行与其他受保护接口相同的基础账号验证。
     current_employee = await get_employee_by_id(
@@ -185,6 +279,13 @@ async def update_inventory_batch_quantity_service(
             detail="库存批次不存在",
         )
 
+    # 明确检查所属店和部门，不再依赖保存前的自动事件。
+    if db.info.get("store_context"):
+        if batch.store_id != db.info.get("own_store_id"):
+            raise HTTPException(403, "只能修改所属门店数据")
+        if not await department_is_enabled(batch.store_id, batch.product.department_id, db):
+            raise HTTPException(400, "本店未启用此部门")
+
     # 店长可以修改所有部门；正式员工只能修改自己所属部门的批次。
     if (
         current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
@@ -228,8 +329,57 @@ async def discard_expired_inventory_batch_service(
     request: InventoryBatchDiscardRequest,
     current_employee_id: int,
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> InventoryBatchDetailResponse:
     """验证账号、部门和过期状态，废弃批次剩余库存并同步商品库存。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 第一步：确认当前员工存在、账号启用并且已经修改初始密码。
     current_employee = await get_employee_by_id(
@@ -274,6 +424,14 @@ async def discard_expired_inventory_batch_service(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="库存批次不存在",
         )
+
+    # 明确检查所属店和部门，不再依赖保存前的自动事件。
+    if db.info.get("store_context"):
+        if batch.store_id != db.info.get("own_store_id"):
+            raise HTTPException(403, "只能修改所属门店数据")
+        if not await department_is_enabled(batch.store_id, batch.product.department_id, db):
+            raise HTTPException(400, "本店未启用此部门")
+
     if (
         current_employee.role == EmployeeRole.REGULAR_EMPLOYEE
         and current_employee.department_id != batch.product.department_id
@@ -322,8 +480,54 @@ async def get_inventory_batch_detail_service(
     current_employee_id: int,
     # db：当前请求使用的异步数据库会话。
     db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> InventoryBatchDetailResponse:
     """验证当前账号有效，并返回指定库存批次的完整详情。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 第一步：检查当前员工存在、账号启用并且已经修改初始密码。
     # 所有员工角色均可查看，不进行角色和所属部门限制。
@@ -393,3 +597,110 @@ __all__ = [
     "get_inventory_batches_list_service",
     "update_inventory_batch_quantity_service",
 ]
+
+
+async def refresh_inventory_batch_statuses(current_date: date, db: AsyncSession) -> int:
+    """根据剩余数量和临期日期刷新全部批次状态，并返回变更数量。"""
+    result = await data_access.get_batches_for_status_refresh(db=db)
+    batches = list(result.all())
+    changed_count = 0
+    for batch in batches:
+        if batch.remaining_quantity == 0:
+            new_status = InventoryBatchStatus.SOLD_OUT
+        elif batch.expiration_date is not None and batch.expiration_date < current_date:
+            new_status = InventoryBatchStatus.EXPIRED
+        elif (
+            batch.expiration_date is not None
+            and batch.product.expiry_warning_days is not None
+            and (
+                batch.expiration_date
+                <= current_date + timedelta(days=batch.product.expiry_warning_days)
+            )
+        ):
+            new_status = InventoryBatchStatus.NEAR_EXPIRY
+        else:
+            new_status = InventoryBatchStatus.AVAILABLE
+        if batch.status != new_status:
+            previous_status = batch.status
+            batch.status = new_status
+            changed_count += 1
+            await create_operation_audit_log(
+                employee_id=None,
+                module="inventory",
+                action="refresh_batch_status",
+                target_type="inventory_batch",
+                target_id=batch.id,
+                before_data={"status": previous_status},
+                after_data={"status": new_status},
+                reason="系统根据库存数量和到期日期自动刷新批次状态",
+                store_id=batch.store_id,
+                db=db,
+            )
+    await db.flush()
+    return changed_count
+
+
+async def update_inventory_batch_quantity(
+    batch: InventoryBatch,
+    remaining_quantity: int,
+    employee_id: int,
+    reason: str | None,
+    db: AsyncSession,
+) -> InventoryBatch:
+    """修改批次剩余数量，记录调整历史并重新汇总商品总库存。"""
+    before_quantity = batch.remaining_quantity
+    batch.remaining_quantity = remaining_quantity
+    if remaining_quantity == 0:
+        batch.status = InventoryBatchStatus.SOLD_OUT
+    elif batch.expiration_date is not None and batch.expiration_date < business_now().date():
+        batch.status = InventoryBatchStatus.EXPIRED
+    elif (
+        batch.expiration_date is not None
+        and batch.product.expiry_warning_days is not None
+        and (
+            batch.expiration_date
+            <= business_now().date() + timedelta(days=batch.product.expiry_warning_days)
+        )
+    ):
+        batch.status = InventoryBatchStatus.NEAR_EXPIRY
+    else:
+        batch.status = InventoryBatchStatus.AVAILABLE
+    await db.flush()
+    batch.product.stock_quantity = int(
+        await data_access.get_product_for_stock_update(db=db, batch=batch) or 0
+    )
+    await create_operation_audit_log(
+        employee_id=employee_id,
+        module="inventory",
+        action="update_quantity",
+        target_type="inventory_batch",
+        target_id=batch.id,
+        before_data={"remaining_quantity": before_quantity},
+        after_data={"remaining_quantity": remaining_quantity},
+        reason=reason,
+        db=db,
+    )
+    return batch
+
+
+async def discard_expired_inventory_batch(
+    batch: InventoryBatch, employee_id: int, reason: str | None, db: AsyncSession
+) -> InventoryBatch:
+    """清空一个过期批次的剩余库存，同步商品总库存并写入审计记录。"""
+    from uuid import uuid4
+
+    from app.crud.auth import get_employee_by_id
+    from app.services.inventory_discards import record_discard
+
+    employee = await get_employee_by_id(employee_id=employee_id, db=db)
+    await record_discard(
+        product=batch.product,
+        allocation=[(batch, batch.remaining_quantity)],
+        request_key=str(uuid4()),
+        reason_code="expired",
+        note=reason,
+        employee=employee,
+        requested_batch_id=batch.id,
+        db=db,
+    )
+    return batch

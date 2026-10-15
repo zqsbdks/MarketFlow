@@ -53,7 +53,8 @@ async def test_manager_can_discard_expired_inventory_batch(monkeypatch) -> None:
         "app.services.inventory_batches.get_inventory_batch_detail_service",
         get_detail,
     )
-    db = AsyncMock(spec=AsyncSession)
+    db = AsyncMock(spec=AsyncSession, info={})
+    db.info = {}
 
     result = await discard_expired_inventory_batch_service(
         batch_id=batch.id,
@@ -98,7 +99,7 @@ async def test_unexpired_inventory_batch_cannot_be_discarded(monkeypatch) -> Non
             batch_id=batch.id,
             request=InventoryBatchDiscardRequest(),
             current_employee_id=employee.id,
-            db=AsyncMock(spec=AsyncSession),
+            db=AsyncMock(spec=AsyncSession, info={}),
         )
 
     assert exc_info.value.status_code == 400

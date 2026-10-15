@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.employee import Employee
+from app.models.enums import EmployeeRole
 from app.models.inventory_batch import InventoryBatch
 from app.models.operation_audit_log import OperationAuditLog
 from app.models.product import Product
@@ -39,8 +40,12 @@ async def create_operation_audit_log(
 ) -> OperationAuditLog:
     """把一次数据变更加入当前事务；系统自动任务的员工 ID 可以为空。"""
 
+    if store_id is not None:
+        store_id_value = store_id
+    else:
+        store_id_value = db.info.get("write_store_id")
     log = OperationAuditLog(
-        store_id=store_id if store_id is not None else db.info.get("write_store_id"),
+        store_id=store_id_value,
         employee_id=employee_id,
         module=module,
         action=action,
@@ -70,11 +75,9 @@ async def get_inventory_movements(
     end_time: datetime | None,
     db: AsyncSession,
 ) -> tuple[
-    list[tuple[OperationAuditLog, str | None, str | None, int | None, str | None, str | None]],
-    int,
+    list[tuple[OperationAuditLog, str | None, str | None, int | None, str | None, str | None]], int
 ]:
     """查询改变批次数量的审计记录，并关联员工、批次和商品。"""
-
     conditions: list[ColumnElement[bool]] = [
         OperationAuditLog.module == "inventory",
         OperationAuditLog.target_type == "inventory_batch",
@@ -99,8 +102,16 @@ async def get_inventory_movements(
         conditions.append(OperationAuditLog.created_at >= start_time)
     if end_time is not None:
         conditions.append(OperationAuditLog.created_at <= end_time)
-
-    # 使用左连接，即使员工为系统任务，流水也不会丢失。
+    # 外连接的店铺条件放进 ON，批次不存在时仍保留这条审计记录。
+    batch_join_condition = InventoryBatch.id == OperationAuditLog.target_id
+    product_join_condition = Product.id == InventoryBatch.product_id
+    if db.info.get("read_store_id") is not None:
+        batch_join_condition = batch_join_condition & (
+            InventoryBatch.store_id == db.info["read_store_id"]
+        )
+        product_join_condition = product_join_condition & (
+            Product.store_id == db.info["read_store_id"]
+        )
     base_statement = (
         select(
             OperationAuditLog,
@@ -111,10 +122,17 @@ async def get_inventory_movements(
             Product.name,
         )
         .outerjoin(Employee, Employee.id == OperationAuditLog.employee_id)
-        .outerjoin(InventoryBatch, InventoryBatch.id == OperationAuditLog.target_id)
-        .outerjoin(Product, Product.id == InventoryBatch.product_id)
+        .outerjoin(InventoryBatch, batch_join_condition)
+        .outerjoin(Product, product_join_condition)
         .where(*conditions)
     )
+    if db.info.get("store_context") and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS:
+        base_statement = base_statement.where(OperationAuditLog.store_id == db.info["own_store_id"])
+    if (
+        db.info.get("private_employee_path")
+        and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS
+    ):
+        base_statement = base_statement.where(Employee.store_id == db.info["own_store_id"])
     list_statement = (
         base_statement.order_by(OperationAuditLog.created_at.desc(), OperationAuditLog.id.desc())
         .offset(offset)
@@ -122,24 +140,40 @@ async def get_inventory_movements(
     )
     count_statement = (
         select(func.count(OperationAuditLog.id))
-        .outerjoin(InventoryBatch, InventoryBatch.id == OperationAuditLog.target_id)
-        .outerjoin(Product, Product.id == InventoryBatch.product_id)
+        .outerjoin(InventoryBatch, batch_join_condition)
+        .outerjoin(Product, product_join_condition)
         .where(*conditions)
     )
-
+    if db.info.get("store_context") and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS:
+        count_statement = count_statement.where(
+            OperationAuditLog.store_id == db.info["own_store_id"]
+        )
     total = int(await db.scalar(count_statement) or 0)
     rows = (await db.execute(list_statement)).all()
-    return [
-        (audit_log, employee_name, batch_no, joined_product_id, product_no, product_name)
-        for (
-            audit_log,
-            employee_name,
-            batch_no,
-            joined_product_id,
-            product_no,
-            product_name,
-        ) in rows
-    ], total
+    response_items_values = []
+    for (
+        response_items_audit_log,
+        response_items_employee_name,
+        response_items_batch_no,
+        response_items_joined_product_id,
+        response_items_product_no,
+        response_items_product_name,
+    ) in rows:
+        response_items_values.append(
+            (
+                response_items_audit_log,
+                response_items_employee_name,
+                response_items_batch_no,
+                response_items_joined_product_id,
+                response_items_product_no,
+                response_items_product_name,
+            )
+        )
+    response_items = response_items_values
+    return (
+        response_items,
+        total,
+    )
 
 
 # endregion
@@ -159,8 +193,6 @@ async def get_operation_audit_logs(
     db: AsyncSession,
 ) -> tuple[list[tuple[OperationAuditLog, str | None]], int]:
     """分页查询审计记录，并同时返回操作员工姓名和符合条件的总数。"""
-
-    # 只把前端实际传入的筛选项加入查询；空条件列表表示查询全部审计记录。
     conditions: list[ColumnElement[bool]] = []
     if employee_id is not None:
         conditions.append(OperationAuditLog.employee_id == employee_id)
@@ -176,8 +208,6 @@ async def get_operation_audit_logs(
         conditions.append(OperationAuditLog.created_at >= start_time)
     if end_time is not None:
         conditions.append(OperationAuditLog.created_at <= end_time)
-
-    # employee_id 允许为空，因此使用左连接；系统自动任务也会保留在查询结果中。
     list_statement = (
         select(OperationAuditLog, Employee.name)
         .outerjoin(Employee, Employee.id == OperationAuditLog.employee_id)
@@ -186,11 +216,27 @@ async def get_operation_audit_logs(
         .offset(offset)
         .limit(page_size)
     )
+    if db.info.get("store_context") and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS:
+        list_statement = list_statement.where(OperationAuditLog.store_id == db.info["own_store_id"])
+    if (
+        db.info.get("private_employee_path")
+        and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS
+    ):
+        list_statement = list_statement.where(Employee.store_id == db.info["own_store_id"])
     count_statement = select(func.count(OperationAuditLog.id)).where(*conditions)
-
+    if db.info.get("store_context") and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS:
+        count_statement = count_statement.where(
+            OperationAuditLog.store_id == db.info["own_store_id"]
+        )
     total = int(await db.scalar(count_statement) or 0)
     rows = (await db.execute(list_statement)).all()
-    return [(audit_log, employee_name) for audit_log, employee_name in rows], total
+    response_items_item_values = []
+    for response_items_item_audit_log, response_items_item_employee_name in rows:
+        response_items_item_values.append(
+            (response_items_item_audit_log, response_items_item_employee_name)
+        )
+    response_items_item = response_items_item_values
+    return (response_items_item, total)
 
 
 # endregion

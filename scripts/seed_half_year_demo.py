@@ -61,7 +61,10 @@ async def seed():
                 )
             ).all()
         )
-        departments = {d.code: d for d in (await db.scalars(select(Department))).all()}
+        departments_mapping = {}
+        for departments_d in (await db.scalars(select(Department))).all():
+            departments_mapping[departments_d.code] = departments_d
+        departments = departments_mapping
         suppliers = list(
             (
                 await db.scalars(
@@ -164,7 +167,11 @@ async def seed():
             hq.employee_no = f"E{hq.id:05d}"
         groups = [("all", None, "全員", employees)]
         for department in departments.values():
-            members = [e for e in employees if e.department_id == department.id]
+            members_values = []
+            for members_e in employees:
+                if members_e.department_id == department.id:
+                    members_values.append(members_e)
+            members = members_values
             if members:
                 groups.append(("department", department.id, department.name, members))
         groups.append(("personal", None, "担当者", [manager, employees[-1]]))
@@ -184,21 +191,25 @@ async def seed():
                 if created > now:
                     created = now - timedelta(minutes=group_index + 1)
                 deadline = created + timedelta(days=3)
-                status = "closed" if deadline <= now else "published"
+                if deadline <= now:
+                    status = "closed"
+                else:
+                    status = "published"
                 if index == 4:
                     status = "draft"
                 elif index == 5:
                     status = "withdrawn"
                 confirmed_all = day_index % 4 == 0 and status == "closed"
-                close_time = (
-                    created + timedelta(hours=2)
-                    if confirmed_all
-                    else deadline
-                    if status == "closed"
-                    else created + timedelta(hours=1)
-                    if status == "withdrawn"
-                    else None
-                )
+                if confirmed_all:
+                    close_time = created + timedelta(hours=2)
+                else:
+                    if status == "closed":
+                        close_time = deadline
+                    else:
+                        if status == "withdrawn":
+                            close_time = created + timedelta(hours=1)
+                        else:
+                            close_time = None
                 if close_time is not None and close_time > now:
                     close_time = now
                 headquarters = target == "all" and day_index % 7 == 0

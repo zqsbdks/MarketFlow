@@ -4,7 +4,7 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.crud.reports import (
     get_report_analytics,
     get_reports,
 )
+from app.crud.stores import first_active_store_id, get_store_by_id
 from app.models.enums import (
     EmployeeRole,
     RankingGroupBy,
@@ -45,8 +46,56 @@ async def overview_service(
     start_time: datetime | None,
     end_time: datetime | None,
     department_id: int | None,
+    *,
+    http_request: Request | None = None,
 ) -> ReportResponse:
     """验证员工和查询条件，并返回营业概览。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            if not is_headquarters:
+                raise HTTPException(403, "只有总部经营报表支持全公司汇总")
+            selected_store_id = None
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
     if employee is None:
@@ -128,8 +177,56 @@ async def get_departments_service(
     employee_id: int,
     start_time: datetime | None,
     end_time: datetime | None,
+    *,
+    http_request: Request | None = None,
 ) -> list[DepartmentResponse]:
     """验证员工和查询时间，并返回所有部门的营业对比数据。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            if not is_headquarters:
+                raise HTTPException(403, "只有总部经营报表支持全公司汇总")
+            selected_store_id = None
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
     if employee is None:
@@ -209,8 +306,54 @@ async def get_rankings_service(
     sort_order: RankingSortOrder,
     page: int,
     page_size: int,
+    *,
+    http_request: Request | None = None,
 ) -> RankingsResponse:
     """验证员工和查询参数，并返回销售排行。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
     if employee is None:
@@ -443,6 +586,8 @@ async def get_report_analytics_service(
     department_id: int | None,
     interval: Literal["hour", "day", "month", "year"],
     metrics: list[ReportMetric],
+    *,
+    http_request: Request | None = None,
 ) -> ReportAnalyticsResponse:
     """验证查询条件，只计算并返回前端勾选的营业指标。
 
@@ -458,6 +603,52 @@ async def get_report_analytics_service(
     Returns:
         ReportAnalyticsResponse: 仅包含用户勾选字段的经营分析响应。
     """
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            if not is_headquarters:
+                raise HTTPException(403, "只有总部经营报表支持全公司汇总")
+            selected_store_id = None
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     # 先按令牌中的员工ID重新读取账号，避免已删除或已停用的账号继续查看数据。
     employee = await get_employee_by_id(employee_id=employee_id, db=db)
@@ -562,22 +753,40 @@ async def get_report_analytics_service(
             ),
             limit_days=None,
         )
+        if current is not None:
+            selected_value = _percentage(losses.cost, current[1])
+        else:
+            selected_value = None
+        response_items_values = []
+        for response_items_item in losses.reasons:
+            response_items_values.append(response_items_item.model_dump())
+        response_items = response_items_values
+        response_items_item_item_values = []
+        for response_items_item_item_item in losses.departments:
+            response_items_item_item_values.append(response_items_item_item_item.model_dump())
+        response_items_item_item = response_items_item_item_values
+        response_items_item_item_item_item_values = []
+        for response_items_item_item_item_item_item in losses.stores:
+            response_items_item_item_item_item_values.append(
+                response_items_item_item_item_item_item.model_dump()
+            )
+        response_items_item_item_item_item = response_items_item_item_item_item_values
         loss_values = {
             ReportMetric.LOSS_COST: losses.cost,
-            ReportMetric.LOSS_REVENUE_RATIO: _percentage(losses.cost, current[1])
-            if current is not None
-            else None,
+            ReportMetric.LOSS_REVENUE_RATIO: selected_value,
             ReportMetric.DISCARD_QUANTITY: losses.quantity,
             ReportMetric.DISCARD_COUNT: losses.record_count,
-            ReportMetric.DISCARD_REASON_SHARE: [item.model_dump() for item in losses.reasons],
-            ReportMetric.DEPARTMENT_LOSS_COMPARISON: [
-                item.model_dump() for item in losses.departments
-            ],
-            ReportMetric.STORE_LOSS_COMPARISON: [item.model_dump() for item in losses.stores],
+            ReportMetric.DISCARD_REASON_SHARE: response_items,
+            ReportMetric.DEPARTMENT_LOSS_COMPARISON: response_items_item_item,
+            ReportMetric.STORE_LOSS_COMPARISON: response_items_item_item_item_item,
         }
-        response_values.update(
-            {metric.value: loss_values[metric] for metric in requested & loss_metrics}
-        )
+        response_mapping_mapping = {}
+        for response_mapping_metric in requested & loss_metrics:
+            response_mapping_mapping[response_mapping_metric.value] = loss_values[
+                response_mapping_metric
+            ]
+        response_mapping = response_mapping_mapping
+        response_values.update(response_mapping)
     if current is not None:
         # CRUD按固定顺序返回原价销售额、营业额、优惠额、成本、毛利、销量和单数。
         original_revenue, revenue, discount_amount, cost, gross_profit, quantity, sale_count = (
@@ -602,13 +811,19 @@ async def get_report_analytics_service(
         if ReportMetric.SALE_COUNT in requested:
             response_values[ReportMetric.SALE_COUNT.value] = sale_count
         if ReportMetric.AVERAGE_SALE_AMOUNT in requested:
-            response_values[ReportMetric.AVERAGE_SALE_AMOUNT.value] = (
-                (revenue / sale_count).quantize(Decimal("0.01")) if sale_count else None
-            )
+            if sale_count:
+                response_values[ReportMetric.AVERAGE_SALE_AMOUNT.value] = (
+                    revenue / sale_count
+                ).quantize(Decimal("0.01"))
+            else:
+                response_values[ReportMetric.AVERAGE_SALE_AMOUNT.value] = None
         if ReportMetric.AVERAGE_SALE_QUANTITY in requested:
-            response_values[ReportMetric.AVERAGE_SALE_QUANTITY.value] = (
-                (Decimal(quantity) / sale_count).quantize(Decimal("0.01")) if sale_count else None
-            )
+            if sale_count:
+                response_values[ReportMetric.AVERAGE_SALE_QUANTITY.value] = (
+                    Decimal(quantity) / sale_count
+                ).quantize(Decimal("0.01"))
+            else:
+                response_values[ReportMetric.AVERAGE_SALE_QUANTITY.value] = None
         if ReportMetric.GROSS_PROFIT_MARGIN in requested:
             response_values[ReportMetric.GROSS_PROFIT_MARGIN.value] = _percentage(
                 gross_profit, revenue
@@ -647,11 +862,12 @@ async def get_report_analytics_service(
                         revenue - previous_revenue, previous_revenue
                     )
                 if ReportMetric.GROSS_PROFIT_GROWTH_RATE in requested:
-                    response_values[ReportMetric.GROSS_PROFIT_GROWTH_RATE.value] = (
-                        _percentage(gross_profit - previous_profit, previous_profit)
-                        if previous_profit > 0
-                        else None
-                    )
+                    if previous_profit > 0:
+                        response_values[ReportMetric.GROSS_PROFIT_GROWTH_RATE.value] = _percentage(
+                            gross_profit - previous_profit, previous_profit
+                        )
+                    else:
+                        response_values[ReportMetric.GROSS_PROFIT_GROWTH_RATE.value] = None
 
     if needs_departments:
         store_revenue = sum((row[2] for row in department_values), Decimal(0))

@@ -232,7 +232,10 @@ async def seed():
             if await db.scalar(select(func.count(Product.id)).where(Product.store_id == store.id)):
                 continue
             chosen = []
-            by_department = {department_id: 0 for department_id in enabled}
+            by_department_mapping = {}
+            for by_department_department_id in enabled:
+                by_department_mapping[by_department_department_id] = 0
+            by_department = by_department_mapping
             for original, catalog, supplier in source:
                 if (
                     original.department_id in by_department
@@ -337,11 +340,10 @@ async def seed():
                     )
                     db.add(line)
                     await db.flush()
-                    history_status = (
-                        InventoryBatchStatus.EXPIRED
-                        if expiry < now.date()
-                        else InventoryBatchStatus.AVAILABLE
-                    )
+                    if expiry < now.date():
+                        history_status = InventoryBatchStatus.EXPIRED
+                    else:
+                        history_status = InventoryBatchStatus.AVAILABLE
                     batch = InventoryBatch(
                         store_id=store.id,
                         batch_no="TMP-" + uuid4().hex[:20],

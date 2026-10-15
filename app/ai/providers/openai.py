@@ -30,7 +30,10 @@ class OpenAiProvider(AiProviderAdapter):
 
         result: list[dict[str, Any]] = [{"role": "system", "content": system_instruction}]
         for message in messages:
-            role = "assistant" if message.role == "model" else "user"
+            if message.role == "model":
+                role = "assistant"
+            else:
+                role = "user"
             result.append({"role": role, "content": message.content})
         return result
 
@@ -45,7 +48,10 @@ class OpenAiProvider(AiProviderAdapter):
             raise ProviderError(None, "OpenAI 返回格式异常")
         message = choice["message"]
         content = message.get("content")
-        text = content.strip() if isinstance(content, str) else ""
+        if isinstance(content, str):
+            text = content.strip()
+        else:
+            text = ""
 
         parsed_calls: list[ProviderToolCall] = []
         raw_calls = message.get("tool_calls")
@@ -75,7 +81,10 @@ class OpenAiProvider(AiProviderAdapter):
         return ProviderTurn(text=text, tool_calls=parsed_calls, continuation=message)
 
     def _tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [{"type": "function", "function": tool} for tool in tools]
+        result_values = []
+        for result_tool in tools:
+            result_values.append({"type": "function", "function": result_tool})
+        return result_values
 
     async def request_initial(
         self,
@@ -144,9 +153,10 @@ class OpenAiProvider(AiProviderAdapter):
             payload,
         )
         turn = self._parse_turn(response)
-        previous_list = (
-            previous_messages if isinstance(previous_messages, list) else [previous_messages]
-        )
+        if isinstance(previous_messages, list):
+            previous_list = previous_messages
+        else:
+            previous_list = [previous_messages]
         turn.continuation = [*previous_list, *tool_messages, turn.continuation]
         return turn
 

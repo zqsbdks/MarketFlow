@@ -131,6 +131,7 @@ def test_detail_route_returns_public_fields(monkeypatch, is_manager):
     """本人可查看，店长可查看停用员工；无部门及可空资料正确序列化。"""
     actor = SimpleNamespace(
         id=1,
+        store_id=1,
         is_active=True,
         must_change_password=False,
         role=EmployeeRole.STORE_MANAGER if is_manager else EmployeeRole.REGULAR_EMPLOYEE,
@@ -169,7 +170,9 @@ def test_detail_route_returns_public_fields(monkeypatch, is_manager):
     app.dependency_overrides[get_current_employee_id] = lambda: 1
 
     async def override_db():
-        yield AsyncMock()
+        db = AsyncMock()
+        db.info = {}
+        yield db
 
     app.dependency_overrides[get_db] = override_db
     with TestClient(app) as client:

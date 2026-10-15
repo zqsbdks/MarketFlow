@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import EmployeeRole
+from app.models.enums import EmployeeRole, enum_values
 
 if TYPE_CHECKING:
     from app.models.department import Department
@@ -63,7 +63,7 @@ class Employee(TimestampMixin, Base):
     role: Mapped[EmployeeRole] = mapped_column(
         Enum(
             EmployeeRole,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="employee_role",
             native_enum=False,
             create_constraint=False,

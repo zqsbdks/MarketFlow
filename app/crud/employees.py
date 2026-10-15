@@ -12,16 +12,20 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.employee_detail import EmployeeDetail
 from app.models.enums import EmployeeGender, EmployeeRole, EmploymentStatus
+from app.models.store import StoreDepartment
 
 
 # region 查询部门
-async def get_department_by_id(
-    department_id: int,
-    db: AsyncSession,
-) -> Department | None:
+async def get_department_by_id(department_id: int, db: AsyncSession) -> Department | None:
     """按主键查询部门。"""
-
-    return await db.get(Department, department_id)
+    store_query_1 = select(Department).where(Department.id == department_id)
+    if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+        enabled_departments = select(StoreDepartment.department_id).where(
+            StoreDepartment.store_id == db.info["read_store_id"],
+            StoreDepartment.is_active.is_(True),
+        )
+        store_query_1 = store_query_1.where(Department.id.in_(enabled_departments))
+    return await db.scalar(store_query_1)
 
 
 # endregion
@@ -40,11 +44,15 @@ async def create_employee(
 
     # employee_no 不允许为空，先使用事务内唯一的临时编号取得自增主键。
     temporary_employee_no = f"TMP-{uuid4().hex[:16]}"
+    if store_id is not None:
+        store_id_value = store_id
+    else:
+        store_id_value = db.info.get("own_store_id")
     new_employee = Employee(
         employee_no=temporary_employee_no,
         name=name,
         role=role,
-        store_id=store_id if store_id is not None else db.info.get("own_store_id"),
+        store_id=store_id_value,
         department_id=department_id,
         password_hash=password_hash,
         must_change_password=True,
@@ -73,7 +81,6 @@ async def get_list_employees(
     db: AsyncSession,
 ) -> tuple[list[Employee], int]:
     """按条件分页查询员工，并返回当前页记录和总数量。"""
-
     conditions = []
     if department_id is not None:
         conditions.append(Employee.department_id == department_id)
@@ -81,11 +88,14 @@ async def get_list_employees(
         conditions.append(Employee.role == role)
     if is_active is not None:
         conditions.append(Employee.is_active == is_active)
-
     count_stmt = select(func.count(Employee.id)).where(*conditions)
+    if (
+        db.info.get("private_employee_path")
+        and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS
+    ):
+        count_stmt = count_stmt.where(Employee.store_id == db.info["own_store_id"])
     count_result = await db.execute(count_stmt)
     total = count_result.scalar_one()
-
     offset = (page - 1) * page_size
     list_stmt = (
         select(Employee)
@@ -95,10 +105,14 @@ async def get_list_employees(
         .offset(offset)
         .limit(page_size)
     )
+    if (
+        db.info.get("private_employee_path")
+        and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS
+    ):
+        list_stmt = list_stmt.where(Employee.store_id == db.info["own_store_id"])
     list_result = await db.execute(list_stmt)
     employees = list(list_result.scalars().all())
-
-    return employees, total
+    return (employees, total)
 
 
 # endregion
@@ -140,30 +154,31 @@ async def reset_employee_password(
 
 
 # region 获取员工详情
-async def get_employee_detail_by_id(
-    employee_id: int,
-    db: AsyncSession,
-) -> EmployeeDetail | None:
+async def get_employee_detail_by_id(employee_id: int, db: AsyncSession) -> EmployeeDetail | None:
     """返回一个 EmployeeDetail 对象，查不到详情时返回 None。
 
     关联对象已提前加载，可通过 detail.employee 访问 Employee，
     通过 detail.employee.department 访问 Department（无部门时为 None）。
     """
-
     statement = (
         select(EmployeeDetail)
         .options(
-            # 使用额外 SELECT 提前加载员工及部门关系，供 Service 读取。
             selectinload(EmployeeDetail.employee).selectinload(Employee.department),
             selectinload(EmployeeDetail.employee).selectinload(Employee.store),
         )
         .where(EmployeeDetail.employee_id == employee_id)
-        # 修改后复用本查询时，刷新会话中已有对象及数据库生成的更新时间。
         .execution_options(populate_existing=True)
     )
+    if (
+        db.info.get("private_employee_path")
+        and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS
+    ):
+        statement = statement.where(
+            EmployeeDetail.employee_id.in_(
+                select(Employee.id).where(Employee.store_id == db.info["own_store_id"])
+            )
+        )
     result = await db.execute(statement)
-
-    # 从执行结果中取出唯一的详情 ORM 对象；没有记录时返回 None。
     return result.scalar_one_or_none()
 
 
@@ -184,7 +199,6 @@ async def update_employee_detail(
     db: AsyncSession,
 ) -> None:
     """执行 UPDATE，不返回详情对象；查询结果与提交事务由 Service 负责。"""
-
     statement = (
         update(EmployeeDetail)
         .where(EmployeeDetail.employee_id == employee_id)
@@ -199,7 +213,15 @@ async def update_employee_detail(
             separation_reason=separation_reason,
         )
     )
-    # execute 执行 UPDATE，其返回值是执行结果，不是 EmployeeDetail 对象。
+    if (
+        db.info.get("private_employee_path")
+        and db.info.get("actor_role") != EmployeeRole.HEADQUARTERS
+    ):
+        statement = statement.where(
+            EmployeeDetail.employee_id.in_(
+                select(Employee.id).where(Employee.store_id == db.info["own_store_id"])
+            )
+        )
     await db.execute(statement)
 
 

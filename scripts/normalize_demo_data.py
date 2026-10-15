@@ -203,24 +203,28 @@ async def normalize():
             bid, pid, item_id, _, remaining, expires, arrived, batch_no, dept, warning, sid = row
             sold_quantity = int(sold.get(bid, 0))
             expired = expires is not None and expires < today
-            waste = max(1, round(sold_quantity * 0.025)) if expired else 0
+            if expired:
+                waste = max(1, round(sold_quantity * 0.025))
+            else:
+                waste = 0
             coverage = {"PRODUCE": 2.5, "MEAT": 1.5, "SEAFOOD": 1.0, "DELI": 1.0}[dept]
             target = max(4, math.ceil(float(demand.get(pid, 2)) * coverage))
-            keep = 0 if expired else min(remaining, max(0, target - on_hand[pid]))
+            if expired:
+                keep = 0
+            else:
+                keep = min(remaining, max(0, target - on_hand[pid]))
             on_hand[pid] += keep
             initial = max(1, sold_quantity + keep + waste)
             # 无销量的历史批次是一次最小损耗，当前零需求批次保留一件以闭合账本。
             if not expired and initial > sold_quantity + keep:
                 keep += 1
-            status = (
-                "sold_out"
-                if keep == 0
-                else (
-                    "near_expiry"
-                    if expires and expires <= today + timedelta(days=warning or 0)
-                    else "available"
-                )
-            )
+            if keep == 0:
+                status = "sold_out"
+            else:
+                if expires and expires <= today + timedelta(days=warning or 0):
+                    status = "near_expiry"
+                else:
+                    status = "available"
             changes.append({"id": bid, "initial": initial, "remaining": keep, "status": status})
             item_changes.append({"id": item_id, "quantity": initial})
             quantities[bid] = initial

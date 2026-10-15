@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin
-from app.models.enums import SaleSource
+from app.models.enums import SaleSource, enum_values
 from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
@@ -102,7 +102,7 @@ class Sale(StoreScopedMixin, CreatedAtMixin, Base):
     source: Mapped[SaleSource] = mapped_column(
         Enum(
             SaleSource,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="sale_source",
             native_enum=False,
             create_constraint=False,

@@ -9,7 +9,7 @@ from sqlalchemy import BigInteger, CheckConstraint, Date, Enum, ForeignKey, Stri
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import EmployeeGender, EmploymentStatus
+from app.models.enums import EmployeeGender, EmploymentStatus, enum_values
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
@@ -44,7 +44,7 @@ class EmployeeDetail(TimestampMixin, Base):
     gender: Mapped[EmployeeGender] = mapped_column(
         Enum(
             EmployeeGender,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="employee_detail_gender",
             native_enum=False,
             create_constraint=False,
@@ -63,7 +63,7 @@ class EmployeeDetail(TimestampMixin, Base):
     employment_status: Mapped[EmploymentStatus] = mapped_column(
         Enum(
             EmploymentStatus,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="employee_detail_employment_status",
             native_enum=False,
             create_constraint=False,

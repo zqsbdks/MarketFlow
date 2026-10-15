@@ -1,6 +1,6 @@
 """折扣规则与适用范围 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -57,6 +57,8 @@ async def get_discount_rule_list(
     current_employee_id: int = Depends(get_current_employee_id),
     # 每次请求获取独立的异步数据库会话，响应结束后由依赖统一关闭。
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscountRuleListResponse]:
     """接收列表筛选条件，并返回统一响应格式的折扣规则分页列表。"""
 
@@ -71,6 +73,7 @@ async def get_discount_rule_list(
         computed_status=request.computed_status,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DiscountRuleListResponse](
         message="获取折扣规则列表成功",
@@ -92,13 +95,13 @@ async def create_discount_rule(
     request: CreateDiscountRuleRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscountRuleListItemResponse]:
     """接收折扣配置，并返回创建成功后的完整规则资料。"""
 
     rule = await create_discount_rule_service(
-        request=request,
-        current_employee_id=current_employee_id,
-        db=db,
+        request=request, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[DiscountRuleListItemResponse](
         message="创建折扣规则成功",
@@ -121,6 +124,8 @@ async def add_discount_rule_products(
     discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[AddDiscountRuleProductsResponse]:
     """接收折扣规则ID和商品ID列表，批量建立规则与商品的关联。"""
 
@@ -129,6 +134,7 @@ async def add_discount_rule_products(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[AddDiscountRuleProductsResponse](
         message="添加折扣商品成功",
@@ -151,6 +157,8 @@ async def get_discount_rule_products(
     request: GetDiscountRuleProductsRequest = Depends(),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscountRuleProductListResponse]:
     """接收规则ID与筛选条件，返回统一响应格式的分页折扣商品列表。"""
 
@@ -159,6 +167,7 @@ async def get_discount_rule_products(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DiscountRuleProductListResponse](
         message="获取折扣商品列表成功",
@@ -181,6 +190,8 @@ async def delete_discount_rule_product(
     product_id: int = Path(..., ge=1, description="需要移出折扣规则的商品ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DeleteDiscountRuleProductsResponse]:
     """接收规则ID和商品ID，删除一条折扣商品关联。"""
 
@@ -189,6 +200,7 @@ async def delete_discount_rule_product(
         product_id=product_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DeleteDiscountRuleProductsResponse](
         message="删除折扣商品成功",
@@ -210,6 +222,8 @@ async def delete_all_discount_rule_products(
     discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DeleteDiscountRuleProductsResponse]:
     """接收规则ID，删除当前员工权限范围内的全部折扣商品。"""
 
@@ -217,6 +231,7 @@ async def delete_all_discount_rule_products(
         discount_rule_id=discount_rule_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DeleteDiscountRuleProductsResponse](
         message="删除全部折扣商品成功",
@@ -238,6 +253,8 @@ async def get_discount_rule_detail(
     discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscountRuleListItemResponse]:
     """接收折扣规则ID，并返回统一响应格式的折扣规则详情。"""
 
@@ -245,6 +262,7 @@ async def get_discount_rule_detail(
         discount_rule_id=discount_rule_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DiscountRuleListItemResponse](
         message="获取折扣规则详情成功",
@@ -267,6 +285,8 @@ async def update_discount_rule(
     discount_rule_id: int = Path(..., ge=1, description="需要修改的折扣规则ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscountRuleListItemResponse]:
     """接收规则ID和可选修改字段，返回修改后的完整折扣规则。"""
 
@@ -275,6 +295,7 @@ async def update_discount_rule(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DiscountRuleListItemResponse](
         message="修改折扣规则成功",
@@ -297,6 +318,8 @@ async def update_discount_rule_status(
     discount_rule_id: int = Path(..., ge=1, description="折扣规则ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DiscountRuleListItemResponse]:
     """接收规则ID和目标状态，返回修改后的完整折扣规则。"""
 
@@ -305,6 +328,7 @@ async def update_discount_rule_status(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DiscountRuleListItemResponse](
         message="修改折扣规则状态成功",
@@ -326,6 +350,8 @@ async def delete_discount_rule(
     discount_rule_id: int = Path(..., ge=1, description="需要删除的折扣规则ID"),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DeleteDiscountRulesResponse]:
     """接收规则ID，删除一条权限范围内的折扣规则。"""
 
@@ -333,6 +359,7 @@ async def delete_discount_rule(
         discount_rule_id=discount_rule_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[DeleteDiscountRulesResponse](
         message="删除折扣规则成功",
@@ -353,12 +380,13 @@ async def delete_discount_rule(
 async def clear_discount_rules(
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[DeleteDiscountRulesResponse]:
     """一键删除当前员工权限范围内的全部折扣规则。"""
 
     result = await clear_discount_rules_service(
-        current_employee_id=current_employee_id,
-        db=db,
+        current_employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[DeleteDiscountRulesResponse](
         message="清空折扣规则成功",

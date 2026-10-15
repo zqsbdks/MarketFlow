@@ -1,6 +1,6 @@
 """员工认证 API 路由。"""
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -108,12 +108,13 @@ async def auth_logout(response: Response) -> ResponseModel[None]:
 async def get_current_employee_info(
     employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[AuthMeResponse]:
     """根据 Token 中的员工 ID 返回当前员工公开信息。"""
 
     employee_info = await get_current_employee_info_service(
-        employee_id=employee_id,
-        db=db,
+        employee_id=employee_id, db=db, http_request=http_request
     )
 
     return ResponseModel[AuthMeResponse](
@@ -135,6 +136,8 @@ async def change_password(
     password: AuthPasswordChangeRequest,
     employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[None]:
     """验证当前密码并更新为新密码。"""
 
@@ -145,6 +148,7 @@ async def change_password(
         confirm_password=password.confirm_password,
         reason=password.reason,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[None](message="密码修改成功")

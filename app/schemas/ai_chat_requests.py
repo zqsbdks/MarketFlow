@@ -44,3 +44,9 @@ class AiChatRequest(BaseModel):
 # endregion
 
 __all__ = ["AiChatMessageRequest", "AiChatRequest", "AiProviderName"]
+
+
+class AiCredentialRequest(BaseModel):
+    """配置员工自己的模型供应商密钥。"""
+
+    api_key: str = Field(..., min_length=10, max_length=255)

@@ -157,7 +157,8 @@ async def test_normal_recipient_cannot_see_employee_confirmation_list(setup, mon
     monkeypatch.setattr(
         service, "get_recipients", AsyncMock(return_value=[(record, "田中", "青果部")])
     )
-    setup.get.side_effect = [employee(), SimpleNamespace(name="青果部")]
+    setup.get.return_value = employee()
+    setup.scalar.return_value = SimpleNamespace(name="青果部")
     response = await service.build_response(notice(), employee(), setup, detail=True)
     assert response.recipients == [] and response.employee_ids == [] and response.can_confirm
 
@@ -176,7 +177,8 @@ async def test_manager_sees_three_lights_without_read_pending_status(setup, monk
             )
         )
     monkeypatch.setattr(service, "get_recipients", AsyncMock(return_value=records))
-    setup.get.side_effect = [employee(), SimpleNamespace(name="青果部")]
+    setup.get.return_value = employee()
+    setup.scalar.return_value = SimpleNamespace(name="青果部")
     response = await service.build_response(
         notice(deadline_at=NOW), employee(EmployeeRole.STORE_MANAGER), setup, detail=True
     )

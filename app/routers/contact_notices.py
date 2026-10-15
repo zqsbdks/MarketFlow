@@ -1,16 +1,10 @@
 """联络事项 API：账号验证、分页查询、发布与确认。"""
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.business_time import business_now
 from app.dependencies.auth import get_verified_current_employee_id
 from app.dependencies.db import get_db
-from app.models.contact_notice import ContactNotice, ContactNoticeRecipient
-from app.models.department import Department
-from app.models.employee import Employee
-from app.models.enums import EmployeeRole
 from app.schemas.base import ResponseModel
 from app.schemas.contact_notices_requests import (
     ContactNoticeActionRequest,
@@ -25,10 +19,10 @@ from app.schemas.contact_notices_responses import (
 )
 from app.services.contact_notices import (
     action_notice,
-    current_employee,
     detail_notice,
+    get_audience_service,
+    get_summary_service,
     list_notices,
-    refresh_expired_notices,
     save_notice,
 )
 
@@ -43,8 +37,12 @@ async def get_list(
     request: ContactNoticeListRequest = Depends(),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    return ResponseModel(data=await list_notices(request, current_employee_id, db))
+    return ResponseModel(
+        data=await list_notices(request, current_employee_id, db, http_request=http_request)
+    )
 
 
 @contact_notices_router.get(
@@ -55,62 +53,24 @@ async def get_list(
 async def get_summary(
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    await refresh_expired_notices(db)
-    base = (
-        select(func.count())
-        .select_from(ContactNoticeRecipient)
-        .join(ContactNotice)
-        .where(
-            ContactNoticeRecipient.employee_id == current_employee_id,
-            ContactNoticeRecipient.store_id == db.info.get("own_store_id", 1),
-            ContactNotice.status == "published",
-            ContactNotice.starts_at <= business_now(),
-        )
+    return await get_summary_service(
+        current_employee_id=current_employee_id, db=db, http_request=http_request
     )
-    unread = int(await db.scalar(base.where(ContactNoticeRecipient.read_at.is_(None))) or 0)
-    pending = int(await db.scalar(base.where(ContactNoticeRecipient.confirmed_at.is_(None))) or 0)
-    return ResponseModel(data=ContactNoticeSummaryResponse(unread=unread, pending=pending))
 
 
 @contact_notices_router.get("/audience", summary="获取允许选择的部门和接收员工")
 async def get_audience(
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    employee = await current_employee(current_employee_id, db)
-    if (
-        employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS)
-        and employee.department_id is None
-    ):
-        return ResponseModel(data={"employees": [], "departments": []})
-    employees_query = (
-        select(Employee)
-        .where(Employee.is_active.is_(True))
-        .order_by(Employee.department_id, Employee.id)
+    return await get_audience_service(
+        current_employee_id=current_employee_id, db=db, http_request=http_request
     )
-    departments_query = select(Department).where(Department.is_active.is_(True))
-    if employee.role != EmployeeRole.HEADQUARTERS:
-        employees_query = employees_query.where(Employee.store_id == employee.store_id)
-    else:
-        employees_query = employees_query.where(Employee.role != EmployeeRole.HEADQUARTERS)
-    if employee.role not in (EmployeeRole.STORE_MANAGER, EmployeeRole.HEADQUARTERS):
-        employees_query = employees_query.where(Employee.department_id == employee.department_id)
-        departments_query = departments_query.where(Department.id == employee.department_id)
-    employees = []
-    for item in (await db.scalars(employees_query)).all():
-        employees.append(
-            {
-                "id": item.id,
-                "name": item.name,
-                "department_id": item.department_id,
-                "store_id": item.store_id,
-            }
-        )
-    departments = []
-    for department in (await db.scalars(departments_query)).all():
-        departments.append({"id": department.id, "name": department.name})
-    return ResponseModel(data={"employees": employees, "departments": departments})
 
 
 # endregion
@@ -126,8 +86,12 @@ async def get_detail(
     notice_id: int,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    return ResponseModel(data=await detail_notice(notice_id, current_employee_id, db))
+    return ResponseModel(
+        data=await detail_notice(notice_id, current_employee_id, db, http_request=http_request)
+    )
 
 
 @contact_notices_router.post(
@@ -137,8 +101,12 @@ async def create_notice(
     request: ContactNoticeWriteRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    return ResponseModel(data=await save_notice(request, current_employee_id, db))
+    return ResponseModel(
+        data=await save_notice(request, current_employee_id, db, http_request=http_request)
+    )
 
 
 @contact_notices_router.put(
@@ -151,8 +119,14 @@ async def update_notice(
     request: ContactNoticeUpdateRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    return ResponseModel(data=await save_notice(request, current_employee_id, db, notice_id))
+    return ResponseModel(
+        data=await save_notice(
+            request, current_employee_id, db, notice_id, http_request=http_request
+        )
+    )
 
 
 # endregion
@@ -169,9 +143,13 @@ async def publish_notice(
     request: ContactNoticeActionRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
     return ResponseModel(
-        data=await action_notice(notice_id, "publish", request, current_employee_id, db)
+        data=await action_notice(
+            notice_id, "publish", request, current_employee_id, db, http_request=http_request
+        )
     )
 
 
@@ -185,9 +163,13 @@ async def close_notice(
     request: ContactNoticeActionRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
     return ResponseModel(
-        data=await action_notice(notice_id, "close", request, current_employee_id, db)
+        data=await action_notice(
+            notice_id, "close", request, current_employee_id, db, http_request=http_request
+        )
     )
 
 
@@ -201,9 +183,13 @@ async def withdraw_notice(
     request: ContactNoticeActionRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
     return ResponseModel(
-        data=await action_notice(notice_id, "withdraw", request, current_employee_id, db)
+        data=await action_notice(
+            notice_id, "withdraw", request, current_employee_id, db, http_request=http_request
+        )
     )
 
 
@@ -216,9 +202,13 @@ async def confirm_notice(
     notice_id: int,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
     return ResponseModel(
-        data=await action_notice(notice_id, "confirm", None, current_employee_id, db)
+        data=await action_notice(
+            notice_id, "confirm", None, current_employee_id, db, http_request=http_request
+        )
     )
 
 
@@ -228,8 +218,12 @@ async def delete_notice(
     request: ContactNoticeActionRequest,
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ):
-    await action_notice(notice_id, "delete", request, current_employee_id, db)
+    await action_notice(
+        notice_id, "delete", request, current_employee_id, db, http_request=http_request
+    )
     return ResponseModel(data={"deleted": True})
 
 

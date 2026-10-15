@@ -23,12 +23,20 @@ from app.models.enums import EmployeeGender, EmploymentStatus
 def missing_fields(detail):
     if detail is None:
         return ["gender", "birth_date", "hire_date", "phone", "address", "employment_status"]
-    return [
-        field
-        for field in ("gender", "birth_date", "hire_date", "phone", "address", "employment_status")
-        if not getattr(detail, field)
-        or (field == "gender" and detail.gender == EmployeeGender.UNSPECIFIED)
-    ]
+    result_values = []
+    for result_field in (
+        "gender",
+        "birth_date",
+        "hire_date",
+        "phone",
+        "address",
+        "employment_status",
+    ):
+        if not getattr(detail, result_field) or (
+            result_field == "gender" and detail.gender == EmployeeGender.UNSPECIFIED
+        ):
+            result_values.append(result_field)
+    return result_values
 
 
 async def main():
@@ -37,10 +45,10 @@ async def main():
             employees = list(
                 (await db.scalars(select(Employee).order_by(Employee.id).with_for_update())).all()
             )
-            details = {
-                d.employee_id: d
-                for d in (await db.scalars(select(EmployeeDetail).with_for_update())).all()
-            }
+            details_mapping = {}
+            for details_d in (await db.scalars(select(EmployeeDetail).with_for_update())).all():
+                details_mapping[details_d.employee_id] = details_d
+            details = details_mapping
             backup = []
             today = business_now().date()
             for employee in employees:

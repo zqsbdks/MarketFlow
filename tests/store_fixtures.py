@@ -117,3 +117,26 @@ async def create_store_database(url="sqlite+aiosqlite:///:memory:"):
             )
         await db.commit()
     return engine, factory
+
+
+async def set_request_store(request, employee, db):
+    """为直接调用服务的测试准备查询参数；权限行为由真实服务测试覆盖。"""
+    raw = request.headers.get("X-Store-ID") or request.query_params.get("store_id")
+    selected = employee.store_id
+    if raw == "all":
+        selected = None
+    elif raw:
+        selected = int(raw)
+    elif selected is None:
+        selected = 1
+    db.info.update(
+        actor_id=employee.id,
+        actor_role=employee.role,
+        own_store_id=employee.store_id,
+        read_store_id=selected,
+        write_store_id=employee.store_id,
+        company_management="/stores" in request.url.path,
+        company_catalog_read="/stores" in request.url.path,
+        private_employee_path="/employees" in request.url.path,
+        store_context=True,
+    )

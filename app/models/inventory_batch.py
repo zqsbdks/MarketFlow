@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import InventoryBatchStatus
+from app.models.enums import InventoryBatchStatus, enum_values
 from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ class InventoryBatch(StoreScopedMixin, TimestampMixin, Base):
     status: Mapped[InventoryBatchStatus] = mapped_column(
         Enum(
             InventoryBatchStatus,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="inventory_batch_status",
             native_enum=False,
             create_constraint=False,

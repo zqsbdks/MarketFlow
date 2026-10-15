@@ -6,6 +6,7 @@ from typing import Literal
 
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.cache import (
     REPORTS_CACHE_NAMESPACE,
@@ -19,6 +20,7 @@ from app.models.enums import RankingGroupBy, RankingSortBy, RankingSortOrder
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.models.store import StoreDepartment
 
 ReportValues = tuple[Decimal, Decimal, Decimal, int, int]
 DepartmentReportValues = tuple[int, str, Decimal, Decimal, int]
@@ -51,35 +53,33 @@ async def get_reports(
     department_id: int | None,
 ) -> ReportValues:
     """查询整个店铺或指定部门的营业汇总数据。"""
-
     if department_id is None:
-        # 全店金额直接汇总销售单，避免关联销售明细后重复计算订单金额。
         summary_statement = select(
             func.coalesce(func.sum(Sale.total_amount), 0),
             func.coalesce(func.sum(Sale.total_cost), 0),
             func.coalesce(func.sum(Sale.gross_profit), 0),
             func.count(Sale.id),
         )
-
+        if db.info.get("read_store_id") is not None:
+            summary_statement = summary_statement.where(Sale.store_id == db.info["read_store_id"])
         if start_time is not None:
             summary_statement = summary_statement.where(Sale.sold_at >= start_time)
         if end_time is not None:
             summary_statement = summary_statement.where(Sale.sold_at <= end_time)
-
         summary_result = await db.execute(summary_statement)
         revenue, sales_cost, gross_profit, sale_count = summary_result.one()
-
-        # 商品数量位于销售明细表，通过所属销售单按销售时间筛选。
         quantity_statement = select(func.coalesce(func.sum(SaleItem.quantity), 0)).join(
             Sale, Sale.id == SaleItem.sale_id
         )
+        if db.info.get("read_store_id") is not None:
+            quantity_statement = quantity_statement.where(
+                SaleItem.store_id == db.info["read_store_id"]
+            )
         if start_time is not None:
             quantity_statement = quantity_statement.where(Sale.sold_at >= start_time)
         if end_time is not None:
             quantity_statement = quantity_statement.where(Sale.sold_at <= end_time)
-
         sales_quantity = await db.scalar(quantity_statement)
-
         return (
             Decimal(revenue),
             Decimal(sales_cost),
@@ -87,31 +87,27 @@ async def get_reports(
             int(sales_quantity or 0),
             int(sale_count),
         )
-
-    # 部门金额只汇总该部门的销售明细，不能计算订单内其他部门的商品。
     department_statement = (
         select(
             func.coalesce(func.sum(SaleItem.subtotal), 0),
             func.coalesce(func.sum(SaleItem.cost_subtotal), 0),
-            func.coalesce(
-                func.sum(SaleItem.subtotal - SaleItem.cost_subtotal),
-                0,
-            ),
+            func.coalesce(func.sum(SaleItem.subtotal - SaleItem.cost_subtotal), 0),
             func.coalesce(func.sum(SaleItem.quantity), 0),
             func.count(distinct(SaleItem.sale_id)),
         )
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(SaleItem.department_id == department_id)
     )
-
+    if db.info.get("read_store_id") is not None:
+        department_statement = department_statement.where(
+            SaleItem.store_id == db.info["read_store_id"]
+        )
     if start_time is not None:
         department_statement = department_statement.where(Sale.sold_at >= start_time)
     if end_time is not None:
         department_statement = department_statement.where(Sale.sold_at <= end_time)
-
     department_result = await db.execute(department_statement)
     revenue, sales_cost, gross_profit, sales_quantity, sale_count = department_result.one()
-
     return (
         Decimal(revenue),
         Decimal(sales_cost),
@@ -127,13 +123,9 @@ async def get_reports(
 # region 获取部门营业对比
 @business_cache(REPORTS_CACHE_NAMESPACE, REPORTS_CACHE_SECONDS, enabled=historical_report)
 async def get_departments_reports(
-    db: AsyncSession,
-    start_time: datetime | None = None,
-    end_time: datetime | None = None,
+    db: AsyncSession, start_time: datetime | None = None, end_time: datetime | None = None
 ) -> list[DepartmentReportValues]:
     """一次查询所有部门的营收、毛利润和销售数量。"""
-
-    # 先按部门汇总符合时间条件的销售明细。
     department_summary_statement = (
         select(
             SaleItem.department_id.label("department_id"),
@@ -144,17 +136,17 @@ async def get_departments_reports(
         .join(Sale, Sale.id == SaleItem.sale_id)
         .group_by(SaleItem.department_id)
     )
-
+    if db.info.get("read_store_id") is not None:
+        department_summary_statement = department_summary_statement.where(
+            SaleItem.store_id == db.info["read_store_id"]
+        )
     if start_time is not None:
         department_summary_statement = department_summary_statement.where(
             Sale.sold_at >= start_time
         )
     if end_time is not None:
         department_summary_statement = department_summary_statement.where(Sale.sold_at <= end_time)
-
     department_summary = department_summary_statement.subquery()
-
-    # 从部门表开始做左连接，因此没有销售记录的部门也会返回，金额和数量为 0。
     statement = (
         select(
             Department.id,
@@ -163,16 +155,17 @@ async def get_departments_reports(
             func.coalesce(department_summary.c.gross_profit, 0),
             func.coalesce(department_summary.c.sales_quantity, 0),
         )
-        .outerjoin(
-            department_summary,
-            department_summary.c.department_id == Department.id,
-        )
+        .outerjoin(department_summary, department_summary.c.department_id == Department.id)
         .order_by(Department.id.asc())
     )
-
+    if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+        enabled_departments = select(StoreDepartment.department_id).where(
+            StoreDepartment.store_id == db.info["read_store_id"],
+            StoreDepartment.is_active.is_(True),
+        )
+        statement = statement.where(Department.id.in_(enabled_departments))
     result = await db.execute(statement)
     rows = result.all()
-
     departments: list[DepartmentReportValues] = []
     for department_id, department_name, revenue, gross_profit, sales_quantity in rows:
         department = (
@@ -183,7 +176,6 @@ async def get_departments_reports(
             int(sales_quantity),
         )
         departments.append(department)
-
     return departments
 
 
@@ -205,7 +197,6 @@ async def get_rankings(
     page_size: int,
 ) -> tuple[list[RankingValues], int]:
     """按商品或分类汇总销售数据，并返回当前页和分组总数。"""
-
     conditions = []
     if start_date is not None:
         conditions.append(Sale.sold_at >= start_date)
@@ -214,43 +205,37 @@ async def get_rankings(
     if department_id is not None:
         conditions.append(SaleItem.department_id == department_id)
     if category_id is not None:
-        # 销售明细保存商品ID，通过商品所属分类筛选对应明细。
         product_ids = select(Product.id).where(Product.category_id == category_id)
+        if db.info.get("read_store_id") is not None:
+            product_ids = product_ids.where(Product.store_id == db.info["read_store_id"])
         conditions.append(SaleItem.product_id.in_(product_ids))
-
-    # 两种排行都需要计算累计销售数量和累计销售金额。
     total_quantity = func.sum(SaleItem.quantity).label("quantity")
     total_amount = func.sum(SaleItem.subtotal).label("amount")
-
     if group_by == RankingGroupBy.PRODUCT:
         list_statement = (
-            select(
-                Product.id,
-                Product.name,
-                total_quantity,
-                total_amount,
-            )
+            select(Product.id, Product.name, total_quantity, total_amount)
             .select_from(SaleItem)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .join(Product, Product.id == SaleItem.product_id)
             .where(*conditions)
             .group_by(Product.id, Product.name)
         )
+        if db.info.get("read_store_id") is not None:
+            list_statement = list_statement.where(Product.store_id == db.info["read_store_id"])
+        if db.info.get("read_store_id") is not None:
+            list_statement = list_statement.where(SaleItem.store_id == db.info["read_store_id"])
         count_statement = (
             select(func.count(distinct(SaleItem.product_id)))
             .select_from(SaleItem)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(*conditions)
         )
+        if db.info.get("read_store_id") is not None:
+            count_statement = count_statement.where(SaleItem.store_id == db.info["read_store_id"])
         group_id = Product.id
     else:
         list_statement = (
-            select(
-                Category.id,
-                Category.name,
-                total_quantity,
-                total_amount,
-            )
+            select(Category.id, Category.name, total_quantity, total_amount)
             .select_from(SaleItem)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .join(Product, Product.id == SaleItem.product_id)
@@ -258,6 +243,14 @@ async def get_rankings(
             .where(*conditions)
             .group_by(Category.id, Category.name)
         )
+        if db.info.get("read_store_id") is not None:
+            list_statement = list_statement.where(SaleItem.store_id == db.info["read_store_id"])
+        if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+            enabled_departments = select(StoreDepartment.department_id).where(
+                StoreDepartment.store_id == db.info["read_store_id"],
+                StoreDepartment.is_active.is_(True),
+            )
+            list_statement = list_statement.where(Category.department_id.in_(enabled_departments))
         count_statement = (
             select(func.count(distinct(Category.id)))
             .select_from(SaleItem)
@@ -266,34 +259,36 @@ async def get_rankings(
             .join(Category, Category.id == Product.category_id)
             .where(*conditions)
         )
+        if db.info.get("read_store_id") is not None:
+            count_statement = count_statement.where(SaleItem.store_id == db.info["read_store_id"])
+        if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+            enabled_departments = select(StoreDepartment.department_id).where(
+                StoreDepartment.store_id == db.info["read_store_id"],
+                StoreDepartment.is_active.is_(True),
+            )
+            count_statement = count_statement.where(Category.department_id.in_(enabled_departments))
         group_id = Category.id
-
-    # 根据请求选择数量或金额作为排序列，再选择升序或降序。
-    sort_column = total_quantity if sort_by == RankingSortBy.QUANTITY else total_amount
+    # 金额列和数量列的数据类型不同，但都可以作为 SQL 排序列。
+    sort_column: ColumnElement
+    if sort_by == RankingSortBy.QUANTITY:
+        sort_column = total_quantity
+    else:
+        sort_column = total_amount
     if sort_order == RankingSortOrder.ASC:
         order_expression = sort_column.asc()
     else:
         order_expression = sort_column.desc()
-
     list_statement = (
         list_statement.order_by(order_expression, group_id.asc()).offset(offset).limit(page_size)
     )
-
     total_result = await db.scalar(count_statement)
     list_result = await db.execute(list_statement)
     rows = list_result.all()
-
     rankings: list[RankingValues] = []
     for item_id, item_name, quantity, amount in rows:
-        ranking = (
-            int(item_id),
-            str(item_name),
-            int(quantity),
-            Decimal(amount),
-        )
+        ranking = (int(item_id), str(item_name), int(quantity), Decimal(amount))
         rankings.append(ranking)
-
-    return rankings, int(total_result or 0)
+    return (rankings, int(total_result or 0))
 
 
 # endregion
@@ -326,30 +321,29 @@ async def get_report_analytics(
     Returns:
         AnalyticsValues: 依次返回汇总数据、部门数据列表和趋势数据列表。
     """
-
-    # 三类查询使用相同的时间范围：包含开始时间，不包含结束时间。
     base_conditions = [Sale.sold_at >= start_time, Sale.sold_at < end_time]
     if department_id is not None:
         base_conditions.append(SaleItem.department_id == department_id)
-
     summary: AnalyticsSummaryValues | None = None
     if include_summary:
         summary_statement = (
             select(
-                # 原价销售额：折扣前单价乘以数量后再汇总。
                 func.coalesce(func.sum(SaleItem.original_unit_price * SaleItem.quantity), 0),
-                func.coalesce(func.sum(SaleItem.subtotal), 0),  # 营业额：销售小计之和。
-                func.coalesce(func.sum(SaleItem.discount_amount), 0),  # 优惠金额之和。
-                func.coalesce(func.sum(SaleItem.cost_subtotal), 0),  # 销售成本之和。
-                # 毛利润：每条明细的销售小计减去成本小计，再计算总和。
+                func.coalesce(func.sum(SaleItem.subtotal), 0),
+                func.coalesce(func.sum(SaleItem.discount_amount), 0),
+                func.coalesce(func.sum(SaleItem.cost_subtotal), 0),
                 func.coalesce(func.sum(SaleItem.subtotal - SaleItem.cost_subtotal), 0),
-                func.coalesce(func.sum(SaleItem.quantity), 0),  # 销售商品总件数。
-                func.count(distinct(SaleItem.sale_id)),  # 去重后的销售单数量。
+                func.coalesce(func.sum(SaleItem.quantity), 0),
+                func.count(distinct(SaleItem.sale_id)),
             )
             .select_from(SaleItem)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(*base_conditions)
         )
+        if db.info.get("read_store_id") is not None:
+            summary_statement = summary_statement.where(
+                SaleItem.store_id == db.info["read_store_id"]
+            )
         result = await db.execute(summary_statement)
         (
             original_revenue,
@@ -369,11 +363,9 @@ async def get_report_analytics(
             int(sales_quantity),
             int(sale_count),
         )
-
     departments: list[AnalyticsDepartmentValues] = []
     if include_departments:
-        # 占比的分母是全店营业额，因此这里始终查询全部部门，再由 Service 筛选返回项。
-        department_summary = (
+        store_query_12 = (
             select(
                 SaleItem.department_id.label("department_id"),
                 func.sum(SaleItem.subtotal).label("revenue"),
@@ -382,30 +374,33 @@ async def get_report_analytics(
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(Sale.sold_at >= start_time, Sale.sold_at < end_time)
             .group_by(SaleItem.department_id)
-            .subquery()
         )
+        if db.info.get("read_store_id") is not None:
+            store_query_12 = store_query_12.where(SaleItem.store_id == db.info["read_store_id"])
+        department_summary = store_query_12.subquery()
         department_statement = (
-            select(
-                Department.id,
-                Department.name,
-                func.coalesce(department_summary.c.revenue, 0),
-            )
+            select(Department.id, Department.name, func.coalesce(department_summary.c.revenue, 0))
             .select_from(Department)
-            .outerjoin(
-                department_summary,
-                department_summary.c.department_id == Department.id,
-            )
+            .outerjoin(department_summary, department_summary.c.department_id == Department.id)
             .order_by(Department.id)
         )
+        if db.info.get("read_store_id") is not None and (not db.info.get("company_catalog_read")):
+            enabled_departments = select(StoreDepartment.department_id).where(
+                StoreDepartment.store_id == db.info["read_store_id"],
+                StoreDepartment.is_active.is_(True),
+            )
+            department_statement = department_statement.where(
+                Department.id.in_(enabled_departments)
+            )
         department_result = await db.execute(department_statement)
-        departments = [
-            (int(item_id), str(name), Decimal(revenue))
-            for item_id, name, revenue in department_result.all()
-        ]
-
+        departments_values = []
+        for departments_item_id, departments_name, departments_revenue in department_result.all():
+            departments_values.append(
+                (int(departments_item_id), str(departments_name), Decimal(departments_revenue))
+            )
+        departments = departments_values
     trend: list[AnalyticsTrendValues] = []
     if include_trend:
-        # MySQL 按实际日期分组；不能只按“小时数字”分组，否则不同日期会混在一起。
         if interval == "hour":
             bucket_expression = func.date_format(Sale.sold_at, "%Y-%m-%d %H:00:00")
         elif interval == "day":
@@ -414,7 +409,6 @@ async def get_report_analytics(
             bucket_expression = func.date_format(Sale.sold_at, "%Y-%m-01 00:00:00")
         else:
             bucket_expression = func.date_format(Sale.sold_at, "%Y-01-01 00:00:00")
-
         trend_statement = (
             select(
                 bucket_expression.label("bucket"),
@@ -429,12 +423,13 @@ async def get_report_analytics(
             .select_from(SaleItem)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(*base_conditions)
-            # 每天只统计09:00至21:00的营业数据。
             .where(func.time(Sale.sold_at) >= time(9, 0))
             .where(func.time(Sale.sold_at) <= time(21, 0))
             .group_by(bucket_expression)
             .order_by(bucket_expression)
         )
+        if db.info.get("read_store_id") is not None:
+            trend_statement = trend_statement.where(SaleItem.store_id == db.info["read_store_id"])
         trend_result = await db.execute(trend_statement)
         for (
             bucket,
@@ -464,8 +459,7 @@ async def get_report_analytics(
                     int(sale_count),
                 )
             )
-
-    return summary, departments, trend
+    return (summary, departments, trend)
 
 
 # endregion

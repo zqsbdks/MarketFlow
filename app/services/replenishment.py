@@ -3,17 +3,10 @@
 from datetime import date, datetime, time, timedelta
 from math import ceil
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import FORECAST_CACHE_NAMESPACE, FORECAST_CACHE_SECONDS, business_cache
-from app.models.inventory_batch import InventoryBatch
-from app.models.product import Product
-from app.models.purchase import Purchase
-from app.models.purchase_item import PurchaseItem
-from app.models.purchase_plan import PurchasePlan
-from app.models.sale import Sale
-from app.models.sale_item import SaleItem
+from app.crud import replenishment as data_access
 
 
 @business_cache(FORECAST_CACHE_NAMESPACE, FORECAST_CACHE_SECONDS, shared_forecast=True)
@@ -26,22 +19,23 @@ async def weekday_sales_forecast(
     没有销售的星期仍按4周平均，不按有销售的日期数平均，避免夸大稀疏销量。
     预测可按店铺/商品/日期缓存，实际库存与最终建议量不能复用此缓存。"""
     rows = (
-        await db.execute(
-            select(SaleItem.product_id, func.date(Sale.sold_at), func.sum(SaleItem.quantity))
-            .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(
-                Sale.store_id == store_id,
-                Sale.sold_at >= datetime.combine(today - timedelta(days=28), time.min),
-                Sale.sold_at < datetime.combine(today, time.min),
-                SaleItem.product_id.in_(product_ids),
-            )
-            .group_by(SaleItem.product_id, func.date(Sale.sold_at))
+        await data_access.get_recent_daily_sales(
+            db=db, product_ids=product_ids, store_id=store_id, today=today
         )
     ).all()
-    totals = {str(product_id): [0] * 7 for product_id in product_ids}
+    totals_mapping = {}
+    for totals_product_id in product_ids:
+        totals_mapping[str(totals_product_id)] = [0] * 7
+    totals = totals_mapping
     for product_id, sold_date, quantity in rows:
         totals[str(product_id)][date.fromisoformat(str(sold_date)).weekday()] += int(quantity)
-    return {key: [ceil(quantity / 4) for quantity in values] for key, values in totals.items()}
+    result_mapping = {}
+    for result_key, result_values in totals.items():
+        result_values_new = []
+        for result_quantity in result_values:
+            result_values_new.append(ceil(result_quantity / 4))
+        result_mapping[result_key] = result_values_new
+    return result_mapping
 
 
 def simulate_replenishment(
@@ -55,14 +49,21 @@ def simulate_replenishment(
     当天销量按09:00至21:00剩余时长折算；按天计入到货，不保证每小时都有库存。
     不修改传入批次对象，不执行数据库操作。
     """
-    stock = [list(batch) for batch in batches]  # [可用日期，到期日期，数量]
+    stock_values = []
+    for stock_batch in batches:
+        stock_values.append(list(stock_batch))
+    stock = stock_values  # [可用日期，到期日期，数量]
     result = {}
     first = now.date()
     last = max(days)
     day = first
     while day <= last:
         # 到期日当天仍可销售，日期小于业务日期的批次才从可用库存移除。
-        stock = [batch for batch in stock if batch[1] is None or batch[1] >= day]
+        stock_values_new = []
+        for stock_batch_item in stock:
+            if stock_batch_item[1] is None or stock_batch_item[1] >= day:
+                stock_values_new.append(stock_batch_item)
+        stock = stock_values_new
         for arrival, expires, quantity in incoming:
             if arrival == day and (expires is None or expires >= day):
                 stock.append([day, expires, quantity])
@@ -88,7 +89,7 @@ def simulate_replenishment(
             if quantity and shelf_life is not None:
                 stock.append([day, day + timedelta(days=shelf_life), quantity])
         # 先销售先过期批次；未到货的批次不能提前使用。
-        stock.sort(key=lambda batch: batch[1] or date.max)
+        stock.sort(key=batch_expiration_sort_key)
         remaining = demand
         for batch in stock:
             if batch[0] > day:
@@ -108,58 +109,30 @@ async def refresh_automatic_plans(db: AsyncSession, now: datetime) -> int:
     每部门独立提交；已生成订单或已锁定快照不覆盖，浏览器无需打开。
     返回更新的计划头数，不是新生成的订单数。
     """
-    from sqlalchemy.dialects.mysql import insert as mysql_insert
-    from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-    from sqlalchemy.orm import selectinload
-
-    from app.models.category import Category
-    from app.models.employee import Employee
-    from app.models.enums import EmployeeRole
-    from app.models.store import Store, StoreDepartment
-    from app.models.supplier_product import SupplierProduct
     from app.services.purchase_plan_submission import plan_cutoff
 
-    pairs = (
-        await db.execute(
-            select(StoreDepartment.store_id, StoreDepartment.department_id)
-            .join(Store, Store.id == StoreDepartment.store_id)
-            .where(Store.is_active.is_(True), StoreDepartment.is_active.is_(True))
-            .order_by(StoreDepartment.store_id, StoreDepartment.department_id)
-        )
-    ).all()
+    pairs = (await data_access.get_enabled_store_departments(db=db)).all()
     count = 0
-    days = [now.date() + timedelta(days=2 + offset) for offset in range(7)]
+    days_values = []
+    for days_offset in range(7):
+        days_values.append(now.date() + timedelta(days=2 + days_offset))
+    days = days_values
     for store_id, department_id in pairs:
-        actor = await db.scalar(
-            select(Employee.id)
-            .where(
-                Employee.store_id == store_id,
-                Employee.is_active.is_(True),
-                (Employee.role == EmployeeRole.STORE_MANAGER)
-                | (
-                    (Employee.role == EmployeeRole.REGULAR_EMPLOYEE)
-                    & (Employee.department_id == department_id)
-                ),
-            )
-            .order_by(Employee.id)
-            .limit(1)
+        actor = await data_access.get_automatic_plan_employee(
+            db=db, department_id=department_id, store_id=store_id
         )
         if actor is None:
             continue
         catalog = (
-            await db.scalars(
-                select(SupplierProduct)
-                .join(Category)
-                .options(selectinload(SupplierProduct.supplier))
-                .where(
-                    SupplierProduct.store_id == store_id,
-                    Category.department_id == department_id,
-                    SupplierProduct.is_active.is_(True),
-                    SupplierProduct.shelf_life_days.is_not(None),
-                )
+            await data_access.get_automatic_plan_catalog(
+                db=db, department_id=department_id, store_id=store_id
             )
         ).all()
-        catalog = [item for item in catalog if item.supplier.is_active]
+        catalog_values = []
+        for catalog_item in catalog:
+            if catalog_item.supplier.is_active:
+                catalog_values.append(catalog_item)
+        catalog = catalog_values
         if not catalog:
             continue
         recommendations = await calculate_replenishment(
@@ -175,24 +148,11 @@ async def refresh_automatic_plans(db: AsyncSession, now: datetime) -> int:
                 updated_by=actor,
             )
             if db.get_bind().dialect.name == "mysql":
-                statement = mysql_insert(PurchasePlan).values(**values)
-                await db.execute(statement.on_duplicate_key_update(id=PurchasePlan.id))
+                await data_access.insert_automatic_plan_mysql(db=db, values=values)
             else:
-                statement_sqlite = sqlite_insert(PurchasePlan).values(**values)
-                await db.execute(
-                    statement_sqlite.on_conflict_do_nothing(
-                        index_elements=["store_id", "department_id", "arrival_date"]
-                    )
-                )
-            plan = await db.scalar(
-                select(PurchasePlan)
-                .where(
-                    PurchasePlan.store_id == store_id,
-                    PurchasePlan.department_id == department_id,
-                    PurchasePlan.arrival_date == day,
-                )
-                .with_for_update()
-                .execution_options(populate_existing=True)
+                await data_access.insert_automatic_plan_sqlite(db=db, values=values)
+            plan = await data_access.get_automatic_plan_for_update(
+                db=db, day=day, department_id=department_id, store_id=store_id
             )
             assert plan is not None
             if plan.purchase_id is not None:
@@ -200,12 +160,14 @@ async def refresh_automatic_plans(db: AsyncSession, now: datetime) -> int:
             cutoff = plan_cutoff(day)
             if now > cutoff + timedelta(minutes=1) and plan.automatic_quantities:
                 continue
-            plan.automatic_quantities = {
-                str(item.id): recommendations.get(item.id, {})
-                .get(day, {})
-                .get("suggested_quantity", 0)
-                for item in catalog
-            }
+            automatic_quantities_mapping = {}
+            for automatic_quantities_item in catalog:
+                automatic_quantities_mapping[str(automatic_quantities_item.id)] = (
+                    recommendations.get(automatic_quantities_item.id, {})
+                    .get(day, {})
+                    .get("suggested_quantity", 0)
+                )
+            plan.automatic_quantities = automatic_quantities_mapping
             count += 1
         await db.commit()
     return count
@@ -220,34 +182,36 @@ async def calculate_replenishment(
     历史销量通过预测缓存复用；批次、待到货和计划每次查询，包含更早计划的影响。
     只读取数据，不保存建议，也不生成订单；实际持久化由refresh_automatic_plans负责。"""
     today = now.date()
-    catalog_ids = [item.id for item in catalog]
+    catalog_ids_values = []
+    for catalog_ids_item in catalog:
+        catalog_ids_values.append(catalog_ids_item.id)
+    catalog_ids = catalog_ids_values
     if not catalog_ids:
         return {}
     products = (
-        await db.scalars(
-            select(Product).where(
-                Product.store_id == store_id, Product.supplier_product_id.in_(catalog_ids)
-            )
+        await data_access.get_replenishment_products(
+            db=db, catalog_ids=catalog_ids, store_id=store_id
         )
     ).all()
-    catalog_by_product = {product.id: product.supplier_product_id for product in products}
+    catalog_by_product_mapping = {}
+    for catalog_by_product_product in products:
+        catalog_by_product_mapping[catalog_by_product_product.id] = (
+            catalog_by_product_product.supplier_product_id
+        )
+    catalog_by_product = catalog_by_product_mapping
     forecasts = await weekday_sales_forecast(store_id, tuple(sorted(catalog_by_product)), today, db)
-    forecast_by_catalog = {
-        catalog_id: forecasts.get(str(product_id), [0] * 7)
-        for product_id, catalog_id in catalog_by_product.items()
-    }
+    forecast_by_catalog_mapping = {}
+    for (
+        forecast_by_catalog_product_id,
+        forecast_by_catalog_catalog_id,
+    ) in catalog_by_product.items():
+        forecast_by_catalog_mapping[forecast_by_catalog_catalog_id] = forecasts.get(
+            str(forecast_by_catalog_product_id), [0] * 7
+        )
+    forecast_by_catalog = forecast_by_catalog_mapping
     batch_rows = (
-        await db.execute(
-            select(
-                InventoryBatch.product_id,
-                InventoryBatch.arrived_at,
-                InventoryBatch.expiration_date,
-                InventoryBatch.remaining_quantity,
-            ).where(
-                InventoryBatch.store_id == store_id,
-                InventoryBatch.product_id.in_(catalog_by_product),
-                InventoryBatch.remaining_quantity > 0,
-            )
+        await data_access.get_replenishment_batches(
+            db=db, catalog_by_product=catalog_by_product, store_id=store_id
         )
     ).all()
     stocks: dict[int, list[tuple[date, date | None, int]]] = {}
@@ -256,21 +220,8 @@ async def calculate_replenishment(
             (arrived.date(), expires, int(quantity))
         )
     incoming_rows = (
-        await db.execute(
-            select(
-                PurchaseItem.supplier_product_id,
-                Purchase.expected_arrival_at,
-                PurchaseItem.expiration_date,
-                PurchaseItem.quantity,
-            )
-            .join(Purchase, Purchase.id == PurchaseItem.purchase_id)
-            .where(
-                Purchase.store_id == store_id,
-                Purchase.status == "pending",
-                PurchaseItem.supplier_product_id.in_(catalog_ids),
-                Purchase.expected_arrival_at
-                < datetime.combine(max(days) + timedelta(days=1), time.min),
-            )
+        await data_access.get_pending_arrival_items(
+            db=db, catalog_ids=catalog_ids, days=days, store_id=store_id
         )
     ).all()
     incoming: dict[int, list[tuple[date, date | None, int]]] = {}
@@ -280,18 +231,18 @@ async def calculate_replenishment(
             (max(today, arrival.date()), expires, int(quantity))
         )
     plans = (
-        await db.scalars(
-            select(PurchasePlan).where(
-                PurchasePlan.store_id == store_id,
-                PurchasePlan.department_id == department_id,
-                PurchasePlan.arrival_date >= today,
-                PurchasePlan.arrival_date <= max(days),
-            )
+        await data_access.get_replenishment_plans(
+            db=db, days=days, department_id=department_id, store_id=store_id, today=today
         )
     ).all()
     result: dict[int, dict] = {}
     # 也模拟尚未生成订单的更早计划，避免七天计划逐日重复补同一库存。
-    simulation_days = set(days) | {plan.arrival_date for plan in plans if plan.purchase_id is None}
+    response_items_set = set()
+    for response_items_plan in plans:
+        if response_items_plan.purchase_id is None:
+            response_items_set.add(response_items_plan.arrival_date)
+    response_items = response_items_set
+    simulation_days = set(days) | response_items
     for item in catalog:
         from app.services.purchase_plan_submission import plan_cutoff
 
@@ -299,11 +250,10 @@ async def calculate_replenishment(
         for plan in plans:
             if plan.purchase_id is not None:
                 continue
-            effective = (
-                (plan.automatic_quantities | plan.quantities)
-                if now >= plan_cutoff(plan.arrival_date)
-                else plan.quantities
-            )
+            if now >= plan_cutoff(plan.arrival_date):
+                effective = plan.automatic_quantities | plan.quantities
+            else:
+                effective = plan.quantities
             if str(item.id) in effective:
                 overrides[plan.arrival_date] = effective[str(item.id)]
         item_days = sorted(
@@ -314,10 +264,16 @@ async def calculate_replenishment(
         if not item_days:
             result[item.id] = {}
             continue
+        response_mapping_mapping = {}
+        for response_mapping_weekday in range(7):
+            response_mapping_mapping[response_mapping_weekday] = forecast_by_catalog.get(
+                item.id, [0] * 7
+            )[response_mapping_weekday]
+        response_mapping = response_mapping_mapping
         result[item.id] = simulate_replenishment(
             now,
             item_days,
-            {weekday: forecast_by_catalog.get(item.id, [0] * 7)[weekday] for weekday in range(7)},
+            response_mapping,
             stocks.get(item.id, []),
             incoming.get(item.id, []),
             item.minimum_stock,
@@ -325,3 +281,11 @@ async def calculate_replenishment(
             overrides,
         )
     return result
+
+
+def batch_expiration_sort_key(batch):
+    """按到期日期排序；没有到期日期的批次放在最后。"""
+    expiration_date = batch[1]
+    if expiration_date is None:
+        return date.max
+    return expiration_date

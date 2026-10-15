@@ -1,7 +1,7 @@
 """创建员工 Service、CRUD 与 API 响应测试。"""
 
 from datetime import date
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -159,7 +159,7 @@ async def test_create_employee_service_hashes_default_password(monkeypatch) -> N
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_current)
     monkeypatch.setattr("app.services.employees.get_department_by_id", get_department)
     monkeypatch.setattr("app.services.employees.create_employee", create)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     result = await create_employee_service(
         name="正式员工",
@@ -191,7 +191,7 @@ async def test_create_employee_service_rejects_non_manager(monkeypatch) -> None:
         return employee
 
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_current)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     with pytest.raises(HTTPException) as exc_info:
         await create_employee_service(
@@ -228,7 +228,7 @@ async def test_create_employee_service_requires_department(monkeypatch) -> None:
             role=EmployeeRole.CONTRACT_WORKER,
             department_id=None,
             current_employee_id=manager.id,
-            db=AsyncMock(spec=AsyncSession),
+            db=AsyncMock(spec=AsyncSession, info={}),
         )
 
     assert exc_info.value.status_code == 400
@@ -256,7 +256,7 @@ async def test_create_employee_service_requires_password_change(monkeypatch) -> 
             role=EmployeeRole.REGULAR_EMPLOYEE,
             department_id=1,
             current_employee_id=manager.id,
-            db=AsyncMock(spec=AsyncSession),
+            db=AsyncMock(spec=AsyncSession, info={}),
         )
 
     assert exc_info.value.status_code == 403
@@ -266,7 +266,7 @@ async def test_create_employee_service_requires_password_change(monkeypatch) -> 
 async def test_create_employee_crud_generates_employee_number() -> None:
     """CRUD 根据数据库自增 ID 生成 E00001 格式员工编号。"""
 
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     async def flush() -> None:
         employee = session.add.call_args.args[0]
@@ -381,7 +381,7 @@ async def test_get_list_employees_service_builds_items_and_pages(monkeypatch) ->
         role=EmployeeRole.REGULAR_EMPLOYEE,
         is_active=True,
         current_employee_id=manager.id,
-        db=AsyncMock(spec=AsyncSession),
+        db=AsyncMock(spec=AsyncSession, info={}),
     )
 
     assert result.page == 2
@@ -418,7 +418,7 @@ async def test_get_list_employees_service_rejects_non_manager(monkeypatch) -> No
             role=None,
             is_active=None,
             current_employee_id=employee.id,
-            db=AsyncMock(spec=AsyncSession),
+            db=AsyncMock(spec=AsyncSession, info={}),
         )
 
     assert exc_info.value.status_code == 403
@@ -452,6 +452,7 @@ def test_update_employee_status_uses_json_body(monkeypatch) -> None:
         reason=None,
         current_employee_id=1,
         db=None,
+        http_request=ANY,
     )
 
 
@@ -481,7 +482,7 @@ async def test_update_employee_status_service_updates_target(monkeypatch) -> Non
 
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
     monkeypatch.setattr("app.services.employees.update_employee_status", update_status)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     result = await update_employee_status_service(
         employee_id=target.id,
@@ -509,7 +510,7 @@ async def test_update_employee_status_service_rejects_self_update(monkeypatch) -
         return manager
 
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     with pytest.raises(HTTPException) as exc_info:
         await update_employee_status_service(
@@ -539,7 +540,7 @@ async def test_update_employee_status_service_rejects_missing_target(monkeypatch
         return next(employees)
 
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     with pytest.raises(HTTPException) as exc_info:
         await update_employee_status_service(
@@ -563,7 +564,7 @@ async def test_update_employee_status_crud_flushes_change() -> None:
         role=EmployeeRole.REGULAR_EMPLOYEE,
         department_id=1,
     )
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     result = await update_employee_status(
         employee=employee,
@@ -610,6 +611,7 @@ def test_reset_employee_password_returns_temporary_password(monkeypatch) -> None
         current_employee_id=1,
         reason=None,
         db=None,
+        http_request=ANY,
     )
 
 
@@ -641,7 +643,7 @@ async def test_reset_employee_password_service_updates_hash_and_flag(monkeypatch
 
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
     monkeypatch.setattr("app.services.employees.reset_employee_password", reset_password)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     result = await reset_employee_password_service(
         employee_id=target.id,
@@ -670,7 +672,7 @@ async def test_reset_employee_password_service_rejects_self_reset(monkeypatch) -
         return manager
 
     monkeypatch.setattr("app.services.employees.get_employee_by_id", get_employee)
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
 
     with pytest.raises(HTTPException) as exc_info:
         await reset_employee_password_service(
@@ -694,7 +696,7 @@ async def test_reset_employee_password_crud_flushes_change() -> None:
         department_id=1,
         must_change_password=False,
     )
-    session = AsyncMock(spec=AsyncSession)
+    session = AsyncMock(spec=AsyncSession, info={})
     temporary_password_hash = hash_password(DEFAULT_EMPLOYEE_PASSWORD)
 
     result = await reset_employee_password(

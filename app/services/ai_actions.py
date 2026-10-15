@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,10 +14,12 @@ from app.core.cache import (
     SUPPLIERS_CACHE_NAMESPACE,
     clear_cache_namespaces,
 )
+from app.crud import ai_actions as data_access
 from app.crud.ai_pending_actions import get_ai_pending_action_by_id
+from app.crud.auth import get_employee_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
+from app.crud.stores import first_active_store_id, get_store_by_id
 from app.models.ai_pending_action import AiPendingAction
-from app.models.employee import Employee
 from app.models.enums import EmployeeRole
 from app.schemas.ai_chat_responses import (
     AiActionExecutionResponse,
@@ -97,19 +99,60 @@ def _validate_pending_action(action: AiPendingAction, employee_id: int) -> None:
 
 # region 确认AI操作
 async def confirm_ai_action_service(
-    *,
-    action_id: int,
-    employee_id: int,
-    db: AsyncSession,
+    *, action_id: int, employee_id: int, db: AsyncSession, http_request: Request | None = None
 ) -> AiActionExecutionResponse:
     """锁定待确认记录、复用现有业务Service再次鉴权并执行修改。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=True,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     action = await get_ai_pending_action_by_id(action_id=action_id, db=db, for_update=True)
     if action is None:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="AI操作不存在")
     _validate_pending_action(action, employee_id)
 
-    employee = await db.get(Employee, employee_id)
+    employee = await data_access.get_action_employee(db=db, employee_id=employee_id)
     if (
         employee is None
         or employee.role == EmployeeRole.HEADQUARTERS
@@ -390,12 +433,53 @@ async def confirm_ai_action_service(
 
 # region 取消AI操作
 async def cancel_ai_action_service(
-    *,
-    action_id: int,
-    employee_id: int,
-    db: AsyncSession,
+    *, action_id: int, employee_id: int, db: AsyncSession, http_request: Request | None = None
 ) -> AiActionExecutionResponse:
     """取消本人仍在等待确认的操作，不执行任何业务数据修改。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=True,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
 
     action = await get_ai_pending_action_by_id(action_id=action_id, db=db, for_update=True)
     if action is None:

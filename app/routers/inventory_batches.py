@@ -1,6 +1,6 @@
 """库存批次 API 路由。"""
 
-from fastapi import APIRouter, Body, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -43,6 +43,8 @@ async def get_inventory_batches_list(
     current_employee_id: int = Depends(get_current_employee_id),
     # db 是当前请求使用的异步数据库会话。
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[InventoryBatchListResponse]:
     """校验当前员工账号，并返回全部部门的分页库存批次列表。"""
 
@@ -57,6 +59,7 @@ async def get_inventory_batches_list(
         expiration_end=request.expiration_end,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[InventoryBatchListResponse](
@@ -80,6 +83,8 @@ async def update_inventory_batch_quantity(
     request: InventoryBatchQuantityUpdateRequest = Body(...),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[InventoryBatchDetailResponse]:
     """接收新的批次剩余数量和可选理由，返回修改后的批次详情。"""
 
@@ -88,6 +93,7 @@ async def update_inventory_batch_quantity(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[InventoryBatchDetailResponse](
         message="库存批次数量修改成功",
@@ -110,6 +116,8 @@ async def discard_expired_inventory_batch(
     request: InventoryBatchDiscardRequest = Body(...),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[InventoryBatchDetailResponse]:
     """废弃指定过期批次的全部剩余库存，并返回处理后的批次详情。"""
 
@@ -118,6 +126,7 @@ async def discard_expired_inventory_batch(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[InventoryBatchDetailResponse](
         message="过期批次库存已废弃",
@@ -142,13 +151,13 @@ async def get_inventory_batch_detail(
     current_employee_id: int = Depends(get_current_employee_id),
     # db 是当前请求使用的异步数据库会话。
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[InventoryBatchDetailResponse]:
     """校验当前员工账号，并返回指定库存批次的完整详情。"""
 
     batch = await get_inventory_batch_detail_service(
-        batch_id=batch_id,
-        current_employee_id=current_employee_id,
-        db=db,
+        batch_id=batch_id, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
 
     return ResponseModel[InventoryBatchDetailResponse](

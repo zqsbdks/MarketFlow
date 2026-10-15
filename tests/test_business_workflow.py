@@ -7,9 +7,9 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import func, select
+from store_fixtures import set_request_store
 from test_store_policy import request
 
-from app.core.store_policy import configure_store_context
 from app.models.employee import Employee
 from app.models.inventory_batch import InventoryBatch
 from app.models.operation_audit_log import OperationAuditLog
@@ -36,10 +36,9 @@ async def test_order_receive_discount_sale_inventory_audit_and_reports(store_dat
     for module in (purchases, sales, discount_rule):
         monkeypatch.setattr(module, "business_now", lambda: clock[0])
     monkeypatch.setattr("app.crud.sales.business_now", lambda: clock[0])
+    # CRUD and services share the same simulated business clock.
     async with store_database() as db:
-        await configure_store_context(
-            request("/api/v1/purchases", "POST"), await db.get(Employee, 1), db
-        )
+        await set_request_store(request("/api/v1/purchases", "POST"), await db.get(Employee, 1), db)
         purchase_request = CreatePurchaseRequest(
             department_id=1,
             client_request_id=uuid4(),
@@ -98,7 +97,7 @@ async def test_order_receive_discount_sale_inventory_audit_and_reports(store_dat
 
 async def test_store_notice_publishing_reading_confirming_and_closing(store_database):
     async with store_database() as db:
-        await configure_store_context(
+        await set_request_store(
             request("/api/v1/contact-notices", "POST"), await db.get(Employee, 1), db
         )
         draft = await save_notice(
@@ -115,9 +114,7 @@ async def test_store_notice_publishing_reading_confirming_and_closing(store_data
             draft.id, "publish", ContactNoticeActionRequest(expected_version=draft.version), 1, db
         )
         assert published.recipient_count == 1
-        await configure_store_context(
-            request("/api/v1/contact-notices/1"), await db.get(Employee, 2), db
-        )
+        await set_request_store(request("/api/v1/contact-notices/1"), await db.get(Employee, 2), db)
         detail = await detail_notice(draft.id, 2, db)
         assert detail.read_at is not None
         confirmed = await action_notice(draft.id, "confirm", None, 2, db)

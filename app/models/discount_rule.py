@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import DiscountScheduleType, DiscountType
+from app.models.enums import DiscountScheduleType, DiscountType, enum_values
 from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ class DiscountRule(StoreScopedMixin, TimestampMixin, Base):
     discount_type: Mapped[DiscountType] = mapped_column(
         Enum(
             DiscountType,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="discount_rule_type",
             native_enum=False,
             create_constraint=False,
@@ -107,7 +107,7 @@ class DiscountRule(StoreScopedMixin, TimestampMixin, Base):
     schedule_type: Mapped[DiscountScheduleType] = mapped_column(
         Enum(
             DiscountScheduleType,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="discount_rule_schedule_type",
             native_enum=False,
             create_constraint=False,

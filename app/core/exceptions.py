@@ -104,7 +104,10 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
     assert isinstance(exc, RequestValidationError)
     errors = exc.errors()  # 获取 Pydantic 的校验错误详情列表。
     # 提取第一条错误信息作为主要提示，若无则使用默认提示。
-    first_error_msg = errors[0].get("msg") if errors else "请求参数校验失败"
+    if errors:
+        first_error_msg = errors[0].get("msg")
+    else:
+        first_error_msg = "请求参数校验失败"
 
     error_data = None
     if settings.debug:

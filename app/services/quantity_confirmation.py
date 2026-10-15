@@ -33,12 +33,19 @@ def check_confirmation(request, actor_id, store_id, kind, reference, previous) -
     HMAC签名覆盖员工、店铺、部门、商品、到货日、数量及操作类型，有效10分钟。
     动态参考量不进签名，避免库存变化导致相同已确认数字反复弹窗。
     这里只检查签名，不提交数据库；调用方还必须校验权限、截止时间并记录审计。"""
-    quantity = request.quantity if kind == "order" else request.minimum_stock
+    if kind == "order":
+        quantity = request.quantity
+    else:
+        quantity = request.minimum_stock
     if quantity is None:
         return None
     reasons = quantity_reasons(quantity, reference, previous)
     if request.input_method == "stepper":
-        reasons = [reason for reason in reasons if reason == "far_above_reference"]
+        reasons_values = []
+        for reasons_reason in reasons:
+            if reasons_reason == "far_above_reference":
+                reasons_values.append(reasons_reason)
+        reasons = reasons_values
     if not reasons:
         return None
     # 凭据不绑定动态建议量，避免正常库存变化让已确认的相同数量反复弹窗。

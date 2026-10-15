@@ -131,16 +131,10 @@ async def get_products_list(
     db: AsyncSession,
 ) -> tuple[list[tuple[Product, ProductInventorySummary]], int]:
     """按条件分页查询商品，并返回当前页商品和符合条件的总数。"""
-
-    # 只添加调用方实际传入的条件；空条件列表表示查询全部商品。
     conditions: list[ColumnElement[bool]] = []
     if keyword is not None:
-        # 同一个关键词既可以输入商品名称，也可以输入扫码或页面展示的商品编号。
         conditions.append(
-            or_(
-                Product.name.ilike(f"%{keyword}%"),
-                Product.product_no.ilike(f"%{keyword}%"),
-            )
+            or_(Product.name.ilike(f"%{keyword}%"), Product.product_no.ilike(f"%{keyword}%"))
         )
     if department_id is not None:
         conditions.append(Product.department_id == department_id)
@@ -148,40 +142,17 @@ async def get_products_list(
         conditions.append(Product.category_id == category_id)
     if status is not None:
         conditions.append(Product.status == status)
-
-    # 先按商品分组汇总所有批次的剩余数量，再作为子查询关联商品表。
-    # 已售罄批次的 remaining_quantity 是 0，因此无需按批次状态排除。
     batch_stock_summary = _build_batch_stock_summary()
-    # 没有任何批次的商品经过外连接后得到 NULL，这里把它转换成库存 0。
     batch_stock_quantity = func.coalesce(batch_stock_summary.c.batch_stock_quantity, 0)
-    saleable_stock_quantity = func.coalesce(
-        batch_stock_summary.c.saleable_stock_quantity,
-        0,
-    )
-    near_expiry_stock_quantity = func.coalesce(
-        batch_stock_summary.c.near_expiry_stock_quantity,
-        0,
-    )
-    near_expiry_batch_count = func.coalesce(
-        batch_stock_summary.c.near_expiry_batch_count,
-        0,
-    )
-    expired_stock_quantity = func.coalesce(
-        batch_stock_summary.c.expired_stock_quantity,
-        0,
-    )
-    expired_batch_count = func.coalesce(
-        batch_stock_summary.c.expired_batch_count,
-        0,
-    )
-
-    # stock_consistent 未传时不筛选；传 true/false 时分别查询一致或不一致商品。
+    saleable_stock_quantity = func.coalesce(batch_stock_summary.c.saleable_stock_quantity, 0)
+    near_expiry_stock_quantity = func.coalesce(batch_stock_summary.c.near_expiry_stock_quantity, 0)
+    near_expiry_batch_count = func.coalesce(batch_stock_summary.c.near_expiry_batch_count, 0)
+    expired_stock_quantity = func.coalesce(batch_stock_summary.c.expired_stock_quantity, 0)
+    expired_batch_count = func.coalesce(batch_stock_summary.c.expired_batch_count, 0)
     if stock_consistent is True:
         conditions.append(Product.stock_quantity == batch_stock_quantity)
     elif stock_consistent is False:
         conditions.append(Product.stock_quantity != batch_stock_quantity)
-
-    # 低库存以“可售库存”和每个商品自己的预警阈值比较，不使用包含过期批次的全部库存。
     if low_stock is True:
         conditions.extend(
             [
@@ -190,26 +161,24 @@ async def get_products_list(
             ]
         )
     elif low_stock is False:
-        # 没有设置阈值的商品不会触发预警，因此也属于“未触发低库存预警”。
         conditions.append(
             or_(
                 Product.low_stock_threshold.is_(None),
                 saleable_stock_quantity > Product.low_stock_threshold,
             )
         )
-
-    # 列表查询和数量查询使用完全相同的筛选条件，保证分页数据准确。
     count_statement = (
         select(func.count(Product.id))
-        .outerjoin(
-            batch_stock_summary,
-            batch_stock_summary.c.product_id == Product.id,
-        )
+        .outerjoin(batch_stock_summary, batch_stock_summary.c.product_id == Product.id)
         .where(*conditions)
     )
+    if db.info.get("read_store_id") is not None:
+        count_statement = count_statement.where(Product.store_id == db.info["read_store_id"])
     count_result = await db.scalar(count_statement)
-    total = count_result if count_result is not None else 0
-
+    if count_result is not None:
+        total = count_result
+    else:
+        total = 0
     offset = (page - 1) * page_size
     list_statement = (
         select(
@@ -221,45 +190,41 @@ async def get_products_list(
             expired_stock_quantity,
             expired_batch_count,
         )
-        # Service 需要部门名和分类名，因此在异步会话中提前加载两个关系。
-        .options(
-            selectinload(Product.department),
-            selectinload(Product.category),
-        )
-        .outerjoin(
-            batch_stock_summary,
-            batch_stock_summary.c.product_id == Product.id,
-        )
+        .options(selectinload(Product.department), selectinload(Product.category))
+        .outerjoin(batch_stock_summary, batch_stock_summary.c.product_id == Product.id)
         .where(*conditions)
         .order_by(Product.id.asc())
         .offset(offset)
         .limit(page_size)
     )
+    if db.info.get("read_store_id") is not None:
+        list_statement = list_statement.where(Product.store_id == db.info["read_store_id"])
     list_result = await db.execute(list_statement)
-    products = [
-        (
-            product,
+    products_values = []
+    for (
+        products_product,
+        products_total_stock,
+        products_saleable_stock,
+        products_near_expiry_stock,
+        products_near_expiry_batches,
+        products_expired_stock,
+        products_expired_batches,
+    ) in list_result.all():
+        products_values.append(
             (
-                int(total_stock),
-                int(saleable_stock),
-                int(near_expiry_stock),
-                int(near_expiry_batches),
-                int(expired_stock),
-                int(expired_batches),
-            ),
+                products_product,
+                (
+                    int(products_total_stock),
+                    int(products_saleable_stock),
+                    int(products_near_expiry_stock),
+                    int(products_near_expiry_batches),
+                    int(products_expired_stock),
+                    int(products_expired_batches),
+                ),
+            )
         )
-        for (
-            product,
-            total_stock,
-            saleable_stock,
-            near_expiry_stock,
-            near_expiry_batches,
-            expired_stock,
-            expired_batches,
-        ) in list_result.all()
-    ]
-
-    return products, total
+    products = products_values
+    return (products, total)
 
 
 # endregion
@@ -268,7 +233,6 @@ async def get_products_list(
 # region 检查商品与批次库存一致性
 async def get_stock_inconsistencies(db: AsyncSession) -> list[StockInconsistency]:
     """查询库存不一致的商品；本函数只读取数据，不执行任何自动修复。"""
-
     batch_stock_summary = _build_batch_stock_summary()
     batch_stock_quantity = func.coalesce(batch_stock_summary.c.batch_stock_quantity, 0)
     statement = (
@@ -279,40 +243,47 @@ async def get_stock_inconsistencies(db: AsyncSession) -> list[StockInconsistency
             Product.stock_quantity,
             batch_stock_quantity,
         )
-        .outerjoin(
-            batch_stock_summary,
-            batch_stock_summary.c.product_id == Product.id,
-        )
+        .outerjoin(batch_stock_summary, batch_stock_summary.c.product_id == Product.id)
         .where(Product.stock_quantity != batch_stock_quantity)
         .order_by(Product.id.asc())
     )
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(Product.store_id == db.info["read_store_id"])
     result = await db.execute(statement)
-    return [
-        (product_id, product_no, name, product_stock, int(batch_stock))
-        for product_id, product_no, name, product_stock, batch_stock in result.all()
-    ]
+    result_values = []
+    for (
+        result_product_id,
+        result_product_no,
+        result_name,
+        result_product_stock,
+        result_batch_stock,
+    ) in result.all():
+        result_values.append(
+            (
+                result_product_id,
+                result_product_no,
+                result_name,
+                result_product_stock,
+                int(result_batch_stock),
+            )
+        )
+    return result_values
 
 
 # endregion
 
 
 # region 根据ID获取商品
-async def get_product_by_id(
-    product_id: int,
-    db: AsyncSession,
-) -> Product | None:
+async def get_product_by_id(product_id: int, db: AsyncSession) -> Product | None:
     """根据商品 ID 查询商品，并提前加载所属部门和分类。"""
-
     select_statement = (
         select(Product)
-        .options(
-            selectinload(Product.department),
-            selectinload(Product.category),
-        )
+        .options(selectinload(Product.department), selectinload(Product.category))
         .where(Product.id == product_id)
-        # 如果当前会话已经加载过这个商品，也用数据库最新值覆盖缓存。
         .execution_options(populate_existing=True)
     )
+    if db.info.get("read_store_id") is not None:
+        select_statement = select_statement.where(Product.store_id == db.info["read_store_id"])
     result = await db.scalar(select_statement)
     return result
 
@@ -322,38 +293,22 @@ async def get_product_by_id(
 
 # region 修改商品
 async def update_product(
-    # product_id：需要更新的商品主键。
-    product_id: int,
-    # update_data：经过 Service 校验后，真正需要写入数据库的字段和值。
-    update_data: dict[str, object],
-    expected_version: int,
-    # db：当前请求的异步数据库会话；CRUD 不在这里提交事务。
-    db: AsyncSession,
+    product_id: int, update_data: dict[str, object], expected_version: int, db: AsyncSession
 ) -> Product:
     """更新指定商品，并返回包含部门和分类关系的最新商品对象。"""
-
-    # 第一步：创建 UPDATE 语句。
-    # update_data 已由 Service 使用 exclude_unset=True 过滤，只包含前端传入的字段。
     update_statement = (
         update(Product)
         .where(Product.id == product_id, Product.version == expected_version)
         .values(**update_data, version=Product.version + 1)
     )
-
-    # 第二步：把 UPDATE 语句发送给数据库。
-    # 此处不调用 commit，由 Service 在全部业务操作成功后统一提交。
+    if db.info.get("own_store_id") is not None:
+        update_statement = update_statement.where(Product.store_id == db.info["own_store_id"])
     result = await db.execute(update_statement)
     if cast(CursorResult[Any], result).rowcount != 1:
         raise ConcurrentUpdateError("商品资料已被其他员工修改，请刷新后重试")
-
-    # 第三步：重新查询修改后的商品。
-    # UPDATE 只能修改商品表，selectinload 不能放在 UPDATE 上加载关联对象。
-    # 因此更新后重新查询一次，取得最新字段以及 department、category 关系。
     updated_product = await get_product_by_id(product_id=product_id, db=db)
     if updated_product is None:
-        # Service 已提前确认商品存在；这里只处理极少见的并发删除情况。
         raise RuntimeError("商品更新后无法重新查询")
-
     return updated_product
 
 

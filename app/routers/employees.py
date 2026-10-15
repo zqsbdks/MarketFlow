@@ -1,6 +1,6 @@
 """员工管理 API 路由。"""
 
-from fastapi import APIRouter, Body, Depends, Path
+from fastapi import APIRouter, Body, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -43,6 +43,8 @@ async def create_employee(
     employee: EmployeesCreateRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[EmployeesCreateResponse]:
     """由当前登录店长创建员工账号。"""
 
@@ -52,6 +54,7 @@ async def create_employee(
         department_id=employee.department_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[EmployeesCreateResponse](
@@ -74,6 +77,8 @@ async def get_list_employees(
     request: EmployeesListRequest = Depends(),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[EmployeesListResponse]:
     """按照分页和筛选条件返回员工列表。"""
 
@@ -85,6 +90,7 @@ async def get_list_employees(
         is_active=request.is_active,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[EmployeesListResponse](
@@ -108,6 +114,8 @@ async def update_employee_status(
     employee_id: int = Path(..., description="员工ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[EmployeesStatusUpdateResponse]:
     """修改指定员工的状态。"""
 
@@ -117,6 +125,7 @@ async def update_employee_status(
         reason=request.reason,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[EmployeesStatusUpdateResponse](
@@ -140,14 +149,21 @@ async def reset_employee_password(
     employee_id: int = Path(..., description="员工ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[EmployeesResetPasswordResponse]:
     """重置指定员工密码并返回一次性临时密码。"""
 
+    if request is not None:
+        reason_value = request.reason
+    else:
+        reason_value = None
     employee = await reset_employee_password_service(
         employee_id=employee_id,
         current_employee_id=current_employee_id,
-        reason=request.reason if request is not None else None,
+        reason=reason_value,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[EmployeesResetPasswordResponse](
@@ -170,6 +186,8 @@ async def get_employee_detail(
     employee_id: int = Path(..., description="员工ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[EmployeeDetailResponse]:
     """接收目标员工 ID，并返回统一格式的员工详情。"""
 
@@ -179,6 +197,7 @@ async def get_employee_detail(
         employee_id=employee_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[EmployeeDetailResponse](
@@ -203,6 +222,8 @@ async def update_employee_detail(
     employee_id: int = Path(..., description="员工ID", ge=1),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[EmployeeDetailResponse]:
     """从 JSON 请求体接收详情，返回保存后的员工资料。"""
 
@@ -212,6 +233,7 @@ async def update_employee_detail(
         request=request,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[EmployeeDetailResponse](

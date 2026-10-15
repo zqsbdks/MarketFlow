@@ -14,8 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.csrf import csrf_for_session
-from app.crud.auth import get_employee_by_id
 from app.dependencies.db import get_db
+from app.services.auth import (
+    get_current_employee_id_service,
+    get_verified_current_employee_id_service,
+)
 
 # auto_error=False 让缺少请求头的情况进入自定义逻辑，返回项目约定的中文提示。
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -38,7 +41,11 @@ async def get_current_token_payload(
         dict[str, Any]: 已验证的 JWT 载荷，其中保证包含非空 ``sub``。
     """
 
-    token = credentials.credentials if credentials else request.cookies.get("marketflow_session")
+    token: str | None
+    if credentials:
+        token = credentials.credentials
+    else:
+        token = request.cookies.get("marketflow_session")
     if not token:
         # 明确返回 Bearer 认证挑战头，客户端可以据此触发重新登录。
         raise HTTPException(
@@ -95,23 +102,7 @@ async def get_current_employee_id(
     token_payload: dict[str, Any] = Depends(get_current_token_payload),
     db: AsyncSession = Depends(get_db),
 ) -> int:
-    """从已验证的 JWT 载荷中取得数字类型的员工 ID。"""
-
-    try:
-        employee_id = int(token_payload["sub"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="访问令牌中的员工标识无效",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
-    employee = await get_employee_by_id(employee_id=employee_id, db=db)
-    if employee is None or not employee.is_active:
-        raise HTTPException(401, "账号不存在或已停用")
-    from app.core.store_policy import configure_store_context
-
-    await configure_store_context(request, employee, db)
-    return employee_id
+    return await get_current_employee_id_service(token_payload=token_payload, db=db)
 
 
 # endregion
@@ -122,30 +113,9 @@ async def get_verified_current_employee_id(
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
 ) -> int:
-    """在解析JWT后，继续检查员工账号的最新可用状态。
-
-    缓存命中时路由函数本身不会再次执行，但 FastAPI 仍会先解析依赖。缓存接口使用
-    本依赖，可以避免已停用或尚未修改初始密码的员工读取已有缓存。
-    """
-
-    employee = await get_employee_by_id(employee_id=current_employee_id, db=db)
-    if employee is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="当前登录员工不存在",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if not employee.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="账号已停用",
-        )
-    if employee.must_change_password:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="请先修改初始密码",
-        )
-    return employee.id
+    return await get_verified_current_employee_id_service(
+        current_employee_id=current_employee_id, db=db
+    )
 
 
 # endregion

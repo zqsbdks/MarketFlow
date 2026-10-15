@@ -8,9 +8,9 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from store_fixtures import set_request_store
 from test_store_policy import request
 
-from app.core.store_policy import configure_store_context
 from app.models.employee import Employee
 from app.models.enums import InventoryBatchStatus, PurchaseStatus
 from app.models.inventory_batch import InventoryBatch
@@ -100,9 +100,7 @@ def payload(**overrides):
 
 
 async def context(db, employee_id=1, store="1", method="POST", path="/api/v1/inventory-discards"):
-    await configure_store_context(
-        request(path, method, store), await db.get(Employee, employee_id), db
-    )
+    await set_request_store(request(path, method, store), await db.get(Employee, employee_id), db)
 
 
 async def test_fefo_preview_and_atomic_stock_cost_audit(discard_database):
@@ -122,7 +120,18 @@ async def test_fefo_preview_and_atomic_stock_cost_audit(discard_database):
         result = await service.create_discard(payload(), 1, db)
         assert result.total_cost == preview.total_cost
         assert (await db.get(Product, 1)).stock_quantity == 28
-        assert sum((await db.scalars(select(InventoryBatch.remaining_quantity))).all()) == 28
+        assert (
+            sum(
+                (
+                    await db.scalars(
+                        select(InventoryBatch.remaining_quantity).where(
+                            InventoryBatch.store_id == 1
+                        )
+                    )
+                ).all()
+            )
+            == 28
+        )
         logs = (
             await db.scalars(
                 select(OperationAuditLog).where(OperationAuditLog.action == "discard_manual")

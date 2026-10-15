@@ -50,10 +50,12 @@ CHECKS = {
 async def main():
     try:
         async with async_engine.connect() as connection:
-            checks = {
-                name: int((await connection.execute(text(sql))).scalar_one())
-                for name, sql in CHECKS.items()
-            }
+            checks_mapping = {}
+            for checks_name, checks_sql in CHECKS.items():
+                checks_mapping[checks_name] = int(
+                    (await connection.execute(text(checks_sql))).scalar_one()
+                )
+            checks = checks_mapping
             counts = dict(
                 (
                     await connection.execute(

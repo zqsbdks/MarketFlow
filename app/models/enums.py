@@ -157,3 +157,11 @@ __all__ = [
     "ReportMetric",
     "SaleSource",
 ]
+
+
+def enum_values(enum_type):
+    """SQLAlchemy 枚举字段需要的转换函数：取出各枚举项实际保存的字符串。"""
+    values = []
+    for item in enum_type:
+        values.append(item.value)
+    return values

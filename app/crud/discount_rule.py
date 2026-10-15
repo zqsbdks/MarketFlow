@@ -112,10 +112,7 @@ async def get_discount_rules_list(
     db: AsyncSession,
 ) -> tuple[list[DiscountRule], int]:
     """按筛选条件分页查询折扣规则，并返回符合条件的总条数。"""
-
     conditions: list[ColumnElement[bool]] = []
-
-    # 每个参数都允许不传；只有前端实际传入时，才添加对应查询条件。
     if keyword is not None:
         conditions.append(DiscountRule.name.ilike(f"%{keyword}%"))
     if department_id is not None:
@@ -128,24 +125,22 @@ async def get_discount_rules_list(
         conditions.append(DiscountRule.is_active.is_(is_active))
     if computed_status is not None:
         conditions.append(_get_computed_status_condition(computed_status, now))
-
-    # 提前加载创建员工和所属部门，Service组装响应时不会再次访问数据库。
     list_statement = (
         select(DiscountRule)
-        .options(
-            selectinload(DiscountRule.creator),
-            selectinload(DiscountRule.department),
-        )
+        .options(selectinload(DiscountRule.creator), selectinload(DiscountRule.department))
         .where(*conditions)
         .order_by(DiscountRule.id.desc())
         .offset(offset)
         .limit(page_size)
     )
+    if db.info.get("read_store_id") is not None:
+        list_statement = list_statement.where(DiscountRule.store_id == db.info["read_store_id"])
     count_statement = select(func.count(DiscountRule.id)).where(*conditions)
-
+    if db.info.get("read_store_id") is not None:
+        count_statement = count_statement.where(DiscountRule.store_id == db.info["read_store_id"])
     total = int(await db.scalar(count_statement) or 0)
     result = await db.scalars(list_statement)
-    return list(result.all()), total
+    return (list(result.all()), total)
 
 
 # endregion
@@ -160,8 +155,6 @@ async def get_active_discount_rules_for_products(
     db: AsyncSession,
 ) -> list[DiscountRule]:
     """查询当前时间内可以作用于指定商品、分类或部门的启用规则。"""
-
-    # 三种范围只要命中一种，就可能成为商品的候选折扣。
     scope_conditions: list[ColumnElement[bool]] = []
     if product_ids:
         scope_conditions.append(
@@ -184,10 +177,8 @@ async def get_active_discount_rules_for_products(
                 DiscountRuleScope.department_id.in_(department_ids),
             )
         )
-
     if not scope_conditions:
         return []
-
     statement = (
         select(DiscountRule)
         .join(DiscountRuleScope)
@@ -198,9 +189,10 @@ async def get_active_discount_rules_for_products(
             or_(*scope_conditions),
         )
         .distinct()
-        # 折后价相同时保留ID较小的规则，使每次计算结果保持稳定。
         .order_by(DiscountRule.id.asc())
     )
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["read_store_id"])
     result = await db.scalars(statement)
     return list(result.all())
 
@@ -209,23 +201,16 @@ async def get_active_discount_rules_for_products(
 
 
 # region 获取折扣规则详情
-async def get_discount_rule_by_id(
-    discount_rule_id: int,
-    db: AsyncSession,
-) -> DiscountRule | None:
+async def get_discount_rule_by_id(discount_rule_id: int, db: AsyncSession) -> DiscountRule | None:
     """根据规则ID查询一条折扣规则，并提前加载创建员工。"""
-
-    # 详情响应需要显示创建员工和所属部门，所以查询规则时一并加载两个关系。
     statement = (
         select(DiscountRule)
-        .options(
-            selectinload(DiscountRule.creator),
-            selectinload(DiscountRule.department),
-        )
+        .options(selectinload(DiscountRule.creator), selectinload(DiscountRule.department))
         .where(DiscountRule.id == discount_rule_id)
-        # 如果会话中已经存在该对象，仍使用数据库最新值覆盖旧的会话缓存。
         .execution_options(populate_existing=True)
     )
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["read_store_id"])
     result = await db.execute(statement)
     return result.scalar_one_or_none()
 
@@ -235,13 +220,12 @@ async def get_discount_rule_by_id(
 
 # region 根据名称查询折扣规则
 async def get_discount_rule_by_name(
-    name: str,
-    db: AsyncSession,
-    excluded_discount_rule_id: int | None = None,
+    name: str, db: AsyncSession, excluded_discount_rule_id: int | None = None
 ) -> DiscountRule | None:
     """查询同名折扣规则；修改规则时可以排除规则自身。"""
-
     statement = select(DiscountRule).where(DiscountRule.name == name)
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["read_store_id"])
     if excluded_discount_rule_id is not None:
         statement = statement.where(DiscountRule.id != excluded_discount_rule_id)
     result = await db.execute(statement)
@@ -268,8 +252,8 @@ async def create_discount_rule(
     db: AsyncSession,
 ) -> DiscountRule:
     """创建折扣规则并取得自增ID；事务提交由Service统一负责。"""
-
     rule = DiscountRule(
+        store_id=db.info.get("write_store_id") or 1,
         department_id=department_id,
         name=name,
         discount_type=discount_type,
@@ -293,14 +277,11 @@ async def create_discount_rule(
 
 
 # region 根据ID列表获取折扣商品
-async def get_discount_products_by_ids(
-    product_ids: list[int],
-    db: AsyncSession,
-) -> list[Product]:
+async def get_discount_products_by_ids(product_ids: list[int], db: AsyncSession) -> list[Product]:
     """一次查询准备加入折扣规则的全部正式商品。"""
-
-    # IN条件会查出ID位于product_ids中的商品；按ID排序让查询结果保持稳定。
     statement = select(Product).where(Product.id.in_(product_ids)).order_by(Product.id.asc())
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(Product.store_id == db.info["read_store_id"])
     result = await db.scalars(statement)
     return list(result.all())
 
@@ -310,19 +291,17 @@ async def get_discount_products_by_ids(
 
 # region 获取已经关联的折扣商品ID
 async def get_existing_discount_product_ids(
-    discount_rule_id: int,
-    product_ids: list[int],
-    db: AsyncSession,
+    discount_rule_id: int, product_ids: list[int], db: AsyncSession
 ) -> set[int]:
     """查询指定规则在本次商品ID中已经存在的关联。"""
-
     statement = select(DiscountRuleScope.product_id).where(
         DiscountRuleScope.discount_rule_id == discount_rule_id,
         DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
         DiscountRuleScope.product_id.in_(product_ids),
     )
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRuleScope.store_id == db.info["read_store_id"])
     result = await db.scalars(statement)
-
     existing_product_ids: set[int] = set()
     for product_id in result.all():
         if product_id is not None:
@@ -335,15 +314,13 @@ async def get_existing_discount_product_ids(
 
 # region 批量创建折扣商品关联
 async def create_discount_rule_product_scopes(
-    discount_rule_id: int,
-    product_ids: list[int],
-    db: AsyncSession,
+    discount_rule_id: int, product_ids: list[int], db: AsyncSession
 ) -> list[DiscountRuleScope]:
     """批量创建商品类型的折扣适用范围；事务提交由Service统一负责。"""
-
     scopes: list[DiscountRuleScope] = []
     for product_id in product_ids:
         scope = DiscountRuleScope(
+            store_id=db.info.get("write_store_id") or 1,
             discount_rule_id=discount_rule_id,
             scope_type=DiscountScopeType.PRODUCT,
             product_id=product_id,
@@ -351,7 +328,6 @@ async def create_discount_rule_product_scopes(
             department_id=None,
         )
         scopes.append(scope)
-
     db.add_all(scopes)
     await db.flush()
     return scopes
@@ -370,8 +346,6 @@ async def get_discount_rule_products_list(
     db: AsyncSession,
 ) -> tuple[list[DiscountRuleScope], int]:
     """分页查询一条折扣规则直接关联的商品，并返回符合条件的总数。"""
-
-    # 所有条件同时用于列表查询和总数查询，保证筛选后的分页信息准确。
     conditions: list[ColumnElement[bool]] = [
         DiscountRuleScope.discount_rule_id == discount_rule_id,
         DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
@@ -379,15 +353,10 @@ async def get_discount_rule_products_list(
     if keyword is not None:
         fuzzy_keyword = f"%{keyword}%"
         conditions.append(
-            or_(
-                Product.product_no.ilike(fuzzy_keyword),
-                Product.name.ilike(fuzzy_keyword),
-            )
+            or_(Product.product_no.ilike(fuzzy_keyword), Product.name.ilike(fuzzy_keyword))
         )
     if category_id is not None:
         conditions.append(Product.category_id == category_id)
-
-    # 关联Product是为了执行商品字段筛选；selectinload提前加载响应需要的部门和分类。
     list_statement = (
         select(DiscountRuleScope)
         .join(Product, Product.id == DiscountRuleScope.product_id)
@@ -400,15 +369,22 @@ async def get_discount_rule_products_list(
         .offset(offset)
         .limit(page_size)
     )
+    if db.info.get("read_store_id") is not None:
+        list_statement = list_statement.where(
+            DiscountRuleScope.store_id == db.info["read_store_id"]
+        )
     count_statement = (
         select(func.count(DiscountRuleScope.id))
         .join(Product, Product.id == DiscountRuleScope.product_id)
         .where(*conditions)
     )
-
+    if db.info.get("read_store_id") is not None:
+        count_statement = count_statement.where(
+            DiscountRuleScope.store_id == db.info["read_store_id"]
+        )
     total = int(await db.scalar(count_statement) or 0)
     result = await db.scalars(list_statement)
-    return list(result.all()), total
+    return (list(result.all()), total)
 
 
 # endregion
@@ -416,12 +392,9 @@ async def get_discount_rule_products_list(
 
 # region 获取单个折扣商品关联
 async def get_discount_rule_product_scope(
-    discount_rule_id: int,
-    product_id: int,
-    db: AsyncSession,
+    discount_rule_id: int, product_id: int, db: AsyncSession
 ) -> DiscountRuleScope | None:
     """根据规则ID和商品ID查询一条商品关联，并提前加载商品资料。"""
-
     statement = (
         select(DiscountRuleScope)
         .options(selectinload(DiscountRuleScope.product))
@@ -431,6 +404,8 @@ async def get_discount_rule_product_scope(
             DiscountRuleScope.product_id == product_id,
         )
     )
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRuleScope.store_id == db.info["read_store_id"])
     result = await db.execute(statement)
     return result.scalar_one_or_none()
 
@@ -440,21 +415,15 @@ async def get_discount_rule_product_scope(
 
 # region 获取准备全部删除的折扣商品关联
 async def get_discount_rule_product_scopes_for_delete(
-    discount_rule_id: int,
-    department_id: int | None,
-    db: AsyncSession,
+    discount_rule_id: int, department_id: int | None, db: AsyncSession
 ) -> list[DiscountRuleScope]:
     """查询规则下可由当前员工删除的商品关联。"""
-
     conditions: list[ColumnElement[bool]] = [
         DiscountRuleScope.discount_rule_id == discount_rule_id,
         DiscountRuleScope.scope_type == DiscountScopeType.PRODUCT,
     ]
-
-    # 店长传入None时查询全部；正式员工传入自己的部门ID时只查询本部门商品。
     if department_id is not None:
         conditions.append(Product.department_id == department_id)
-
     statement = (
         select(DiscountRuleScope)
         .join(Product, Product.id == DiscountRuleScope.product_id)
@@ -462,6 +431,8 @@ async def get_discount_rule_product_scopes_for_delete(
         .where(*conditions)
         .order_by(DiscountRuleScope.id.asc())
     )
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRuleScope.store_id == db.info["read_store_id"])
     result = await db.scalars(statement)
     return list(result.all())
 
@@ -486,17 +457,14 @@ async def delete_discount_rule_product_scopes(
 
 # region 获取准备一键清空的折扣规则
 async def get_discount_rules_for_delete(
-    department_id: int | None,
-    db: AsyncSession,
+    department_id: int | None, db: AsyncSession
 ) -> list[DiscountRule]:
     """查询当前员工权限范围内准备一键删除的折扣规则。"""
-
     statement = select(DiscountRule)
-
-    # 店长传入None时查询全部规则；正式员工只查询自己部门的规则。
+    if db.info.get("read_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["read_store_id"])
     if department_id is not None:
         statement = statement.where(DiscountRule.department_id == department_id)
-
     statement = statement.order_by(DiscountRule.id.asc())
     result = await db.scalars(statement)
     return list(result.all())
@@ -506,13 +474,11 @@ async def get_discount_rules_for_delete(
 
 
 # region 删除折扣规则
-async def delete_discount_rules(
-    rule_ids: list[int],
-    db: AsyncSession,
-) -> None:
+async def delete_discount_rules(rule_ids: list[int], db: AsyncSession) -> None:
     """根据ID删除折扣规则；商品关联由数据库外键自动级联删除。"""
-
     statement = delete(DiscountRule).where(DiscountRule.id.in_(rule_ids))
+    if db.info.get("own_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["own_store_id"])
     await db.execute(statement)
     await db.flush()
 
@@ -522,18 +488,16 @@ async def delete_discount_rules(
 
 # region 修改折扣规则状态
 async def update_discount_rule_status(
-    discount_rule_id: int,
-    is_active: bool,
-    expected_version: int,
-    db: AsyncSession,
+    discount_rule_id: int, is_active: bool, expected_version: int, db: AsyncSession
 ) -> None:
     """修改折扣规则的人工启停状态；事务提交由Service统一负责。"""
-
     statement = (
         update(DiscountRule)
         .where(DiscountRule.id == discount_rule_id, DiscountRule.version == expected_version)
         .values(is_active=is_active, version=DiscountRule.version + 1)
     )
+    if db.info.get("own_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["own_store_id"])
     result = await db.execute(statement)
     if cast(CursorResult[Any], result).rowcount != 1:
         raise ConcurrentUpdateError("折扣规则已被其他员工修改，请刷新后重试")
@@ -545,18 +509,16 @@ async def update_discount_rule_status(
 
 # region 修改折扣规则资料
 async def update_discount_rule(
-    discount_rule_id: int,
-    update_data: dict[str, object],
-    expected_version: int,
-    db: AsyncSession,
+    discount_rule_id: int, update_data: dict[str, object], expected_version: int, db: AsyncSession
 ) -> None:
     """修改折扣规则资料；事务提交由Service统一负责。"""
-
     statement = (
         update(DiscountRule)
         .where(DiscountRule.id == discount_rule_id, DiscountRule.version == expected_version)
         .values(**update_data, version=DiscountRule.version + 1)
     )
+    if db.info.get("own_store_id") is not None:
+        statement = statement.where(DiscountRule.store_id == db.info["own_store_id"])
     result = await db.execute(statement)
     if cast(CursorResult[Any], result).rowcount != 1:
         raise ConcurrentUpdateError("折扣规则已被其他员工修改，请刷新后重试")

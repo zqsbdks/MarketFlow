@@ -8,18 +8,15 @@ import asyncio
 import logging
 from datetime import datetime, time, timedelta
 
-from sqlalchemy import select
-
 from app.core.business_time import business_now
 from app.core.database import async_session_factory
 from app.core.distributed_lock import distributed_lock
-from app.crud.inventory_batches import refresh_inventory_batch_statuses
-from app.crud.products import StockInconsistency, get_stock_inconsistencies
-from app.crud.purchases import auto_receive_due_purchases
-from app.models.inventory_batch import InventoryBatch
-from app.models.purchase_plan import PurchasePlan
-from app.services.inventory_discards import discard_expired_product
-from app.services.purchase_plan_submission import submit_due_plan
+from app.crud.products import StockInconsistency
+from app.services.inventory_batches import refresh_inventory_batch_statuses
+from app.services.inventory_discards import discard_expired_product, get_expired_product_ids_service
+from app.services.products import get_stock_inconsistencies_service as get_stock_inconsistencies
+from app.services.purchase_plan_submission import get_due_plan_ids_service, submit_due_plan
+from app.services.purchases import auto_receive_due_purchases
 from app.services.replenishment import refresh_automatic_plans
 
 logger = logging.getLogger(__name__)
@@ -123,19 +120,7 @@ async def _run_batch_status_refresh_once() -> int:
         # 每个商品独立事务，锁顺序与销售相同，避免一次锁住全公司的库存。
         today = business_now().date()
         async with async_session_factory() as db:
-            product_ids = list(
-                (
-                    await db.scalars(
-                        select(InventoryBatch.product_id)
-                        .where(
-                            InventoryBatch.expiration_date < today,
-                            InventoryBatch.remaining_quantity > 0,
-                        )
-                        .distinct()
-                        .order_by(InventoryBatch.product_id)
-                    )
-                ).all()
-            )
+            product_ids = await get_expired_product_ids_service(today, db)
         discarded_count = 0
         for product_id in product_ids:
             async with async_session_factory() as db:
@@ -281,20 +266,13 @@ async def _run_plan_submission_once() -> int:
             async with async_session_factory() as db:
                 await refresh_automatic_plans(db, now)
             _last_replenishment_hour = hour
-        latest = now.date() + timedelta(days=2 if now.time() >= AUTO_RECEIVE_TIME else 1)
+        if now.time() >= AUTO_RECEIVE_TIME:
+            days_value = 2
+        else:
+            days_value = 1
+        latest = now.date() + timedelta(days=days_value)
         async with async_session_factory() as db:
-            ids = list(
-                (
-                    await db.scalars(
-                        select(PurchasePlan.id)
-                        .where(
-                            PurchasePlan.purchase_id.is_(None),
-                            PurchasePlan.arrival_date <= latest,
-                        )
-                        .order_by(PurchasePlan.id)
-                    )
-                ).all()
-            )
+            ids = await get_due_plan_ids_service(latest, db)
         count = 0
         for plan_id in ids:
             async with async_session_factory() as db:

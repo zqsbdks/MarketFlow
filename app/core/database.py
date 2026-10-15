@@ -48,7 +48,7 @@ async_session_factory = async_sessionmaker(
     expire_on_commit=False,
 )
 
-# 注册统一门店隔离策略；后台任务按来源记录显式指定写入门店。
+# 数据隔离由各业务 Service 检查权限、CRUD 明确添加门店条件；这里不注册业务事件。
 
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:

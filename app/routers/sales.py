@@ -1,6 +1,6 @@
 """销售记录 API 路由。"""
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -33,6 +33,8 @@ async def get_sales(
     request: SalesListRequest = Depends(),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SalesListResponse]:
     """接收销售单查询参数，并返回统一格式的销售单列表。"""
 
@@ -44,6 +46,7 @@ async def get_sales(
         sale_no=request.sale_no,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[SalesListResponse](
@@ -66,13 +69,13 @@ async def preview_sale_price(
     request: CreateSaleRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SalePricePreviewResponse]:
     """接收扫码商品和数量，返回当前时刻的折扣试算结果。"""
 
     preview = await preview_sale_price_service(
-        request=request,
-        current_employee_id=current_employee_id,
-        db=db,
+        request=request, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[SalePricePreviewResponse](
         message="销售价格预览成功",
@@ -94,13 +97,13 @@ async def create_sale(
     request: CreateSaleRequest,
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SaleDetailResponse]:
     """接收商品及数量，返回合并同商品批次后的销售小票。"""
 
     sale = await create_sale_service(
-        request=request,
-        current_employee_id=current_employee_id,
-        db=db,
+        request=request, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
     return ResponseModel[SaleDetailResponse](message="销售单创建成功", data=sale)
 
@@ -124,13 +127,13 @@ async def get_sale_detail(
     ),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[SaleDetailResponse]:
     """根据销售单号返回一张销售单的详细信息。"""
 
     sale = await get_sales_detail_service(
-        sale_no=sale_no,
-        current_employee_id=current_employee_id,
-        db=db,
+        sale_no=sale_no, current_employee_id=current_employee_id, db=db, http_request=http_request
     )
 
     return ResponseModel[SaleDetailResponse](

@@ -10,7 +10,7 @@ from sqlalchemy import BigInteger, CheckConstraint, DateTime, Enum, ForeignKey, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import PurchaseStatus
+from app.models.enums import PurchaseStatus, enum_values
 from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
@@ -108,7 +108,7 @@ class Purchase(StoreScopedMixin, TimestampMixin, Base):
     status: Mapped[PurchaseStatus] = mapped_column(
         Enum(
             PurchaseStatus,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="purchase_status",
             native_enum=False,
             create_constraint=False,

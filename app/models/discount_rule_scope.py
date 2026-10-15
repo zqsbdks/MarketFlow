@@ -14,7 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin
-from app.models.enums import DiscountScopeType
+from app.models.enums import DiscountScopeType, enum_values
 from app.models.store_scoped import StoreScopedMixin
 
 if TYPE_CHECKING:
@@ -77,7 +77,7 @@ class DiscountRuleScope(StoreScopedMixin, CreatedAtMixin, Base):
     scope_type: Mapped[DiscountScopeType] = mapped_column(
         Enum(
             DiscountScopeType,
-            values_callable=lambda enum_type: [item.value for item in enum_type],
+            values_callable=enum_values,
             name="discount_rule_scope_type",
             native_enum=False,
             create_constraint=False,

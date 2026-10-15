@@ -1,14 +1,8 @@
 """商品分类查询 API 路由。"""
 
-from fastapi import APIRouter, Depends
-from fastapi_cache.decorator import cache
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import (
-    CATEGORIES_CACHE_NAMESPACE,
-    CATEGORIES_CACHE_SECONDS,
-    request_cache_key_builder,
-)
 from app.dependencies.auth import get_verified_current_employee_id
 from app.dependencies.db import get_db
 from app.schemas.base import ResponseModel
@@ -29,15 +23,12 @@ categories_router = APIRouter(
     summary="获取商品分类列表",
     description="返回商品分类列表，并支持按照部门ID筛选。",
 )
-@cache(
-    expire=CATEGORIES_CACHE_SECONDS,
-    namespace=CATEGORIES_CACHE_NAMESPACE,
-    key_builder=request_cache_key_builder,
-)
 async def get_list_categories(
     request: CategoryListRequest = Depends(),
     current_employee_id: int = Depends(get_verified_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[list[CategoriesItemResponse]]:
     """获取商品分类列表，并使用项目统一响应格式返回。"""
 
@@ -45,6 +36,7 @@ async def get_list_categories(
         department_id=request.department_id,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[list[CategoriesItemResponse]](

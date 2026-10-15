@@ -1,23 +1,23 @@
 """废弃计划、原子库存扣减、不可变损耗记录及自动过期处理。"""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
-from fastapi import HTTPException
-from sqlalchemy import func, or_, select
+from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import lazyload, selectinload
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.business_time import business_now
+from app.crud import inventory_discards as data_access
 from app.crud.auth import get_employee_by_id
 from app.crud.operation_audit_logs import create_operation_audit_log
+from app.crud.scheduler import get_expired_product_ids
+from app.crud.stores import first_active_store_id, get_store_by_id
 from app.models.employee import Employee
 from app.models.enums import EmployeeRole, InventoryBatchStatus
 from app.models.inventory_batch import InventoryBatch
 from app.models.inventory_discard import InventoryDiscard, InventoryDiscardItem
 from app.models.product import Product
-from app.models.store import StoreDepartment
 from app.schemas.inventory_discards import (
     DiscardBatchResponse,
     DiscardCreateRequest,
@@ -58,12 +58,7 @@ async def load_product(
 
     正式员工仅所属部门；必须是本店启用部门。锁定读取重新载入当前数据，
     避免ORM旧对象或MySQL快照影响库存扣减。调用方负责事务提交或回滚。"""
-    statement = (
-        select(Product).where(Product.id == product_id).options(selectinload(Product.department))
-    )
-    if lock:
-        statement = statement.with_for_update().execution_options(populate_existing=True)
-    product = await db.scalar(statement)
+    product = await data_access.get_discard_product(db=db, lock=lock, product_id=product_id)
     if product is None:
         raise HTTPException(404, "商品不存在")
     if product.store_id != employee.store_id:
@@ -73,12 +68,7 @@ async def load_product(
         and employee.department_id != product.department_id
     ):
         raise HTTPException(403, "正式员工只能废弃自己所属部门的商品")
-    enabled = await db.scalar(
-        select(StoreDepartment.is_active).where(
-            StoreDepartment.store_id == product.store_id,
-            StoreDepartment.department_id == product.department_id,
-        )
-    )
+    enabled = await data_access.get_product_department_enabled(db=db, product=product)
     if not enabled or product.department is None:
         raise HTTPException(400, "本店未启用此部门")
     return product
@@ -92,29 +82,9 @@ async def eligible_batches(
     无到期日的批次排在后面，同到期日按到货时间及ID排序，保证稳定分配。
     过期库存由自动流程处理。真正提交时lock=True，预览不持有写锁。"""
     now = business_now()
-    statement = (
-        select(InventoryBatch)
-        .where(
-            InventoryBatch.store_id == product.store_id,
-            InventoryBatch.product_id == product.id,
-            InventoryBatch.remaining_quantity > 0,
-            InventoryBatch.arrived_at <= now,
-            or_(
-                InventoryBatch.expiration_date.is_(None),
-                InventoryBatch.expiration_date >= now.date(),
-            ),
-        )
-        .options(selectinload(InventoryBatch.purchase_item))
-        .order_by(
-            InventoryBatch.expiration_date.is_(None),
-            InventoryBatch.expiration_date,
-            InventoryBatch.arrived_at,
-            InventoryBatch.id,
-        )
+    return list(
+        (await data_access.get_discard_batches(db=db, lock=lock, now=now, product=product)).all()
     )
-    if lock:
-        statement = statement.with_for_update().execution_options(populate_existing=True)
-    return list((await db.scalars(statement)).all())
 
 
 def allocate(
@@ -125,7 +95,11 @@ def allocate(
     指定batch_id时只用该批次；否则顺序分配。总可用量不足即拒绝，不部分扣减。
     返回结果用于预览或锁定后提交，预览结果不能作为库存仍充足的凭据。"""
     if request.batch_id is not None:
-        batches = [batch for batch in batches if batch.id == request.batch_id]
+        batches_values = []
+        for batches_batch in batches:
+            if batches_batch.id == request.batch_id:
+                batches_values.append(batches_batch)
+        batches = batches_values
         if not batches:
             raise HTTPException(400, "指定批次不属于该商品、已过期或没有可处理库存")
     if sum(batch.remaining_quantity for batch in batches) < request.quantity:
@@ -144,28 +118,89 @@ def allocate(
 
 def plan_items(allocation: list[tuple[InventoryBatch, int]]) -> list[DiscardItemResponse]:
     """把分配结果转为成本和前后数量快照；金额使用批次进货成本而非现售价。"""
-    return [
-        DiscardItemResponse(
-            batch_id=batch.id,
-            batch_no=batch.batch_no,
-            expiration_date=batch.expiration_date,
-            quantity=quantity,
-            unit_cost=batch.purchase_item.unit_cost,
-            total_cost=(batch.purchase_item.unit_cost * quantity).quantize(Decimal("0.01")),
-            before_quantity=batch.remaining_quantity,
-            after_quantity=batch.remaining_quantity - quantity,
+    result_values = []
+    for result_batch, result_quantity in allocation:
+        result_values.append(
+            DiscardItemResponse(
+                batch_id=result_batch.id,
+                batch_no=result_batch.batch_no,
+                expiration_date=result_batch.expiration_date,
+                quantity=result_quantity,
+                unit_cost=result_batch.purchase_item.unit_cost,
+                total_cost=(result_batch.purchase_item.unit_cost * result_quantity).quantize(
+                    Decimal("0.01")
+                ),
+                before_quantity=result_batch.remaining_quantity,
+                after_quantity=result_batch.remaining_quantity - result_quantity,
+            )
         )
-        for batch, quantity in allocation
-    ]
+    return result_values
 
 
 async def get_discard_stock(
-    product_id: int, employee_id: int, db: AsyncSession
+    product_id: int, employee_id: int, db: AsyncSession, *, http_request: Request | None = None
 ) -> DiscardStockResponse:
     """返回员工可处理商品的批次、可用量和进货成本，不写入库存。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
+
     employee = await validate_actor(employee_id, db, write=True)
     product = await load_product(product_id, employee, db)
     batches = await eligible_batches(product, db)
+    batches_value_values = []
+    for batches_value_batch in batches:
+        batches_value_values.append(
+            DiscardBatchResponse(
+                batch_id=batches_value_batch.id,
+                batch_no=batches_value_batch.batch_no,
+                expiration_date=batches_value_batch.expiration_date,
+                remaining_quantity=batches_value_batch.remaining_quantity,
+                unit_cost=batches_value_batch.purchase_item.unit_cost,
+            )
+        )
+    batches_value = batches_value_values
     return DiscardStockResponse(
         product_id=product.id,
         product_no=product.product_no,
@@ -173,23 +208,63 @@ async def get_discard_stock(
         department_id=product.department_id,
         department_name=product.department.name,
         available_quantity=sum(batch.remaining_quantity for batch in batches),
-        batches=[
-            DiscardBatchResponse(
-                batch_id=batch.id,
-                batch_no=batch.batch_no,
-                expiration_date=batch.expiration_date,
-                remaining_quantity=batch.remaining_quantity,
-                unit_cost=batch.purchase_item.unit_cost,
-            )
-            for batch in batches
-        ],
+        batches=batches_value,
     )
 
 
 async def preview_discard(
-    request: DiscardPlanRequest, employee_id: int, db: AsyncSession
+    request: DiscardPlanRequest,
+    employee_id: int,
+    db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> DiscardPlanResponse:
     """预览废弃批次及实际成本；不加写锁、不保存，提交时必须重新校验。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
+
     employee = await validate_actor(employee_id, db, write=True)
     product = await load_product(request.product_id, employee, db)
     items = plan_items(allocate(await eligible_batches(product, db), request))
@@ -215,6 +290,20 @@ async def record_discard(
 ) -> InventoryDiscard:
     """调用方先锁定商品与批次；库存、损耗单和流水在同一事务中写入。"""
     items = plan_items(allocation)
+    if employee:
+        employee_id_value = employee.id
+    else:
+        employee_id_value = None
+    if employee:
+        employee_name_value = employee.name
+    else:
+        employee_name_value = None
+    items_value_values = []
+    for items_value_item in items:
+        items_value_values.append(
+            InventoryDiscardItem(store_id=product.store_id, **items_value_item.model_dump())
+        )
+    items_value = items_value_values
     record = InventoryDiscard(
         store_id=product.store_id,
         request_key=request_key,
@@ -223,19 +312,17 @@ async def record_discard(
         product_name=product.name,
         department_id=product.department_id,
         department_name=product.department.name,
-        employee_id=employee.id if employee else None,
-        employee_name=employee.name if employee else None,
+        employee_id=employee_id_value,
+        employee_name=employee_name_value,
         reason_code=reason_code,
         note=note,
         requested_batch_id=requested_batch_id,
         quantity=sum(item.quantity for item in items),
         total_cost=sum((item.total_cost for item in items), Decimal("0.00")),
         created_at=business_now(),
-        items=[
-            InventoryDiscardItem(store_id=product.store_id, **item.model_dump()) for item in items
-        ],
+        items=items_value,
     )
-    db.add(record)
+    data_access.add_discard_record(db=db, record=record)
     await db.flush()
     for batch, quantity in allocation:
         before = batch.remaining_quantity
@@ -247,16 +334,26 @@ async def record_discard(
         elif (
             batch.expiration_date is not None
             and product.expiry_warning_days is not None
-            and batch.expiration_date
-            <= business_now().date() + timedelta(days=product.expiry_warning_days)
+            and (
+                batch.expiration_date
+                <= business_now().date() + timedelta(days=product.expiry_warning_days)
+            )
         ):
             batch.status = InventoryBatchStatus.NEAR_EXPIRY
         else:
             batch.status = InventoryBatchStatus.AVAILABLE
+        if employee:
+            employee_id_value_item = employee.id
+        else:
+            employee_id_value_item = None
+        if reason_code == "expired":
+            action_value = "discard_expired"
+        else:
+            action_value = "discard_manual"
         await create_operation_audit_log(
-            employee_id=employee.id if employee else None,
+            employee_id=employee_id_value_item,
             module="inventory",
-            action="discard_expired" if reason_code == "expired" else "discard_manual",
+            action=action_value,
             target_type="inventory_batch",
             target_id=batch.id,
             before_data={"remaining_quantity": before},
@@ -272,43 +369,76 @@ async def record_discard(
             db=db,
         )
     await db.flush()
-    # 使用锁定读取获得最新数量，避免 MySQL REPEATABLE READ 的旧快照覆盖库存。
     product.stock_quantity = sum(
-        (
-            await db.scalars(
-                select(InventoryBatch.remaining_quantity)
-                .where(
-                    InventoryBatch.store_id == product.store_id,
-                    InventoryBatch.product_id == product.id,
-                )
-                .with_for_update()
-            )
-        ).all()
+        (await data_access.get_remaining_batch_quantities(db=db, product=product)).all()
     )
     await db.flush()
     return record
 
 
 async def create_discard(
-    request: DiscardCreateRequest, employee_id: int, db: AsyncSession
+    request: DiscardCreateRequest,
+    employee_id: int,
+    db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> DiscardResponse:
     """按请求ID幂等地执行手动废弃，并将库存、损耗记录与审计一起提交。
 
     先锁商品，再检查已有请求和批次；同一请求不能改用不同数量、原因或员工。
     重复请求返回原记录而不再次扣减，发生异常由上层会话依赖回滚。"""
+
+    # 本接口在服务层明确检查店铺范围；不依赖数据库自动事件。
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            raise HTTPException(403, "此接口不支持全公司汇总")
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and raw_store_id != "all":
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        if is_headquarters:
+            raise HTTPException(403, "总部不执行门店日常业务")
+        if selected_store_id != access_employee.store_id:
+            raise HTTPException(403, "跨店查看为只读，不能修改其他门店")
+        # 这里只记录本次查询参数；CRUD 会明确读取并添加 store_id 条件。
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
+
     employee = await validate_actor(employee_id, db, write=True)
     # 商品锁同时串行化同商品的销售、废弃和同一请求重试。
     product = await load_product(request.product_id, employee, db, lock=True)
-    existing = await db.scalar(
-        select(InventoryDiscard)
-        .where(
-            InventoryDiscard.store_id == product.store_id,
-            InventoryDiscard.request_key == str(request.request_id),
-        )
-        .with_for_update()
-        .options(lazyload(InventoryDiscard.items))
-        .execution_options(populate_existing=True)
-    )
+    existing = await data_access.get_discard_by_request_id(db=db, product=product, request=request)
     if existing is not None:
         if (
             existing.product_id != request.product_id
@@ -321,16 +451,7 @@ async def create_discard(
             raise HTTPException(409, "该请求编号已用于不同的废弃操作")
         # 父单和明细均使用当前锁定读取，重复请求不能返回旧快照中的空明细。
         items = list(
-            (
-                await db.scalars(
-                    select(InventoryDiscardItem)
-                    .where(
-                        InventoryDiscardItem.discard_id == existing.id,
-                    )
-                    .with_for_update()
-                    .execution_options(populate_existing=True)
-                )
-            ).all()
+            (await data_access.get_discard_items_for_update(db=db, existing=existing)).all()
         )
         set_committed_value(existing, "items", items)
         response = DiscardResponse.model_validate(existing)
@@ -353,9 +474,55 @@ async def create_discard(
 
 
 async def list_discards(
-    request: DiscardListRequest, employee_id: int, db: AsyncSession
+    request: DiscardListRequest,
+    employee_id: int,
+    db: AsyncSession,
+    *,
+    http_request: Request | None = None,
 ) -> DiscardListResponse:
     """按授权门店、查询日期和筛选条件分页读取废弃记录及汇总。"""
+    if http_request is not None:
+        access_employee = await get_employee_by_id(employee_id=employee_id, db=db)
+        if access_employee is None or not access_employee.is_active:
+            raise HTTPException(401, "账号不存在或已停用")
+        is_headquarters = access_employee.role == EmployeeRole.HEADQUARTERS
+        selected_store_id = access_employee.store_id
+        raw_store_id = http_request.headers.get("X-Store-ID")
+        if not raw_store_id:
+            raw_store_id = http_request.query_params.get("store_id")
+        if raw_store_id == "all":
+            if not is_headquarters:
+                raise HTTPException(403, "只有总部经营报表支持全公司汇总")
+            selected_store_id = None
+        elif raw_store_id:
+            try:
+                selected_store_id = int(raw_store_id)
+            except ValueError as error:
+                raise HTTPException(422, "门店ID无效") from error
+            if selected_store_id <= 0:
+                raise HTTPException(422, "门店ID无效")
+        if selected_store_id is None and is_headquarters and (raw_store_id != "all"):
+            selected_store_id = await first_active_store_id(db)
+        if selected_store_id is not None:
+            selected_store = await get_store_by_id(selected_store_id, db)
+            if selected_store is None or not selected_store.is_active:
+                raise HTTPException(403, "门店不存在或已停用")
+        if not is_headquarters and access_employee.store_id is None:
+            raise HTTPException(403, "员工尚未分配门店")
+        db.info.update(
+            actor_id=access_employee.id,
+            actor_role=access_employee.role,
+            own_store_id=access_employee.store_id,
+            read_store_id=selected_store_id,
+            write_store_id=access_employee.store_id,
+            company_management=False,
+            company_catalog_read=False,
+            private_employee_path=False,
+            store_context=True,
+        )
+        http_request.state.store_id = selected_store_id
+        http_request.state.employee_id = access_employee.id
+        http_request.state.own_store_id = access_employee.store_id
     employee = await validate_actor(employee_id, db)
     if employee.role not in (
         EmployeeRole.STORE_MANAGER,
@@ -363,59 +530,27 @@ async def list_discards(
         EmployeeRole.HEADQUARTERS,
     ):
         raise HTTPException(403, "只有店长、正式员工或总部可以查看废弃记录")
-    if request.start_date and request.end_date and request.start_date > request.end_date:
+    if request.start_date and request.end_date and (request.start_date > request.end_date):
         raise HTTPException(400, "开始日期不能晚于结束日期")
-    conditions = []
-    if request.product_id is not None:
-        conditions.append(InventoryDiscard.product_id == request.product_id)
-    if request.department_id is not None:
-        conditions.append(InventoryDiscard.department_id == request.department_id)
-    if request.reason_code:
-        conditions.append(InventoryDiscard.reason_code == request.reason_code)
-    if request.mode:
-        conditions.append(
-            InventoryDiscard.employee_id.is_(None)
-            if request.mode == "automatic"
-            else InventoryDiscard.employee_id.is_not(None)
-        )
-    if request.start_date:
-        conditions.append(
-            InventoryDiscard.created_at >= datetime.combine(request.start_date, time.min)
-        )
-    if request.end_date:
-        conditions.append(
-            InventoryDiscard.created_at
-            < datetime.combine(request.end_date + timedelta(days=1), time.min)
-        )
-    # 显式门店条件也供直接 Service 调用使用，避免依赖关系加载隐藏历史记录。
     selected = db.info.get("read_store_id", employee.store_id)
-    if selected is not None:
-        conditions.append(InventoryDiscard.store_id == selected)
-    if employee.role == EmployeeRole.REGULAR_EMPLOYEE:
-        conditions.append(InventoryDiscard.department_id == employee.department_id)
     count, quantity, cost = (
-        await db.execute(
-            select(
-                func.count(InventoryDiscard.id),
-                func.coalesce(func.sum(InventoryDiscard.quantity), 0),
-                func.coalesce(func.sum(InventoryDiscard.total_cost), 0),
-            ).where(*conditions)
+        await data_access.get_discard_totals(
+            db=db, employee=employee, request=request, selected=selected
         )
     ).one()
     records = (
-        await db.scalars(
-            select(InventoryDiscard)
-            .where(*conditions)
-            .order_by(
-                InventoryDiscard.created_at.desc(),
-                InventoryDiscard.id.desc(),
-            )
-            .offset((request.page - 1) * request.page_size)
-            .limit(request.page_size)
+        await data_access.get_discard_page(
+            db=db, employee=employee, request=request, selected=selected
         )
     ).all()
+    items_value_item_item_values = []
+    for items_value_item_item_record in records:
+        items_value_item_item_values.append(
+            DiscardResponse.model_validate(items_value_item_item_record)
+        )
+    items_value_item_item = items_value_item_item_values
     return DiscardListResponse(
-        items=[DiscardResponse.model_validate(record) for record in records],
+        items=items_value_item_item,
         page=request.page,
         page_size=request.page_size,
         total=count,
@@ -427,31 +562,13 @@ async def list_discards(
 
 async def discard_expired_product(product_id: int, current_date: date, db: AsyncSession) -> int:
     """后台按商品短事务处理，日期当天有效；重复运行只处理正数剩余库存。"""
-    product = await db.scalar(
-        select(Product)
-        .where(Product.id == product_id)
-        .options(
-            selectinload(Product.department),
-        )
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    product = await data_access.get_expired_product_for_update(db=db, product_id=product_id)
     if product is None:
         return 0
     batches = list(
         (
-            await db.scalars(
-                select(InventoryBatch)
-                .where(
-                    InventoryBatch.product_id == product.id,
-                    InventoryBatch.store_id == product.store_id,
-                    InventoryBatch.expiration_date < current_date,
-                    InventoryBatch.remaining_quantity > 0,
-                )
-                .options(selectinload(InventoryBatch.purchase_item))
-                .order_by(InventoryBatch.id)
-                .with_for_update()
-                .execution_options(populate_existing=True)
+            await data_access.get_expired_product_batches(
+                db=db, current_date=current_date, product=product
             )
         ).all()
     )
@@ -468,3 +585,8 @@ async def discard_expired_product(product_id: int, current_date: date, db: Async
             db=db,
         )
     return len(batches)
+
+
+async def get_expired_product_ids_service(today, db):
+    """给过期废弃任务提供待处理商品；每个商品仍由废弃服务独立处理。"""
+    return await get_expired_product_ids(today, db)

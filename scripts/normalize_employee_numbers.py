@@ -21,8 +21,21 @@ async def main():
             employees = list(
                 (await db.scalars(select(Employee).order_by(Employee.id).with_for_update())).all()
             )
-            changes = [e for e in employees if e.employee_no != f"E{e.id:05d}"]
-            mapping = [{"id": e.id, "old": e.employee_no, "new": f"E{e.id:05d}"} for e in changes]
+            changes_values = []
+            for changes_e in employees:
+                if changes_e.employee_no != f"E{changes_e.id:05d}":
+                    changes_values.append(changes_e)
+            changes = changes_values
+            mapping_values = []
+            for mapping_e in changes:
+                mapping_values.append(
+                    {
+                        "id": mapping_e.id,
+                        "old": mapping_e.employee_no,
+                        "new": f"E{mapping_e.id:05d}",
+                    }
+                )
+            mapping = mapping_values
             if changes:
                 backup = Path(".cache") / f"employee-number-map-{uuid4().hex}.json"
                 backup.parent.mkdir(exist_ok=True)

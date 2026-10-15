@@ -1,6 +1,6 @@
 """操作审计记录查询 API 路由。"""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_employee_id
@@ -37,6 +37,8 @@ async def get_operation_audit_logs_list(
     request: OperationAuditLogListRequest = Depends(),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[OperationAuditLogListResponse]:
     """接收分页及筛选参数，并返回统一格式的操作审计记录列表。"""
 
@@ -52,6 +54,7 @@ async def get_operation_audit_logs_list(
         end_time=request.end_time,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
 
     return ResponseModel[OperationAuditLogListResponse](
@@ -74,6 +77,8 @@ async def get_inventory_movement_list(
     request: InventoryMovementListRequest = Depends(),
     current_employee_id: int = Depends(get_current_employee_id),
     db: AsyncSession = Depends(get_db),
+    *,
+    http_request: Request,
 ) -> ResponseModel[InventoryMovementListResponse]:
     """接收库存流水筛选条件，返回关联商品和批次名称的分页结果。"""
 
@@ -88,6 +93,7 @@ async def get_inventory_movement_list(
         end_time=request.end_time,
         current_employee_id=current_employee_id,
         db=db,
+        http_request=http_request,
     )
     return ResponseModel[InventoryMovementListResponse](
         message="获取库存变动流水成功",
