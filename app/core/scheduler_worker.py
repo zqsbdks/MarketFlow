@@ -4,6 +4,7 @@ import asyncio
 import signal
 
 from app.core.cache import initialize_business_cache
+from app.core.contact_notice_scheduler import run_contact_notice_scheduler
 from app.core.database import async_engine
 from app.core.purchase_scheduler import run_purchase_scheduler
 from app.core.redis import close_redis
@@ -18,7 +19,11 @@ async def main() -> None:
         loop.add_signal_handler(signum, stop_event.set)
     try:
         await initialize_business_cache()
-        await run_purchase_scheduler(stop_event)
+        # 两个调度器共享停止信号；全部退出后才释放数据库和 Redis 资源。
+        await asyncio.gather(
+            run_purchase_scheduler(stop_event),
+            run_contact_notice_scheduler(stop_event),
+        )
     finally:
         await close_redis()
         await async_engine.dispose()
